@@ -49,4 +49,4 @@ result['home'] = f_home
 result['work'] = f_work
 result['public'] = f_public
 
-result.to_excel('../inputs/charging_probability.xlsx')
+result.to_excel('../intermediate/charging_probability.xlsx')

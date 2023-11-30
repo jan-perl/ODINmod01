@@ -43,4 +43,6 @@ df_2022 = pd.read_csv("../data/ODiN2021_Databestand.csv", encoding = "ISO-8859-1
 
 df_2019
 
+df_2019.dtypes
+
 

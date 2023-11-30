@@ -101,7 +101,7 @@ def findTripCharacteristics(data, name):
 	output['travel'] = pdf_travelTime
 	output['activity'] = pdf_activityTime
 
-	output.to_csv('../inputs/'+name+'.csv')
+	output.to_csv('../intermediate/'+name+'.csv')
 
 	return output
 
@@ -161,10 +161,10 @@ persondays_retired = tripsToPersonDays(prepared_dataset.query('MaatsPart == 7'))
 
 # And split the days into 'Working days' (in which OPID had a work trip) and 'Non working days' for W (workers) and R (retired)
 W_non_working_trips_on_working_days, W_trips_on_non_working_days = separateWorkingDays(persondays_working)
-W_non_working_trips_on_working_days.to_csv('../inputs/W_non_working_trips_on_working_days.csv')
-W_trips_on_non_working_days.to_csv('../inputs/W_trips_on_non_working_days.csv')
+W_non_working_trips_on_working_days.to_csv('../intermediate/W_non_working_trips_on_working_days.csv')
+W_trips_on_non_working_days.to_csv('../intermediate/W_trips_on_non_working_days.csv')
 
 
 R_non_working_trips_on_working_days, R_trips_on_non_working_days = separateWorkingDays(persondays_working)
-R_non_working_trips_on_working_days.to_csv('../inputs/R_non_working_trips_on_working_days.csv')
-R_trips_on_non_working_days.to_csv('../inputs/R_trips_on_non_working_days.csv')
+R_non_working_trips_on_working_days.to_csv('../intermediate/R_non_working_trips_on_working_days.csv')
+R_trips_on_non_working_days.to_csv('../intermediate/R_trips_on_non_working_days.csv')
