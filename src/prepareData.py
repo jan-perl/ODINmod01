@@ -22,8 +22,8 @@ import numpy as np
 def importdata():
 	## DATA ##
 	# (1) Import data
-	file = './data/Databestand_ODiN2019.csv'
-	df = pd.read_csv(file)
+	file = '../data/ODiN2019_Databestand_v2.0.csv'
+	df = pd.read_csv(file , encoding = "ISO-8859-1", sep=";")
 	# df = df.head(500) # For speed
 	
 	# (2) Prettify the data
@@ -52,7 +52,7 @@ def importdata():
 	data.drop(data[data.MaatsPart == 5].index, inplace=True)
 	data.drop(data[data.MaatsPart == 6].index, inplace=True)
 	data.drop(data[data.MaatsPart == 8].index, inplace=True)
- 	data.drop(data[data.MaatsPart == 9].index, inplace=True)
+	data.drop(data[data.MaatsPart == 9].index, inplace=True)
 
 	# This works much better:
 # 	data = df.query('MaatsPart == 1 | MaatsPart == 2 | MaatsPart == 7')
@@ -101,7 +101,7 @@ def findTripCharacteristics(data, name):
 	output['travel'] = pdf_travelTime
 	output['activity'] = pdf_activityTime
 
-	output.to_csv('./inputs/'+name+'.csv')
+	output.to_csv('../inputs/'+name+'.csv')
 
 	return output
 
@@ -161,10 +161,10 @@ persondays_retired = tripsToPersonDays(prepared_dataset.query('MaatsPart == 7'))
 
 # And split the days into 'Working days' (in which OPID had a work trip) and 'Non working days' for W (workers) and R (retired)
 W_non_working_trips_on_working_days, W_trips_on_non_working_days = separateWorkingDays(persondays_working)
-W_non_working_trips_on_working_days.to_csv('./inputs/W_non_working_trips_on_working_days.csv')
-W_trips_on_non_working_days.to_csv('./inputs/W_trips_on_non_working_days.csv')
+W_non_working_trips_on_working_days.to_csv('../inputs/W_non_working_trips_on_working_days.csv')
+W_trips_on_non_working_days.to_csv('../inputs/W_trips_on_non_working_days.csv')
 
 
 R_non_working_trips_on_working_days, R_trips_on_non_working_days = separateWorkingDays(persondays_working)
-R_non_working_trips_on_working_days.to_csv('./inputs/R_non_working_trips_on_working_days.csv')
-R_trips_on_non_working_days.to_csv('./inputs/R_trips_on_non_working_days.csv')
+R_non_working_trips_on_working_days.to_csv('../inputs/R_non_working_trips_on_working_days.csv')
+R_trips_on_non_working_days.to_csv('../inputs/R_trips_on_non_working_days.csv')
