@@ -15,19 +15,25 @@
 import pandas as pd
 import numpy as np
 
-import ODiN2pd
+#import ODiN2pd
+import ODiN2readpkl
 
-ODiN2pd.df_2019.dtypes
+ODiN2readpkl.allodinyr.dtypes
 
-dbk_2022 = ODiN2pd.dbk_2022
+dbk_2022 = ODiN2readpkl.dbk_allyr_cols
 dbk_2022_cols = dbk_2022 [~ dbk_2022.Variabele_naam_ODiN_2022.isna()]
 dbk_2022_cols [ dbk_2022_cols.Niveau.isna()]
 
 #valideeer dat alleen ['P', 'V', 'R', 'W'] voor komen in bestand
 dbk_2022_cols.Niveau.unique()
 
+
+def gtyrdat(yr):
+    return (ODiN2readpkl.allodinyr[ODiN2readpkl.allodinyr['Jaar']==yr])
+
+
 # +
-excols = ODiN2pd.excols
+excols = ODiN2readpkl.excols
 def std_zero(x): return np.std(x, ddof=0)
 def chklevstat(df,grpby,dbk,vnamcol,myNiveau):
     chkcols = dbk [ (dbk.Niveau == myNiveau) & ~ ( dbk[vnamcol].isin( excols) )]
@@ -45,11 +51,11 @@ def chklevstat(df,grpby,dbk,vnamcol,myNiveau):
         if maxsd !=0:
             print (chkcol,maxsd)
 
-chklevstat(ODiN2pd.df_2022,"RitID",dbk_2022_cols,'Variabele_naam_ODiN_2022','R')
+chklevstat(gtyrdat(2022),"RitID",dbk_2022_cols,'Variabele_naam_ODiN_2022','R')
 # -
 
-chklevstat(ODiN2pd.df_2022,"VerplID",dbk_2022_cols,'Variabele_naam_ODiN_2022','V')
+chklevstat(gtyrdat(2022),"VerplID",dbk_2022_cols,'Variabele_naam_ODiN_2022','V')
 
-chklevstat(ODiN2pd.df_2022,"OPID",dbk_2022_cols,'Variabele_naam_ODiN_2022','P')
+chklevstat(gtyrdat(2022),"OPID",dbk_2022_cols,'Variabele_naam_ODiN_2022','P')
 
 

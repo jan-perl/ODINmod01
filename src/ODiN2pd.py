@@ -59,6 +59,7 @@ dbk_2022_cols [ dbk_2022_cols.Niveau.isna()]
 dbk_2022_cols.Niveau.unique()
 
 # +
+#note: to clean: copied in ODiN2readpkl
 excols= ['Wogem', 'AutoHhl', 'MRDH', 'Utr', 'FqLopen', 'FqMotor', 'WrkVervw', 'WrkVerg', 'VergVast', 
          'VergKm', 'VergBrSt', 'VergOV', 'VergAans', 'VergVoer', 'VergBudg', 'VergPark', 'VergStal', 'VergAnd', 
          'BerWrk', 'RdWrkA', 'RdWrkB', 'BerOnd', 'RdOndA', 'RdOndB', 'BerSup', 'RdSupA', 'RdSupB',

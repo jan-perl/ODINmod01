@@ -19,7 +19,7 @@ import seaborn as sns
 #import ODiN2pd
 import ODiN2readpkl
 
-ODiN2readpkl.ODiN2pd.df_2019.dtypes
+ODiN2readpkl.allodinyr.dtypes
 
 
 def chklevstat(df,grpby,dbk,vnamcol,myNiveau):
@@ -40,18 +40,22 @@ def chklevstat(df,grpby,dbk,vnamcol,myNiveau):
 
 
 
-allodinyr=pd.concat([ODiN2pd.df_2018,ODiN2pd.df_2019,ODiN2pd.df_2020,ODiN2pd.df_2021,ODiN2pd.df_2022], ignore_index=True)
+allodinyr=ODiN2readpkl.allodinyr
 len(allodinyr.index)
 
-ODiN2pd.fietswijk1pc4['S_MXI22_GR'] = pd.qcut(ODiN2pd.fietswijk1pc4['S_MXI22_B'], 10)
-ODiN2pd.fietswijk1pc4['PC4'] =  pd.to_numeric(ODiN2pd.fietswijk1pc4['PC4'] ,errors='coerce')
-print(ODiN2pd.fietswijk1pc4.dtypes)
-fwin4 = ODiN2pd.fietswijk1pc4 [['PC4','S_MXI22_GR','S_MXI22_B']]
+# +
+fietswijk1pc4= ODiN2readpkl.fietswijk1pc4
+
+fietswijk1pc4['S_MXI22_GW'] = pd.qcut(fietswijk1pc4['S_MXI22_BW'], 10)
+fietswijk1pc4['PC4'] =  pd.to_numeric(fietswijk1pc4['PC4'] ,errors='coerce')
+print(fietswijk1pc4.dtypes)
+fwin4 = fietswijk1pc4 [['PC4','S_MXI22_GW','S_MXI22_BW']]
 allodinyr2 = allodinyr.merge(fwin4,left_on='AankPC', right_on='PC4',how='left')
-allodinyr2 = allodinyr2.rename ( columns= {'S_MXI22_GR': 'Aank_MXI22_GR', 'S_MXI22_B': 'Aank_MXI22_B' } )
+allodinyr2 = allodinyr2.rename ( columns= {'S_MXI22_GW': 'Aank_MXI22_GW', 'S_MXI22_BW': 'Aank_MXI22_BW' } )
 allodinyr2 = allodinyr2.merge(fwin4,left_on='VertPC', right_on='PC4',how='left')
-allodinyr2 = allodinyr2.rename (columns= {'S_MXI22_GR': 'Vert_MXI22_GR', 'S_MXI22_B': 'Vert_MXI22_B' } )
+allodinyr2 = allodinyr2.rename (columns= {'S_MXI22_GW': 'Vert_MXI22_GW', 'S_MXI22_BW': 'Vert_MXI22_BW' } )
 len(allodinyr2.index)
+# -
 
 print(allodinyr2)
 allodinyr = allodinyr2
@@ -106,28 +110,28 @@ datpltverplp = mkpltverplp (allodinyr,'VertUur','Jaar')
 
 #neem alleen ritten naar huis, Aankomst is dan wonen: 
 naarhuis = allodinyr [allodinyr ['Doel'] ==1 ]
-datpltverplp = mkpltverplp (naarhuis,'Aank_MXI22_GR','Jaar')
+datpltverplp = mkpltverplp (naarhuis,'Aank_MXI22_GW','Jaar')
 
 #naar huis: aankomst is wonen: 
-datpltverplp = mkpltverplp (naarhuis,'KHvm','Aank_MXI22_GR')
+datpltverplp = mkpltverplp (naarhuis,'KHvm','Aank_MXI22_GW')
 
 #naar huis: aankomst is wonen: 
-datpltverplp = mkpltverplp (naarhuis,'KAfstV','Aank_MXI22_GR')
+datpltverplp = mkpltverplp (naarhuis,'KAfstV','Aank_MXI22_GW')
 
 #naar huis: vertrel is utiliteit: 
-datpltverplp = mkpltverplp (naarhuis,'KHvm','Vert_MXI22_GR')
+datpltverplp = mkpltverplp (naarhuis,'KHvm','Vert_MXI22_GW')
 
 #neem alleen ritten naar werk, Aankomst is dan werken: 
 naarwerk= allodinyr [allodinyr ['Doel'] ==2 ]
-datpltverplp = mkpltverplp (naarwerk,'Aank_MXI22_GR','Jaar')
+datpltverplp = mkpltverplp (naarwerk,'Aank_MXI22_GW','Jaar')
 
 #neem alleen ritten naar werk, Aankomst is dan wonen
-datpltverplp = mkpltverplp (naarwerk,'Vert_MXI22_GR','Jaar')
+datpltverplp = mkpltverplp (naarwerk,'Vert_MXI22_GW','Jaar')
 
 #neem alleen ritten naar werk, Aankomst is dan werken: 
-datpltverplp = mkpltverplp (naarwerk,'KHvm','Aank_MXI22_GR')
+datpltverplp = mkpltverplp (naarwerk,'KHvm','Aank_MXI22_GW')
 
 #neem alleen ritten naar werk, Aankomst is dan werken: 
-datpltverplp = mkpltverplp (naarwerk,'KAfstV','Aank_MXI22_GR')
+datpltverplp = mkpltverplp (naarwerk,'KAfstV','Aank_MXI22_GW')
 
 
