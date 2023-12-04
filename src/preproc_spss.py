@@ -15,34 +15,41 @@
 import pandas as pd
 import numpy as np
 
-# +
-#system(pip install --upgrade pip setuptools wheel)
+import ODiN2pd
+
+ODiN2pd.df_2019.dtypes
+
+dbk_2022 = ODiN2pd.dbk_2022
+dbk_2022_cols = dbk_2022 [~ dbk_2022.Variabele_naam_ODiN_2022.isna()]
+dbk_2022_cols [ dbk_2022_cols.Niveau.isna()]
+
+#valideeer dat alleen ['P', 'V', 'R', 'W'] voor komen in bestand
+dbk_2022_cols.Niveau.unique()
 
 # +
-#system(pip install spss-converter)
+excols = ODiN2pd.excols
+def std_zero(x): return np.std(x, ddof=0)
+def chklevstat(df,grpby,dbk,vnamcol,myNiveau):
+    chkcols = dbk [ (dbk.Niveau == myNiveau) & ~ ( dbk[vnamcol].isin( excols) )]
+    for chkcol in chkcols[vnamcol]:
+        nonadf= df[~ ( df[chkcol].isna() |  df[grpby].isna() ) ]
+#        print (chkcol)
+#        print (nonadf['RitID'])
+#        sdvals= nonadf. groupby([grpby]) [chkcol].std_zero()
+        sdvals= nonadf. groupby([grpby]) [chkcol].agg(['min','max']).reset_index()
+#        print(sdvals)
+        sdrng = (sdvals.iloc[:,2] != sdvals.iloc[:,1]).replace({True: 1, False: 0})
+#        print(sdrng)
+        maxsd=sdrng.max()
+        #als alle standaard deviaties 0 zijm, zijn de waarden homogeen in de groep
+        if maxsd !=0:
+            print (chkcol,maxsd)
 
-# +
-#to be run as tooy inside container: docker exec -u 0 -it jupyter03 bash
-#system(apt-get install libz-dev)
-
-# +
-#system(pip uninstall pyreadstat)
-
-# +
-#system(pip install pyreadstat==0.3.4)
+chklevstat(ODiN2pd.df_2022,"RitID",dbk_2022_cols,'Variabele_naam_ODiN_2022','R')
 # -
 
-#system(pip install spss-converter)
-print (pd.__version__) 
+chklevstat(ODiN2pd.df_2022,"VerplID",dbk_2022_cols,'Variabele_naam_ODiN_2022','V')
 
-df_2018 = pd.read_csv("../data/ODiN2018_Databestand_v2.0.csv", encoding = "ISO-8859-1", sep=";")  
-df_2019 = pd.read_csv("../data/ODiN2019_Databestand_v2.0.csv", encoding = "ISO-8859-1", sep=";")  
-df_2020 = pd.read_csv("../data/ODiN2020_Databestand_v2.0.csv", encoding = "ISO-8859-1", sep=";")  
-df_2021 = pd.read_csv("../data/ODiN2021_Databestand.csv", encoding = "ISO-8859-1", sep=";")  
-df_2022 = pd.read_csv("../data/ODiN2021_Databestand.csv", encoding = "ISO-8859-1", sep=";")  
-
-df_2019
-
-df_2019.dtypes
+chklevstat(ODiN2pd.df_2022,"OPID",dbk_2022_cols,'Variabele_naam_ODiN_2022','P')
 
 
