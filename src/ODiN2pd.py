@@ -15,9 +15,15 @@
 import pandas as pd
 import numpy as np
 import os as os
+import seaborn as sns
 
 # +
 #system(pip install --upgrade pip setuptools wheel)
+# -
+
+ODiN2readpd_skiprd=1
+import ODiN2readpkl
+print (ODiN2readpkl.fietswijk1pc4)
 
 # +
 #system(pip install spss-converter)
@@ -100,7 +106,7 @@ len(allodinyr.index)
 
 allodinyr.to_pickle("../intermediate/allodinyr.pkl")
 
-dbk_2022_cols.to_pickle("../intermediate/dbk_allyr_cols.pkl")
+dbk_2022.to_pickle("../intermediate/dbk_allyr.pkl")
 
 # +
 #nu postcode match hulptabel
@@ -132,21 +138,45 @@ fieldnames
 fietswijk1bu = pd.DataFrame( sf.records() )
 fietswijk1bu.columns = fieldnames
 fietswijk1bufor4 = fietswijk1bu.merge(pc4bumatch,how='left')
-fietswijk1bufor4['S_MXI22_BWT'] =fietswijk1bufor4['S_MXI22_B'] * fietswijk1bufor4['O_MXI22T']
+fietswijk1bufor4['S_MXI22_BWT'] =fietswijk1bufor4['S_MXI22_B'] *  fietswijk1bufor4['O_MXI22T']
 fietswijk1bufor4['S_MXI22_BAT'] =fietswijk1bufor4['S_MXI22_B'] * (fietswijk1bufor4['O_MXI22N'] - fietswijk1bufor4['O_MXI22T'] )
-fietswijk1bufor4['S_MXI22_BWN'] =fietswijk1bufor4['O_MXI22T']
+fietswijk1bufor4['S_MXI22_BBT'] =fietswijk1bufor4['S_MXI22_B'] * (fietswijk1bufor4['O_MXI22N'] )
+fietswijk1bufor4['S_MXI22_BWN'] = fietswijk1bufor4['O_MXI22T']
 fietswijk1bufor4['S_MXI22_BAN'] =(fietswijk1bufor4['O_MXI22N'] - fietswijk1bufor4['O_MXI22T'] )
-fietswijk1pc4 = fietswijk1bufor4[['PC4','S_MXI22_BWT','S_MXI22_BAT','S_MXI22_BWN','S_MXI22_BAN','PC6']].groupby('PC4').sum().reset_index()
-fietswijk1pc4['S_MXI22_BW'] =fietswijk1pc4['S_MXI22_BWT'] / fietswijk1pc4['S_MXI22_BWN']
-fietswijk1pc4['S_MXI22_BA'] =fietswijk1pc4['S_MXI22_BAT'] /  fietswijk1pc4['S_MXI22_BAN']                                                                 
-fietswijk1pc4['S_MXI22_GW'] = pd.qcut(fietswijk1pc4['S_MXI22_BW'], 10)
-fietswijk1pc4['S_MXI22_GA'] = pd.qcut(fietswijk1pc4['S_MXI22_BA'], 10)
+fietswijk1bufor4['S_MXI22_BBN'] =(fietswijk1bufor4['O_MXI22N']  )
+fietswijk1bufor4['S_MXI22_BGN'] =(fietswijk1bufor4['AREA_GEO']  )
+fietswijk1pc4 = fietswijk1bufor4[['PC4','S_MXI22_BWT','S_MXI22_BAT','S_MXI22_BWN','S_MXI22_BAN',
+                                        'S_MXI22_BBT','S_MXI22_BBN','S_MXI22_BGN','PC6']].groupby('PC4').sum().reset_index()
+#fietswijk1pc4['S_MXI22_BW'] =fietswijk1pc4['S_MXI22_BWT'] / fietswijk1pc4['S_MXI22_BWN']
+#fietswijk1pc4['S_MXI22_BA'] =fietswijk1pc4['S_MXI22_BAT'] / fietswijk1pc4['S_MXI22_BAN']  
+fietswijk1pc4['S_MXI22_BB'] = fietswijk1pc4['S_MXI22_BBT'] / fietswijk1pc4['S_MXI22_BBN']  
+fietswijk1pc4['S_MXI22_BG'] = fietswijk1pc4['S_MXI22_BBN'] / fietswijk1pc4['S_MXI22_BGN'] 
+fietswijk1pc4['S_MXI22_GB'] = pd.qcut(fietswijk1pc4['S_MXI22_BB'], 10)
+fietswijk1pc4['S_MXI22_GG'] = pd.qcut(fietswijk1pc4['S_MXI22_BG'], 10)
 fietswijk1pc4
 
 fietswijk1pc4.to_pickle("../intermediate/fietswijk1pc4.pkl")
 
-fietswijk1pc4c2 = fietswijk1pc4.groupby('S_MXI22_GW').mean().reset_index()
+#dit is niet goed: de gemiddelden van 'MXIGRP' liggen niet bij midden in intervallen, maar er onder.
+#wat is hier aan de hand ???
+#wel goed: het gemiddeld aantal PC6-en loopt op als er meer woningen zijn
+fietswijk1pc4c2 = fietswijk1pc4.groupby('S_MXI22_GB').mean().reset_index()
 fietswijk1pc4c2['MXIGRP']  = fietswijk1pc4c2['S_MXI22_BWN']  / (fietswijk1pc4c2['S_MXI22_BWN']  + fietswijk1pc4c2['S_MXI22_BAN'] )
 fietswijk1pc4c2 
 
+#eigen postcode 4 vs gemoothd met omgeving
+fietswijk1pc4['S_MXI22_NS'] = fietswijk1pc4['S_MXI22_BWN']  / (fietswijk1pc4['S_MXI22_BWN']  + fietswijk1pc4['S_MXI22_BAN'] )
+sns.scatterplot(data=fietswijk1pc4,x='S_MXI22_NS',y='S_MXI22_BB')
 
+#sns.scatterplot(data=fietswijk1pc4,x='S_MXI22_BB',y='S_MXI22_BG')
+sns.scatterplot(data=fietswijk1pc4,x='S_MXI22_NS',y='S_MXI22_BG')
+
+#input data: per buurt
+fietswijk1bufor4['S_MXI22_NS'] = fietswijk1bufor4['S_MXI22_BWN']  / (fietswijk1bufor4['S_MXI22_BWN']  + fietswijk1bufor4['S_MXI22_BAN'] )
+fietswijk1bufor4['S_MXI22_NSAD'] = fietswijk1bufor4['S_MXI22_NS'] -  fietswijk1bufor4['S_MXI22_BWN']  / ( fietswijk1bufor4['S_MXI22_BBN'] )
+print(fietswijk1bufor4['S_MXI22_NSAD'].std() )
+sns.scatterplot(data=fietswijk1bufor4,x='S_MXI22_NS',y='S_MXI22_B')
+
+# +
+#TODO CBS lezen arbeidsplaatsen en inwoners
+#TODO CBS relateren arbeidsplaatsen en inwoners aan BAG getallen

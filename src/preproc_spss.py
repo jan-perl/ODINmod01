@@ -20,7 +20,7 @@ import ODiN2readpkl
 
 ODiN2readpkl.allodinyr.dtypes
 
-dbk_2022 = ODiN2readpkl.dbk_allyr_cols
+dbk_2022 = ODiN2readpkl.dbk_allyr
 dbk_2022_cols = dbk_2022 [~ dbk_2022.Variabele_naam_ODiN_2022.isna()]
 dbk_2022_cols [ dbk_2022_cols.Niveau.isna()]
 
@@ -58,4 +58,77 @@ chklevstat(gtyrdat(2022),"VerplID",dbk_2022_cols,'Variabele_naam_ODiN_2022','V')
 
 chklevstat(gtyrdat(2022),"OPID",dbk_2022_cols,'Variabele_naam_ODiN_2022','P')
 
+# +
+largranval =ODiN2readpkl.largranval 
 
+specvaltab = ODiN2readpkl.mkspecvaltab(dbk_2022)
+specvaltab
+
+
+# +
+def chkexplstat(df,dbk_cols,vnamcol,specvaltab):
+    chkcols = dbk_cols [  ~ ( dbk_cols[vnamcol].isin( excols) )]
+    #chkcols = chkcols.iloc [range(5)]
+    c0=[]
+    c1=[]
+    c2=[]
+    for chkcol in chkcols[vnamcol]:
+        nonadf= df[~ ( df[chkcol].isna() ) ]
+        nonadf[chkcol] = pd.to_numeric(nonadf[chkcol],errors='coerce')
+        explhere = specvaltab [specvaltab ['Variabele_naam'] == chkcol]
+        explhere['Code'] = pd.to_numeric(explhere['Code'],errors='coerce')
+        print(explhere)
+        mspec=nonadf.merge(explhere,left_on=chkcol, right_on='Code', how='left')
+        ltot=len(mspec)
+        lna = len(mspec [mspec ['Code_label'].isna()] )
+        c0.append(chkcol)
+        c1.append(ltot)
+        c2.append(lna)
+    outcol_names =  ['Variabele_naam', 'ltot', 'lna'] 
+    outdf=pd.DataFrame(list(zip(c0,c1,c2)),columns=outcol_names)
+    return(outdf)
+
+        
+chklabs= chkexplstat(gtyrdat(2022),dbk_2022_cols,'Variabele_naam_ODiN_2022',specvaltab)
+chklabs
+# -
+
+#een paar kolommen niet gelabeld, en Factoren niet
+chklabs[chklabs['lna'] == 200054]
+
+#hier verwacht men meldingen
+leeftlr = specvaltab [ specvaltab  ['Code'] ==largranval ]
+leeftlr
+
+#mooi: het enige dat over is zijn zjin VeplID en RitID
+#
+chklabs[~ (chklabs['lna'].isin([0,200054]))] .merge(leeftlr,how='left')
+
+
+# +
+#en vergelijkbare code als hierboven kan dus gebruikt worden om te taggen
+#geef waarschuwing als largranval ook is gezet voor kolommen -> dan werkt taggen niet 
+#en is numerieke code beter, tenzij Code_label gezet is
+
+# +
+#check AantVpl met aantal verplaatingen per persoon, check ook 0 waarden
+# let op: bij Rit is waarde 3 een buitenlandse rit, die tellen wel mee binnen verplaatsing
+def chkaantal(df,dbk_cols,idsumm,refwrd,nwcol1,nwcol2):
+    nAantCnb = df [ df [nwcol1]==1][[idsumm,refwrd]]
+    nAantCnt = df [ df [nwcol2].isin([1,3])][[idsumm,nwcol2]].groupby(idsumm).count()[[nwcol2]].reset_index()
+    cvmb = nAantCnb.merge(nAantCnt ,on=idsumm,how='outer')
+    outdf = cvmb.groupby([refwrd,nwcol2]).count()[[idsumm]].reset_index()
+    outdf['Same']= outdf[refwrd] == outdf[nwcol2]
+    return(outdf)
+
+        
+chkAantVpl= chkaantal(ODiN2readpkl.allodinyr,dbk_2022_cols,'OPID','AantVpl','OP','Verpl')
+chkAantVpl
+# -
+
+#check AantRit met aantal riitn per verplaating, check ook of 0 voor komt
+chkAantRit= chkaantal(ODiN2readpkl.allodinyr,dbk_2022_cols,'VerplID','AantRit','Verpl','Rit')
+chkAantRit
+
+# +
+#TODO check sum FactorV versus FactorP
