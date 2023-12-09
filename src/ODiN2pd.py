@@ -168,6 +168,8 @@ fietswijk1pc4c2
 fietswijk1pc4['S_MXI22_NS'] = fietswijk1pc4['S_MXI22_BWN']  / (fietswijk1pc4['S_MXI22_BWN']  + fietswijk1pc4['S_MXI22_BAN'] )
 sns.scatterplot(data=fietswijk1pc4,x='S_MXI22_NS',y='S_MXI22_BB')
 
+fietswijk1pc4[fietswijk1pc4['S_MXI22_BB']<.05]
+
 #sns.scatterplot(data=fietswijk1pc4,x='S_MXI22_BB',y='S_MXI22_BG')
 sns.scatterplot(data=fietswijk1pc4,x='S_MXI22_NS',y='S_MXI22_BG')
 
