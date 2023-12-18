@@ -15,6 +15,16 @@
 import pandas as pd
 import numpy as np
 import seaborn as sns
+from sklearn.linear_model import LinearRegression
+
+import geopandas
+
+cbspc4data = geopandas.read_file("../data/CBS/cbs_pc4_2022_v1.gpkg")
+cbspc4data['postcode4'] = pd.to_numeric(cbspc4data['postcode4'])
+
+cbspc4data.dtypes
+
+cbspc4data.plot()
 
 #import ODiN2pd
 import ODiN2readpkl
@@ -73,7 +83,9 @@ if 0==1:
     print(allodinyr2.dtypes)
     len(allodinyr2.index)
 
-print(allodinyr2)
+
+# +
+#print(allodinyr2)
 #allodinyr = allodinyr2
 
 # +
@@ -136,16 +148,25 @@ addparscol(naarhuis,"AankPC/rudifun/S_MXI22_BB").dtypes
 # maak groepen op aantallen postcodes (of oppervlakken ?)
 #1 plot punt per PC4 -> middelen gaat in regressie
 
-def mkpltverplxyp (df,myspecvals,xvar,pltgrp,selstr):
-    dfvrecs = df [df['Verpl']==1]
+def mkpltverplxypc4 (df,myspecvals,xvar,pltgrp,selstr,ngrp):
+    xsrcarr=  xvar.split ('/')
+    xvarPC = xsrcarr[0]
+    dfvrecs = df [(df['Verpl']==1 ) & (df[xvarPC] > 500)  ]   
+    dfvrecs=addparscol(dfvrecs,pltgrp)
 #    oprecs = df [df['OP']==1]
-    pstats = dfvrecs[[normgrp, collvar,'FactorV']].groupby([normgrp, collvar]).sum().reset_index()
+    pstats = dfvrecs[[pltgrp, xvarPC,'FactorV']].groupby([pltgrp, xvarPC]).sum().reset_index()
+    pstats =addparscol(pstats,xvar)
     #print(pstats)
-    denoms= pstats [[normgrp, 'FactorV']].groupby([normgrp]).sum().reset_index().rename(columns={'FactorV':'Denom'} )
+    denoms= pstats [[pltgrp, 'FactorV']].groupby([pltgrp]).sum().reset_index().rename(columns={'FactorV':'Denom'} )
+    denoms [ 'Denom'] =0.01
     #print(denoms)
     pstatsn = pstats.merge(denoms,how='left')
     pstatsn['FractV'] = pstatsn['FactorV'] *100.0/ pstatsn['Denom']
-    vardescr = dbk_2022_cols [dbk_2022_cols['Variabele_naam_ODiN_2022'] == collvar] ['Variabele_label_ODiN_2022']
+    if ngrp !=0:
+        pstatsn['GIDX'] = pd.qcut(pstatsn[xvar], ngrp)
+        pstatsn = pstatsn.groupby([pltgrp,'GIDX']).mean().reset_index()
+    
+    vardescr = dbk_2022_cols [dbk_2022_cols['Variabele_naam_ODiN_2022'] == xvar] ['Variabele_label_ODiN_2022']
 #    print(vardescr)
     if len(vardescr) ==0:
         vardescr = ""        
@@ -153,34 +174,125 @@ def mkpltverplxyp (df,myspecvals,xvar,pltgrp,selstr):
     else:
         vardescr = vardescr.item()
         heeftlrv = len(myspecvals [ (myspecvals ['Code'] ==largranval) & 
-                            (myspecvals ['Variabele_naam'] ==collvar) ] ) !=0
+                            (myspecvals ['Variabele_naam'] ==xvar) ] ) !=0
 #    print(vardescr,heeftlrv)
-    xlab="Percentage of FractV in group"
-    ylab=collvar + " : "+ vardescr 
+
+    grplrv = len(myspecvals [ (myspecvals ['Code'] ==largranval) & 
+                            (myspecvals ['Variabele_naam'] ==pltgrp) ] ) !=0
+    if ~grplrv:
+        explhere = myspecvals [myspecvals['Variabele_naam'] == pltgrp].copy()
+        explhere['Code'] = pd.to_numeric(explhere['Code'],errors='coerce')
+#   print(explhere)
+        pstatsn=pstatsn.merge(explhere,left_on=pltgrp, right_on='Code', how='left')    
+        pstatsn[pltgrp] = pstatsn[pltgrp].astype(str)  + " : " + pstatsn['Code_label']    
+        pstatsn= pstatsn.drop(columns=['Code','Code_label'])
+
+    ylab="Percentage of FractV in group"
+    xlab=xvar + " : "+ vardescr 
     if heeftlrv:
 #        pstatsn['Code_label'] = pstatsn[collvar] 
 #        print(pstatsn)
         if vardescr == "" :
-            chart= sns.catplot(data=pstatsn, x='FractV', y=collvar, hue=normgrp, kind="bar",orient="h",height=5, aspect=2.2)
+            chart= sns.relplot(data=pstatsn, y='FractV', x=xvar, hue=pltgrp, kind="scatter",height=5, aspect=2.2)
         else:
-            chart= sns.relplot(data=pstatsn, y='FractV', x=collvar, hue=normgrp,  kind="line",height=5, aspect=2.2)
-            xlab=ylab
-            ylab="Percentage of FractV in group"
+            chart= sns.relplot(data=pstatsn, y='FractV', x=xvar, hue=pltgrp, kind="line",height=5, aspect=2.2)
     else:
-        explhere = myspecvals [myspecvals['Variabele_naam'] == collvar].copy()
-        explhere['Code'] = pd.to_numeric(explhere['Code'],errors='coerce')
-#        print(explhere)
-        pstatsn=pstatsn.merge(explhere,left_on=collvar, right_on='Code', how='left')
-#        print(pstatsn)
-        pstatsn['Code_label'] = pstatsn[collvar].astype(str)  + " : " + pstatsn['Code_label']
-        chart= sns.catplot(data=pstatsn, x='FractV', y='Code_label', hue=normgrp, kind="bar",orient="h",height=5, aspect=2.2)            
+        chart= sns.relplot(data=pstatsn, y='FractV', x=xvar, hue=pltgrp, kind="scatter",height=5, aspect=2.2)
     chart.fig.suptitle(selstr)
     chart.set_xlabels(xlab)
     chart.set_ylabels(ylab)
     return(pstatsn)
    
+naarhuis = allodinyr [allodinyr ['Doel'] ==1 ]    
+datpltverplp = mkpltverplxypc4 (naarhuis,specvaltab,
+                                'AankPC/rudifun/S_MXI22_BWN','MotiefV','Naar huis',100)
+
+
+# +
+#verwachte relaties
+#woon-werk (naarhuis andersom - kijk hoe te plotten)
+#oppervlak werk (niet genorm op geo) ~ aantal ritten met werk aan niet-woon zijde
+#oppervlak woon (niet genorm op geo) ~ aantal ritten met werk aan woon zijde
+#dit zou er in x-y plotjes uit moeten kunnen komen
+#verwachting: onafhankelijk van afstandsklasse of jaar
+#verwachting: regressie per klasse is mogelijk -> levert ook info op
+#voor andere motieven: niet-woon zijde kan relatie met werk of woon opp hebben -> check
+#kijk eens naar verdelingen totaal aantal verplaatsingen per persoon
+#maak zonodig extra kolommen aan in database, waar meerdere PC4 databases mogelijk zijn
+# format [AankPC][VertPC]/[dbpc4]/[dbpc4 field] 
+# maak groepen op aantallen postcodes (of oppervlakken ?)
+#1 plot punt per PC4 -> middelen gaat in regressie
+
+def mkfitverplxypc4 (df,myspecvals,xvar,pltgrp,selstr,ngrp):
+    xsrcarr=  xvar.split ('/')
+    xvarPC = xsrcarr[0]
+    dfvrecs = df [(df['Verpl']==1 ) & (df[xvarPC] > 500)  ]   
+    dfvrecs=addparscol(dfvrecs,pltgrp)
+#    oprecs = df [df['OP']==1]
+    pstats = dfvrecs[[pltgrp, xvarPC,'FactorV']].groupby([pltgrp, xvarPC]).sum().reset_index()
+    pstats =addparscol(pstats,xvar)
+    #print(pstats)
+    denoms= pstats [[pltgrp, 'FactorV']].groupby([pltgrp]).sum().reset_index().rename(columns={'FactorV':'Denom'} )
+    denoms [ 'Denom'] =0.01
+    #print(denoms)
+    pstatsn = pstats.merge(denoms,how='left')
+    pstatsn['FractV'] = pstatsn['FactorV'] *100.0/ pstatsn['Denom']
+    if ngrp !=0:
+        pstatsn['GIDX'] = pd.qcut(pstatsn[xvar], ngrp)
+        pstatsn = pstatsn.groupby([pltgrp,'GIDX']).mean().reset_index()
     
-datpltverplp = mkpltverplp (allodinyr,specvaltab,'Doel','Jaar','Alle ritten')
+    vardescr = dbk_2022_cols [dbk_2022_cols['Variabele_naam_ODiN_2022'] == xvar] ['Variabele_label_ODiN_2022']
+#    print(vardescr)
+    if len(vardescr) ==0:
+        vardescr = ""        
+        heeftlrv = True
+    else:
+        vardescr = vardescr.item()
+        heeftlrv = len(myspecvals [ (myspecvals ['Code'] ==largranval) & 
+                            (myspecvals ['Variabele_naam'] ==xvar) ] ) !=0
+#    print(vardescr,heeftlrv)
+
+    grplrv = len(myspecvals [ (myspecvals ['Code'] ==largranval) & 
+                            (myspecvals ['Variabele_naam'] ==pltgrp) ] ) !=0
+    if ~grplrv:
+        explhere = myspecvals [myspecvals['Variabele_naam'] == pltgrp].copy()
+        explhere['Code'] = pd.to_numeric(explhere['Code'],errors='coerce')
+#   print(explhere)
+        pstatsn=pstatsn.merge(explhere,left_on=pltgrp, right_on='Code', how='left')    
+        pstatsn[pltgrp] = pstatsn[pltgrp].astype(str)  + " : " + pstatsn['Code_label']    
+        pstatsn= pstatsn.drop(columns=['Code','Code_label'])
+
+    ylab="Percentage of FractV in group"
+    xlab=xvar + " : "+ vardescr 
+    if heeftlrv:
+#        pstatsn['Code_label'] = pstatsn[collvar] 
+#        print(pstatsn)
+        if vardescr == "" :
+            chart= sns.relplot(data=pstatsn, y='FractV', x=xvar, hue=pltgrp, kind="scatter",height=5, aspect=2.2)
+        else:
+            chart= sns.relplot(data=pstatsn, y='FractV', x=xvar, hue=pltgrp, kind="line",height=5, aspect=2.2)
+    else:
+        chart= sns.relplot(data=pstatsn, y='FractV', x=xvar, hue=pltgrp, kind="scatter",height=5, aspect=2.2)
+    chart.fig.suptitle(selstr)
+    chart.set_xlabels(xlab)
+    chart.set_ylabels(ylab)
+    return(pstatsn)
+   
+naarhuis = allodinyr [allodinyr ['Doel'] ==1 ]    
+datpltverplp = mkfitverplxypc4 (naarhuis,specvaltab,
+                                'AankPC/rudifun/S_MXI22_BWN','MotiefV','Naar huis',100)
+# -
+
+datpltverplp = mkpltverplxypc4 (naarhuis,specvaltab,'VertPC/rudifun/S_MXI22_BWN',
+                                'Jaar','Naar huis',100)
+
+haarhuisapart = addparscol(naarhuis,'VertPC/rudifun/S_MXI22_BWN')
+haarhuisapart = haarhuisapart[ (haarhuisapart['VertPC/rudifun/S_MXI22_BWN'] <1e3 ) | 
+                               (haarhuisapart['VertPC/rudifun/S_MXI22_BWN'] >2e6 ) ]
+
+haarhuisapart.groupby(['VertPC']).agg({'VertPC':'count','VertPC/rudifun/S_MXI22_BWN':'mean'} )
+
+cbspc4data.merge(haarhuisapart, left_on='postcode4', right_on='VertPC', how='right').plot()
 
 
 # +
@@ -190,9 +302,9 @@ datpltverplp = mkpltverplp (allodinyr,specvaltab,'Doel','Jaar','Alle ritten')
 # maak groepen op aantallen postcodes (of oppervlakken ?)
 
 def mkpltverplp (df,myspecvals,collvar,normgrp,selstr):
-    df=addparscol(df,collvar)
-    df=addparscol(df,normgrp)
     dfvrecs = df [df['Verpl']==1]
+    dfvrecs=addparscol(dfvrecs,collvar)
+    dfvrecs=addparscol(dfvrecs,normgrp)
 #    oprecs = df [df['OP']==1]
     pstats = dfvrecs[[normgrp, collvar,'FactorV']].groupby([normgrp, collvar]).sum().reset_index()
     #print(pstats)

@@ -15,15 +15,16 @@
 import pandas as pd
 import numpy as np
 import os as os
+import re as re
 import seaborn as sns
+
+import sys
+print(sys.path)
+sys.path.append('/home/jovyan/work/pyshp')
+import shapefile
 
 # +
 #system(pip install --upgrade pip setuptools wheel)
-# -
-
-ODiN2readpd_skiprd=1
-import ODiN2readpkl
-print (ODiN2readpkl.fietswijk1pc4)
 
 # +
 #system(pip install spss-converter)
@@ -46,6 +47,11 @@ from pandas_ods_reader import read_ods
 
 #system(pip install spss-converter)
 print (pd.__version__) 
+
+ODiN2readpd_skiprd=1
+import ODiN2readpkl
+print (ODiN2readpkl.fietswijk1pc4)
+#de bestanden die ODiN2readpkl in leest worden niet gebruikt, de constanten wel
 
 df_2018 = pd.read_csv("../data/ODiN2018_Databestand_v2.0.csv", encoding = "ISO-8859-1", sep=";")  
 df_2019 = pd.read_csv("../data/ODiN2019_Databestand_v2.0.csv", encoding = "ISO-8859-1", sep=";")  
@@ -109,10 +115,10 @@ allodinyr.to_pickle("../intermediate/allodinyr.pkl")
 dbk_2022.to_pickle("../intermediate/dbk_allyr.pkl")
 
 # +
-#nu postcode match hulptabel
+#nu postcode match hulptabel inlezen
 # -
 
-pc6gwb2020 = pd.read_csv("../data/pc6-gwb2020.csv", encoding = "ISO-8859-1", sep=";")  
+pc6gwb2020 = pd.read_csv("../data/CBS/pc6-gwb2020.csv", encoding = "ISO-8859-1", sep=";")  
 pc6gwb2020['PC4'] = pc6gwb2020['PC6'].str[0:4]
 
 pc6gwb2020
@@ -122,11 +128,6 @@ pc4bumatch = pc6gwb2020[['Buurt2020','PC4','PC6']].groupby(['Buurt2020','PC4']).
 pc4bumatch['BU_CODE']  = pc4bumatch['Buurt2020'].apply( lambda x: "BU%08i" % x)
 
 pc4bumatch
-
-import sys
-print(sys.path)
-sys.path.append('/home/jovyan/work/pyshp')
-import shapefile
 
 sf = shapefile.Reader("../inputs/fietswijk1.dbf")
 
@@ -178,7 +179,3 @@ fietswijk1bufor4['S_MXI22_NS'] = fietswijk1bufor4['S_MXI22_BWN']  / (fietswijk1b
 fietswijk1bufor4['S_MXI22_NSAD'] = fietswijk1bufor4['S_MXI22_NS'] -  fietswijk1bufor4['S_MXI22_BWN']  / ( fietswijk1bufor4['S_MXI22_BBN'] )
 print(fietswijk1bufor4['S_MXI22_NSAD'].std() )
 sns.scatterplot(data=fietswijk1bufor4,x='S_MXI22_NS',y='S_MXI22_B')
-
-# +
-#TODO CBS lezen arbeidsplaatsen en inwoners
-#TODO CBS relateren arbeidsplaatsen en inwoners aan BAG getallen
