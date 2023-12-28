@@ -19,7 +19,7 @@ from sklearn.linear_model import LinearRegression
 
 import geopandas
 
-cbspc4data = geopandas.read_file("../data/CBS/cbs_pc4_2022_v1.gpkg")
+cbspc4data = geopandas.read_file("../data/CBS/PC4STATS/cbs_pc4_2022_v1.gpkg")
 cbspc4data['postcode4'] = pd.to_numeric(cbspc4data['postcode4'])
 
 cbspc4data.dtypes
