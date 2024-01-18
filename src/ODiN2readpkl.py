@@ -12,6 +12,11 @@
 #     name: python3
 # ---
 
+# +
+#leest geconverteerde pickle data tabellen
+#goede basis voor verdere berekeningen
+# -
+
 import pandas as pd
 import numpy as np
 import os as os
