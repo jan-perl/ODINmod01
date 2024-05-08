@@ -29,6 +29,9 @@ print(sys.path)
 sys.path.append('/home/jovyan/work/pyshp')
 import shapefile
 
+#import ODiN2pd
+import ODiN2readpkl
+
 os.system("pip install geopandas")
 
 os.system("pip install contextily")
@@ -53,19 +56,11 @@ plt.rcParams['figure.figsize'] = [10, 6]
 # -
 
 #eerste read is alleen nodig om kolom namen op te pakken
-data_pc4_2020_1 =pd.read_excel('../data/CBS/PC4STATS/pc4_2020_vol.xlsx',
-                             skiprows=8)
-data_pc4_2020 =pd.read_excel('../data/CBS/PC4STATS/pc4_2020_vol.xlsx',
-                             skiprows=9)
-data_pc4_2020.columns = data_pc4_2020_1.columns
+data_pc4_2020 = ODiN2readpkl.getpc4stats(2020)
 data_pc4_2020
 
-#eerste read is alleen nodig om kolom namen op te pakken
-data_pc4_2022_1 =pd.read_excel('../data/CBS/PC4STATS/pc4_2022_v1.xlsx',
-                             skiprows=7)
-data_pc4_2022 =pd.read_excel('../data/CBS/PC4STATS/pc4_2022_v1.xlsx',
-                             skiprows=8)
-data_pc4_2022.columns = data_pc4_2022_1.columns
+data_pc4_2022 = ODiN2readpkl.getpc4stats(2022)
+data_pc4_2022
 
 data_pc4_2022.dtypes
 
@@ -86,35 +81,10 @@ dat_85560_mc
 
 dat_85560
 
+gemeentendata ,  wijkgrensdata ,    buurtendata = ODiN2readpkl.getgwb(2020)    
 
 # +
-def getgwb(year):
-    if year==2023:
-        g = geopandas.read_file("../data/CBS/wijkbuurt/gemeenten_2023_v1.dbf")
-        w = geopandas.read_file("../data/CBS/wijkbuurt/wijken_2023_v1.dbf")
-        b = geopandas.read_file("../data/CBS/wijkbuurt/buurten_2023_v1.dbf")
-        b.replace(to_replace=-99999999,value=pd.NA,inplace=True)
-    elif year==2022:
-        g = geopandas.read_file("../data/CBS/wijkbuurt/gemeenten_2022_v2.dbf")
-        w = geopandas.read_file("../data/CBS/wijkbuurt/wijken_2022_v2.dbf")
-        b = geopandas.read_file("../data/CBS/wijkbuurt/buurten_2022_v2.dbf")
-        b.replace(to_replace=-99999999,value=pd.NA,inplace=True)
-    elif year==2021:
-        g = geopandas.read_file("../data/CBS/wijkbuurt/gemeenten_2021_v3.dbf")
-        w = geopandas.read_file("../data/CBS/wijkbuurt/wijken_2021_v3.dbf")
-        b = geopandas.read_file("../data/CBS/wijkbuurt/buurten_2021_v3.dbf")
-        b.replace(to_replace=-99999999,value=pd.NA,inplace=True)
-    elif year==2020:
-        g = geopandas.read_file("../data/CBS/WijkBuurtkaart_2020_v3/gemeente_2020_v3.dbf")
-        w = geopandas.read_file("../data/CBS/WijkBuurtkaart_2020_v3/wijk_2020_v3.dbf")
-        b = geopandas.read_file("../data/CBS/WijkBuurtkaart_2020_v3/buurt_2020_v3.dbf")
-        b.replace(to_replace=-99999999,value=pd.NA,inplace=True)    
-    return ([g,w,b])
-
-gemeentendata ,  wijkgrensdata ,    buurtendata = getgwb(2020)    
-# -
-
-gemeentendata_c ,  wijkgrensdata_c ,    buurtendata_c = getgwb(2021)    
+#gemeentendata_c ,  wijkgrensdata_c ,    buurtendata_c = getgwb(2021)    
 
 # +
 #print(wijkgrensdata.crs.to_string() )
@@ -242,30 +212,15 @@ buurtdata_withfield03.plot(ax=base,column=adcol03[1],legend=True, cmap='OrRd',
              legend_kwds={"label": "Aantal cafes < 1 km"}
            )          
 
-
 # +
-def getpc6hnryr(year):
-    stryear=str(year)
-    indat = pd.read_csv("../data/CBS/PC6HNR/pc6hnr"+stryear+
-                        ("0801_gwb.csv" if (year!=2018) else "0801_gwb-vs2.csv" ), 
-                        encoding = "ISO-8859-1", 
-                        sep=(";" if (year<2023) else "," )  )
-    indat=indat.rename(columns={"Buurt"+stryear:"Buurt","Wijk"+stryear:"Wijk",
-                                "Gemeente"+stryear:"Gemeente"})  
-    ngrp = indat.groupby(["PC6","Buurt", "Wijk","Gemeente"]).count().reset_index()
-    ngrp['PC4'] = ngrp['PC6'].str[0:4].astype('int64')
-#noot: 2023 data heeft vreemde waarden in buurt
-    ngrp['Buurt'] = ngrp['Buurt'].astype('int64')
-    ngrp['BU_CODE']  = ngrp['Buurt'].apply( lambda x: "BU%08i" % x)
-    return(ngrp)
-                       
-pc6hnryr =getpc6hnryr(2020) 
+  
+pc6hnryr =ODiN2readpkl.getpc6hnryr(2020) 
 pc6hnryr.dtypes
 # -
 
 #2023 werkt nog niet
 for year in range(2018,2023):
-    pc6hnryr =getpc6hnryr(year) 
+    pc6hnryr =ODiN2readpkl.getpc6hnryr(year) 
     print(pc6hnryr.dtypes)
 
 
@@ -276,7 +231,7 @@ for year in range(2018,2023):
 # -
 
 pc6gwb2020 = pd.read_csv("../data/CBS/PC6HNR/pc6-gwb2020.csv", encoding = "ISO-8859-1", sep=";")  
-pc6gwb2020['PC4'] = pc6gwb2020['PC6'].str[0:4]
+pc6gwb2020['PC4'] = pc6gwb2020['PC6'].str[0:4].astype('int64')
 pc6gwb2020['BU_CODE']  = pc6gwb2020['Buurt2020'].apply( lambda x: "BU%08i" % x)
 
 pc6gwb2020.dtypes
@@ -403,7 +358,7 @@ pc6gwb2020c1ls=pc6gwb2020c1l[pc6gwb2020c1l['BU_CODE']== tstbu]
 
 distrpc6v2020(pc6gwb2020c1l,buurtendata,'BU_CODE',bufields_sum[1:3] )   
 # -
-pc6hnryr =getpc6hnryr(2020) 
+pc6hnryr =ODiN2readpkl.getpc6hnryr(2020) 
 
 
 nbuurtperpc6 =pc6hnryr[['Buurt','PC6']].groupby(['PC6']).count().reset_index().rename(
@@ -539,8 +494,8 @@ cmp4bu2020.sort_values(by=['AANT_MANdiff'],ascending=False)
 
 # +
 def matchyr(year):
-    gemeentendata_l ,  wijkgrensdata_l,    buurtendata_l = getgwb(year)  
-    pc6hnryr_l =getpc6hnryr(year) 
+    gemeentendata_l ,  wijkgrensdata_l,    buurtendata_l = ODiN2readpkl.getgwb(year)  
+    pc6hnryr_l =ODiN2readpkl.getpc6hnryr(year) 
     nhnrperbuurt_l =pc6hnryr_l[['Huisnummer','Buurt']].groupby(['Buurt']).sum().reset_index().rename(
         columns={'Huisnummer':'nhuisnrbuurt'} )
     #somminge PC6-en liggen ook nog eens in meerdere buurten
@@ -551,5 +506,7 @@ matchyr(2021)
 # -
 
 matchyr(2022)    
+
+print("Finished")
 
 

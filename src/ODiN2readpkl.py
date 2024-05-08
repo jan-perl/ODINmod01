@@ -83,6 +83,32 @@ def mkspecvaltab(indbk):
 
 specvaltab = mkspecvaltab(dbk_allyr)
 specvaltab
+
+
 # -
+def getgwb(year):
+    stryear=str(year)    
+    g=pd.read_pickle("../intermediate/CBS/gwb_gem_"+stryear+".pkl")    
+    w=pd.read_pickle("../intermediate/CBS/gwb_wijk_"+stryear+".pkl") 
+    b=pd.read_pickle("../intermediate/CBS/gwb_buurt_"+stryear+".pkl") 
+    return ([g,w,b])
+#test code
+#gemeentendata ,  wijkgrensdata ,    buurtendata = getgwb(2020)    
+
+
+def getpc4stats(year):
+    stryear=str(year)    
+    data_pc4=pd.read_pickle("../intermediate/CBS/pc4stats_"+stryear+".pkl")    
+    return (data_pc4)
+#test code
+#data_pc4_2020 = getpc4stats(2020)
+
+
+def getpc6hnryr(year):
+    stryear=str(year)    
+    ngrp=pd.read_pickle("../intermediate/CBS/pc6hnryr_"+stryear+".pkl") 
+    return(ngrp)
+pc6hnryr =getpc6hnryr(2020) 
+pc6hnryr.dtypes
 
 
