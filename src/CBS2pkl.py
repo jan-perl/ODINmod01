@@ -58,7 +58,7 @@ if(1==1):
 #wijkendata.fields
 # -
 
-#eerste read is alleen nodig om kolom namen op te pakken
+# eerste read is alleen nodig om kolom namen op te pakken
 
 
 # +

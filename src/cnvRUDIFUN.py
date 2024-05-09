@@ -13,8 +13,7 @@
 # ---
 
 # +
-#leest ODiN gegevens en schrijft naar pickles
-#las eerder ook RUDiFUN en gesmoothde RUDIFUN
+#leest  RUDiFUN en gesmoothde RUDIFUN gegevens en schrijft naar pickles
 # -
 
 import pandas as pd
