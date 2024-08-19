@@ -15,6 +15,25 @@
 # +
 #leesrouteines voor diverse CBS gegevens
 #en conversie routines buurt-PC4,6
+
+#idee van het algortime: maak een routine die van buurten data converteert naar PC6 data
+#PC6 data kan daarna eenvoudig worden gesommeerd / gemiddeld naar PC4 data
+#Gebruik hiervoor een gacalibreerde conversie, gebaseerd op aantallen inwoners, mannen , vrouwen
+#Die calibratie is per jaar verschillend ( buurten en wijken worden bijgewerkt)
+#calibratie struktuur bevat:
+#1) namen van alle wijken (als index)
+#2) namen van alle PC6 uit (als index)
+#3) een lijst (lengte wijken) met de eerst PC6 per wijk -> deze zet een eerste verdeling
+#4) een sparse array met van iedere wijk met meerdere PC6 en een contributie correctie 
+#de calibratie volgt uit een structuur met een of meerdere kolommen 
+#per wijk en per PC6 die gematcht gaan worden en een lijst van overlaps
+#bij de intake worden even de sommen vergeleken
+#het laatste array is opgebouwd met vanuit coefficienten: de eerste per wijk is steeds 1- de som van de rest
+#om de coefficienten (m.u.v. de eerste) te bepalen wordt eerst een calibratie array opgebouwd
+#het calibratie array bevat de veranderingen t.o.v. de oorspronkelijke vector CalA x dcoeff = dVec
+#dVec beval ALLE PC6 waarden waar uit verdeede wijken
+#dcoeff alleen de veranderde coefficienten (dus niet de eerste die de som op 1 zetten)
+#omdat PC6 gebieden veel kleiner zijn dan buurten, verdelen op aantal inwonders, huisnrs en dan oppervlak
 # -
 
 import pandas as pd
@@ -28,6 +47,40 @@ import sys
 print(sys.path)
 sys.path.append('/home/jovyan/work/pyshp')
 import shapefile
+
+#try returning data structure
+#from https://docs.python.org/3/tutorial/controlflow.html#tut-unpacking-arguments
+list(range(3, 6))            # normal call with separate arguments
+args = [3, 6]
+list(range(*args))            # call with arguments unpacked from a list
+def myretfunc():
+    #returns data structure with the first arguments for mycallfunc
+    return [3, 'a']
+def mycallfunc (a1,a2,a3):
+    print(a1,a2,a3)
+vr= myretfunc()
+mycallfunc(*vr,"addl")    
+
+# +
+#get started with a sparse matrix
+#example code from https://docs.scipy.org/doc/scipy/reference/sparse.html
+from scipy import sparse
+from scipy.sparse.linalg import spsolve
+import scipy 
+from numpy import array
+print(scipy.__version__)
+
+I = array([0,3,1,0,2])
+J = array([0,3,1,2,3])
+V = array([4,5,7,9,11])
+A = sparse.coo_matrix((V,(I,J)),shape=(4,4))
+A =sparse.eye(4)+A
+r= np.array([-14,25,17,29])
+print(A)
+s2=spsolve(A,r)
+print(s2)
+print(A.dot(s2))
+# -
 
 #import ODiN2pd
 import ODiN2readpkl
@@ -95,11 +148,14 @@ buurtendata.dtypes
 
 print(gemeentendata.dtypes)
 
-
+# +
+#obsolete code, later weg
 
 # +
 #now start algoritm to make pc4 values from buurten
 #first fetch matchigng table, special one for 2020
+#note: all years have better one: see code
+#pc6hnryr =ODiN2readpkl.getpc6hnryr(2020) 
 # -
 
 pc6gwb2020 = pd.read_csv("../data/CBS/PC6HNR/pc6-gwb2020.csv", encoding = "ISO-8859-1", sep=";")  
@@ -229,10 +285,24 @@ buurtendatasel=buurtendata[buurtendata['BU_CODE']==tstbu]
 pc6gwb2020c1ls=pc6gwb2020c1l[pc6gwb2020c1l['BU_CODE']== tstbu]
 
 distrpc6v2020(pc6gwb2020c1l,buurtendata,'BU_CODE',bufields_sum[1:3] )   
+# +
+#einde obsolete code, later weg
 # -
+
+#nu lezen we 
 pc6hnryr =ODiN2readpkl.getpc6hnryr(2020) 
+#pc6hnryr
 
 
+#kijk hoe veel buurten er per PC6 zijn; deze is overigens niet  relevant in conversie
+nbuurtperpc6 =pc6hnryr[['Buurt','PC6']].groupby(['Buurt']).count().reset_index().rename(
+    columns={'PC6':'npc6buurt'} )
+#somminge PC6-en liggen ook nog eens in meerdere buurten
+numPC6perbuurtverd = nbuurtperpc6 .groupby(['npc6buurt']).count().reset_index()
+numPC6perbuurtverd
+
+#kijk hoe PV6 gebieden er bijdragen van meerdere VERSCHILLENDE buurten hebben
+#meestal gaat 1 buurt maar naar 1 PC6 (al zijn er natuurlijk meerdere PC6 en in een buurt)
 nbuurtperpc6 =pc6hnryr[['Buurt','PC6']].groupby(['PC6']).count().reset_index().rename(
     columns={'Buurt':'nbuurtpc6'} )
 #somminge PC6-en liggen ook nog eens in meerdere buurten

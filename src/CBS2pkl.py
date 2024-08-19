@@ -179,4 +179,21 @@ for year in range(2018,2023):
     pc6hnryr =cnvpc6hnryr(year) 
     print(pc6hnryr.dtypes)
 
+# +
+#basic PC4 data
+cbspc4data = geopandas.read_file("../data/CBS/PC4STATS/cbs_pc4_2022_v1.gpkg")
+cbspc4data['postcode4'] = pd.to_numeric(cbspc4data['postcode4'])
+
+stryear='2022'
+cbspc4data.to_pickle("../intermediate/CBS/pc4data_"+stryear+".pkl") 
+
+# +
+#basic PC6 data
+cbspc6data = geopandas.read_file("../data/CBS/PC6STATS/cbs_pc6_2022_v2.gpkg")
+
+#cbspc6data['postcode6'] = pd.to_numeric(cbspc4data['postcode6'])
+stryear='2022'
+cbspc6data.to_pickle("../intermediate/CBS/pc6data_"+stryear+".pkl") 
+# -
+
 print("Finished")

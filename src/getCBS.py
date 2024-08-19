@@ -40,6 +40,20 @@ pc4lnks = ["https://download.cbs.nl/postcode/2023-CBS_pc4_2022_v1.zip",
           ] 
 print(pc4lnks[1:3])
 
+#Kerncijfers per postcode
+#https://www.cbs.nl/nl-nl/dossier/nederland-regionaal/geografische-data/gegevens-per-postcode
+pc6lnks = ["https://download.cbs.nl/postcode/2024-cbs_pc6_2023_v1.zip",
+           "https://download.cbs.nl/postcode/2024-cbs_pc6_2022_v2.zip",
+           "https://download.cbs.nl/postcode/2024-cbs_pc6_2021_vol.zip",
+           "https://download.cbs.nl/postcode/2023-cbs_pc6_2020_vol.zip",
+           "https://download.cbs.nl/postcode/2023-cbs_pc6_2019_vol.zip",
+           "https://download.cbs.nl/postcode/CBS-PC6-2018-v3.zip",
+           "https://download.cbs.nl/postcode/CBS-PC6-2017-v3.zip",
+           "https://download.cbs.nl/postcode/CBS-PC6-2016-v2.zip",
+           "https://download.cbs.nl/postcode/CBS-PC6-2015-v2.zip"
+          ] 
+print(pc6lnks[1:3])
+
 
 def getcbspc4(link,uzdir):
     of=re.sub("^.*/","",link)
@@ -61,6 +75,10 @@ def getcbspc4(link,uzdir):
 if fetchweb :
     for link in pc4lnks:
         getcbspc4(link,'PC4STATS')
+
+if fetchweb | True:
+    for link in pc6lnks:
+        getcbspc4(link,'PC6STATS')
 
 
 #Huishoudens; huishoudenssamenstelling en viercijferige postcode, 1 januari

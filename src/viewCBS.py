@@ -29,6 +29,11 @@ print(sys.path)
 sys.path.append('/home/jovyan/work/pyshp')
 import shapefile
 
+import geopandas
+import contextily as cx
+import xyzservices.providers as xyz
+import matplotlib.pyplot as plt
+
 #import ODiN2pd
 import ODiN2readpkl
 
@@ -212,11 +217,16 @@ buurtdata_withfield03.plot(ax=base,column=adcol03[1],legend=True, cmap='OrRd',
              legend_kwds={"label": "Aantal cafes < 1 km"}
            )          
 
-# +
-  
 pc6hnryr =ODiN2readpkl.getpc6hnryr(2020) 
 pc6hnryr.dtypes
-# -
+
+pc6hnryr[pc6hnryr['PC4']==3992]
+
+#this frame does not contain geo info
+if 0==1:
+    pc6hnryr.plot(ax=base,column='Huisnummer',legend=True, cmap='OrRd',
+             legend_kwds={"label": "Huisnummer"}
+           )          
 
 #2023 werkt nog niet
 for year in range(2018,2023):

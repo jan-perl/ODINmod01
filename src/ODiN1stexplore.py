@@ -22,13 +22,97 @@ import seaborn as sns
 from sklearn.linear_model import LinearRegression
 
 import geopandas
+import contextily as cx
+import xyzservices.providers as xyz
+import matplotlib.pyplot as plt
 
-cbspc4data = geopandas.read_file("../data/CBS/PC4STATS/cbs_pc4_2022_v1.gpkg")
-cbspc4data['postcode4'] = pd.to_numeric(cbspc4data['postcode4'])
+if 1==0:
+    cbspc4data = geopandas.read_file("../data/CBS/PC4STATS/cbs_pc4_2022_v1.gpkg")
+    cbspc4data['postcode4'] = pd.to_numeric(cbspc4data['postcode4'])
+    stryear='2022'
+    cbspc4data.to_pickle("../intermediate/CBS/pc4data_"+stryear+".pkl") 
+
+stryear='2022'
+cbspc4data =pd.read_pickle("../intermediate/CBS/pc4data_"+stryear+".pkl")
+
+cbspc4data['oppervlak'] = cbspc4data.area
 
 cbspc4data.dtypes
 
-cbspc4data.plot()
+#providers = cx.providers.flatten()
+#providers
+prov0=cx.providers.nlmaps.grijs.copy()
+print( cbspc4data.crs)
+print (prov0)
+#plot_crs=3857
+plot_crs=28992
+if 1==1:
+    prov0['url']='https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/{variant}/EPSG:28992/{z}/{x}/{y}.png'
+#    prov0['url']='https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/{variant}/EPSG:3857/{z}/{x}/{y}.png'    
+#    prov0['bounds']=  [[48.040502, -1.657292 ],[56.110590 ,12.431727 ]]  
+    prov0['bounds']=  [[48.040502, -1.657292 ],[56.110590 ,12.431727 ]]  
+    prov0['min_zoom']= 0
+    prov0['max_zoom'] =12
+    print (prov0)
+
+pland= cbspc4data.to_crs(epsg=plot_crs).plot()
+cx.add_basemap(pland, source= prov0)
+
+cbspc4datahtn = cbspc4data[(cbspc4data['postcode4']>3990) & (cbspc4data['postcode4']<3999)]
+phtn = cbspc4datahtn.to_crs(epsg=plot_crs).plot()
+cx.add_basemap(phtn, source= prov0)
+
+if 0==1:
+    cbspc6data = geopandas.read_file("../data/CBS/PC6STATS/cbs_pc6_2022_v2.gpkg")
+    #cbspc6data['postcode6'] = pd.to_numeric(cbspc4data['postcode6'])
+    stryear='2022'
+    cbspc6data.to_pickle("../intermediate/CBS/pc6data_"+stryear+".pkl") 
+
+cbspc6data =pd.read_pickle("../intermediate/CBS/pc6data_"+stryear+".pkl")
+
+cbspc6data['oppervlak'] = cbspc6data.area
+
+cbspc6data.dtypes
+
+cbspc6data.plot()
+
+cbspc6data.plot(column="aantal_woningen",legend=True, cmap='OrRd')
+
+cbspc6data.columns
+
+cbspc6data.columns.tolist()
+
+cbspc6data['PC4']= cbspc6data['postcode6'].str[0:4].astype('int64')
+htnpc6data=cbspc6data[(cbspc6data['PC4'] >3990) & (cbspc6data['PC4'] <3999) ].copy()
+
+htnpc6data["dichtstbijzijnde_treinstation_afstand_in_km"][htnpc6data["dichtstbijzijnde_treinstation_afstand_in_km"] >=-90000].max()
+
+htnpc6inw= htnpc6data[htnpc6data["aantal_inwoners"] >=-90000]
+phtn=htnpc6inw.to_crs(epsg=3857). \
+          plot(column="aantal_inwoners",legend=True, cmap='OrRd',alpha=.7)
+cx.add_basemap(phtn, source= prov0)
+
+# +
+#now circles instead of areas
+htnpc6inwr2= htnpc6data[htnpc6data["aantal_inwoners"] >=-90000].copy()
+htnpc6inwr2[ "center"]= htnpc6inwr2.representative_point()
+htnpc6inwr3= htnpc6inwr2.copy()
+#htnpc6inwr3.set_geometry ( "center", inplace = True)
+htnpc6inwr3.set_geometry (  htnpc6inwr3.representative_point(), inplace = True)
+#htnpc6inwr3= htnpc6inwr3.set_geometry ( "center", inplace = False)
+
+phtn3=htnpc6inwr3.to_crs(epsg=3857). \
+          plot(column="aantal_inwoners",legend=True, cmap='OrRd',alpha=.7)
+cx.add_basemap(phtn3, source= prov0)
+# -
+
+htnpc6inwr3['geometry']
+
+htnpc6data[htnpc6data["aantal_inwoners"] >200]
+
+htnpc6data['PC5']= cbspc6data['postcode6'].str[0:5]
+hvnpc6data=htnpc6data[htnpc6data['PC5']== '3992P']
+hvnpc6data[hvnpc6data["aantal_inwoners"] >=-90000].plot(column="aantal_inwoners",legend=True, cmap='OrRd')
 
 #import ODiN2pd
 import ODiN2readpkl
