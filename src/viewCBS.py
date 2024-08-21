@@ -84,6 +84,8 @@ dat_85560['Value'] = pd.to_numeric(dat_85560['Value'].str.replace(",","."))
 
 dat_85560_mc
 
+dat_85560_mc[dat_85560_mc['Title'].str.contains(r'innen')]
+
 dat_85560
 
 gemeentendata ,  wijkgrensdata ,    buurtendata = ODiN2readpkl.getgwb(2020)    
