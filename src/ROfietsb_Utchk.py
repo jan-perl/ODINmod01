@@ -39,6 +39,7 @@ from rasterio.transform import Affine
 from rasterio import features
 
 import rasterstats
+import rasteruts1
 
 calcgdir="../intermediate/calcgrids"
 
@@ -59,6 +60,7 @@ Rf_net_buurt.columns
 Rf_net_buurt
 
 Rf_net_buurt['area_geo'] = Rf_net_buurt.area
+Rf_net_buurt['center']= Rf_net_buurt.representative_point()
 Rf_net_buurt['area_geo_diff'] = Rf_net_buurt['Shape_Area'] - Rf_net_buurt['area_geo']
 Rf_net_buurt['C_FSI22'] = Rf_net_buurt['bruto_22'] /Rf_net_buurt['area_geo']
 Rf_net_buurt['C_FSI22diff'] = Rf_net_buurt['FSI_22'] -Rf_net_buurt['C_FSI22']
@@ -119,39 +121,14 @@ xi['Z'].dtype
 
 
 
-# +
-def createNLgrid(res,fn,countin,deel):
-#resulution
-#coords    "[{300000, 0}, {625000, 280000})"; 
-    
-    if deel == 'Ut':
-        transformx = Affine.translation(113000 - res / 2, 480000 - res / 2) * Affine.scale(res, -res)    
-        hv=(480000 - 430000)/res
-        wv=(180000- 113000)/res  
-    else:
-        transformx = Affine.translation(0 - res / 2, 625000  - res / 2) * Affine.scale(res, -res)    
-        hv=(625000 - 300000)/res
-        wv=(280000- 0)/res
-
-    new_dataset = rasterio.open(
-         fn,          'w',         driver='GTiff',
-        height= hv,        width=wv,       count=countin,
-         dtype=np.float32(1).dtype,
-         crs='EPSG:28992',
-         transform=transformx,
-         nodata = np.nan
-#          nodata = 0
-     )
-    return new_dataset
-
-gridNL100 = createNLgrid(100,calcgdir+'/land.tif',1,'')
-# -
+lasttifname=calcgdir+'/land.tif'
+gridNL100 = rasteruts1.createNLgrid(100,lasttifname,1,'')
 
 gridNL100.write(xi['Z'],1)
 #mag niet: plt.imshow(gridNL100.read(1), cmap='pink')
 gridNL100.close()
 
-dataset = rasterio.open(calcgdir+'/land.tif')
+dataset = rasterio.open(lasttifname)
 
 dataset.width
 
@@ -163,7 +140,7 @@ dataset.bounds
 
 dataset.crs
 
-plt.imshow(dataset.read(1), cmap='pink')
+plt.imshow(dataset.read(1), cmap='pink',origin='lower')
 
 rasterio.plot.show(dataset, cmap='pink')
 
@@ -180,44 +157,18 @@ coord_list
 #attribute<ratio>  D_MXI22     (NLgrid/rdc_100m) := G1_MXI22 - G2_MXI22;
 # -
 
-gridNL100b = createNLgrid(100,calcgdir+'/landUmxi.tif',2,'Ut')
+lasttifname=calcgdir+'/landUmxi-Ut01.tif'
+gridNL100b = rasteruts1.createNLgrid(100,lasttifname,2,'Ut')
 
+imageMXIo= rasteruts1.makerasterdef(itotUtr,'MXI_22',gridNL100b)
 
-#all_touched = True zorgt dat bij 100 meter grid ca 1.300 of  1.484 van waardes te
-# hoog terug komt  in check met if fillrela
-# en dat 49 van de 971 waarden in Utrecht bij uitlezen waarde van 
-#all_touched = False zorgt dat bij 100 meter grid ca 1.0025467901140264, 1.0006930004604095 van waardes te
-# hoog terug komt  in check met if fillrela
-# en dat 0 van de 971 waarden in Utrecht bij uitlezen waarde anders worden
-def makerasterdef (df,col,grid):
-    shapesusd = ((geom,value) for geom, value in zip( df.geometry, df[col]))
-    imageout = rasterio.features.rasterize(
-            shapes=shapesusd,
-            merge_alg=rasterio.features.MergeAlg.replace,
-#            all_touched=True,
-            default_value=np.nan,
-            out_shape=grid.shape,
-            transform=grid.transform)
-    return imageout
-imageMXIo= makerasterdef(itotUtr,'MXI_22',gridNL100b)
-
-
-def makerasterpts (df,col,grid):
-    shapesusd = ((geom,value) for geom, value in zip( df["center"], df[col]))
-    imageout = rasterio.features.rasterize(
-            shapes=shapesusd,            
-            merge_alg=rasterio.features.MergeAlg.add,
-            default_value=0,
-            out_shape=grid.shape,
-            transform=grid.transform)
-    return imageout
-imageMXIp= makerasterpts(itotUtr,'MXI_22',gridNL100b)
+imageMXIp= rasteruts1.makerasterpts(itotUtr,'MXI_22',gridNL100b)
 
 gridNL100b.write(imageMXIo,1)
 gridNL100b.write(imageMXIp,2)
 gridNL100b.close()
 
-dataset2 = rasterio.open(calcgdir+'/landUmxi.tif')
+dataset2 = rasterio.open(lasttifname)
 
 
 # +
@@ -244,92 +195,15 @@ itotUtr["mxifromgridp"] = [x[0] for x in dataset2.sample(coord_list,indexes=2)]
 
 itotUtr["mxifromgridp"]
 
-
-def misstats (c1,c2):
-    itotUtr["griddif"]= abs(itotUtr[c1] - itotUtr[c2])
-    mis=itotUtr[np.isnan(itotUtr[c1])]
-    print (( len(itotUtr["griddif"]),len(mis),
-    len(itotUtr[itotUtr["griddif"]>1e-6]) ))
-    return (itotUtr[itotUtr["griddif"]>1e-6])
-misstats("mxifromgrida","MXI_22")            
-
-misstats("mxifromgridp","MXI_22") 
+rasteruts1.misstats("mxifromgrida","MXI_22",itotUtr)            
 
 itotUtr[abs(itotUtr["mxifromgrida"] - 0.94999998807907) <1e-6]
 
-
-#now some kernel and transformations
-#note: for gaussian: ony can do 2 1d convolutions
-def kernelfietspara():
-    maxfietsdist =5000
-    maxkernrng = 1* maxfietsdist
-    gridstep =100
-    FWHMcnv  = 2.0 * np.sqrt (2.0 * np.log (2.0));
-    #print(FWHMcnv)
-    gaussdenom   = (maxfietsdist/FWHMcnv) ;
-    #print(gaussdenom)
-    x = np.linspace(-maxkernrng,+maxkernrng, int(2*maxkernrng/gridstep+1))
-    y = np.linspace(-maxkernrng,+maxkernrng, int(2*maxkernrng/gridstep+1))
-    X, Y = np.meshgrid(x, y)
-    d1 = np.sqrt(X*X+Y*Y)
-    Z1 = np.exp(-d1*d1 / (2*gaussdenom* gaussdenom))
-    Z1= Z1/ np.sum(Z1)
-    K1D= np.exp(-x*x / (2*gaussdenom* gaussdenom))
-    K1D= K1D/ np.sum(K1D)
-    Z2D= np.outer( K1D, (K1D))
-#    print(np.sum(Z1))
-#    print('sum')
-    Z = Z1
-    return {'X':X,'Y':Y,'Z':Z,'K1D':K1D,'Z2D':Z2D }
-fietskern1= kernelfietspara()
+fietskern1= rasteruts1.kernelfietspara()
 dcalc=(fietskern1['Z2D']-fietskern1['Z'])
 print(np.max(np.abs(dcalc)) )
 
-# +
-from numba import cuda
-import numpy as np
-
-@cuda.jit
-def convolve2d(result, mask, image):
-    # expects a 2D grid and 2D blocks,
-    # a mask with odd numbers of rows and columns, (-1-) 
-    # a grayscale image
-    
-    # (-2-) 2D coordinates of the current thread:
-    i, j = cuda.grid(2) 
-    
-    # (-3-) if the thread coordinates are outside of the image, we ignore the thread:
-    image_rows, image_cols = image.shape
-    if (i >= image_rows) or (j >= image_cols): 
-        return
-    
-    # To compute the result at coordinates (i, j), we need to use delta_rows rows of the image 
-    # before and after the i_th row, 
-    # as well as delta_cols columns of the image before and after the j_th column:
-    delta_rows = mask.shape[0] // 2 
-    delta_cols = mask.shape[1] // 2
-    
-    # The result at coordinates (i, j) is equal to 
-    # sum_{k, l} mask[k, l] * image[i - k + delta_rows, j - l + delta_cols]
-    # with k and l going through the whole mask array:
-    s = 0
-    for k in range(mask.shape[0]):
-        for l in range(mask.shape[1]):
-            i_k = i - k + delta_rows
-            j_l = j - l + delta_cols
-            # (-4-) Check if (i_k, j_k) coordinates are inside the image: 
-            if (i_k >= 0) and (i_k < image_rows) and (j_l >= 0) and (j_l < image_cols):  
-                s += mask[k, l] * image[i_k, j_l]
-    result[i, j] = s
-
-
-# -
-
-def cfunc(sl):
-    return np.convolve(sl,fietskern1['K1D'],mode='same')
-def convfietsimg(img):
-    return np.apply_along_axis(cfunc,1, np.apply_along_axis(cfunc,0, img) )
-
+testfietso= rasteruts1.convfietsimg(imageMXIo,fietskern1)
 
 fillrela=True
 
@@ -337,18 +211,19 @@ fillrela=True
 #open en close binnen 1 cel om verwarring te voorkomen
 
 # +
+lasttifname=calcgdir+'/oriTN.tif'
 from rasterio.enums import ColorInterp
-gridori = createNLgrid(100,calcgdir+'/oriTN.tif',7,'Ut')
+gridori = rasteruts1.createNLgrid(100,lasttifname,7,'Ut')
 if fillrela:
-    image1 = makerasterdef(itotUtr,'R_MXI22T',gridori)
-    image2 = makerasterdef(itotUtr,'R_MXI22N',gridori)
+    image1 = rasteruts1.makerasterdef(itotUtr,'R_MXI22T',gridori)
+    image2 = rasteruts1.makerasterdef(itotUtr,'R_MXI22N',gridori)
 else:
-    image1 = makerasterpts(itotUtr,'O_MXI22T',gridori)
-    image2 = makerasterpts(itotUtr,'O_MXI22N',gridori)
+    image1 = rasteruts1.makerasterpts(itotUtr,'O_MXI22T',gridori)
+    image2 = rasteruts1.makerasterpts(itotUtr,'O_MXI22N',gridori)
 
-image4= convfietsimg(image1 ) 
-image5= convfietsimg(image2) 
-image6= convfietsimg( imageMXIo) 
+image4= rasteruts1.convfietsimg(image1,fietskern1 ) 
+image5= rasteruts1.convfietsimg(image2,fietskern1) 
+image6= rasteruts1.convfietsimg( imageMXIo,fietskern1) 
 image7= image4/image5
 
 gridori.write(image1,1)
@@ -361,24 +236,9 @@ gridori.write(image5,5)
 gridori.write(image6,6)
 gridori.write(image7,7)
 gridori.close()
-
-
 # -
 
-def convfiets2d(image):
-    # We preallocate the result array:
-    result = np.empty_like(image)
-    # We use blocks of 32x32 pixels:
-    blockdim = (32, 32)
-#    print('Blocks dimensions:', blockdim)
-
-    # We compute grid dimensions big enough to cover the whole image:
-    griddim = (image.shape[0] // blockdim[0] + 1, image.shape[1] // blockdim[1] + 1)
-#    print('Grid dimensions:', griddim)
-    # We apply our convolution to our image:
-    convolve2d[griddim, blockdim](result, fietskern1['Z'], image)
-    return result
-image4g= convfiets2d(image1 )     
+image4g= rasteruts1.convfiets2d(image1,fietskern1['Z'] )     
 
 print('Maximum relative error:', np.max( np.abs(image4g- image4) ) / np.max(np.abs(image4)) )
 from scipy.ndimage.filters import convolve as scipy_convolve
@@ -387,9 +247,9 @@ from scipy.ndimage.filters import convolve as scipy_convolve
 # %timeit scipy_result = scipy_convolve(image1, fietskern1['Z'],  mode='constant', cval=0.0, origin=0)
 
 #deze mogelijk ook voor cirkels
-# %timeit image4g= convfiets2d(image1 )  
+# %timeit image4g= rasteruts1.convfiets2d(image1 ,fietskern1['Z'] )      
 
-# %timeit image4= convfietsimg(image1 ) 
+# %timeit image4= rasteruts1.convfietsimg(image1,fietskern1 ) 
 
 # +
 #nu wat analyses
@@ -407,7 +267,7 @@ mixnfrat = np.sum(image5)*gridm*gridm /sum(itotUtr['O_MXI22N'])
 print ((mixtirat,mixnirat,mixtfrat,mixnfrat) )
 # -
 
-dataset3 = rasterio.open(calcgdir+'/oriTN.tif')
+dataset3 = rasterio.open(lasttifname)
 
 dataset3.tags(1)
 
@@ -416,22 +276,10 @@ base=itotUtr.boundary.plot(color='green',ax=ax,alpha=.3);
 rasterio.plot.show((dataset3,5), cmap='OrRd',ax=ax)
 setaxhtn(ax)
 
-
 # +
-def normalize(array):
-    array_min, array_max = array.min(), array.max()
-    return (array - array_min) / (array_max - array_min)
 
-def plotrb(dset,c1,c2):
-    # Normalize band DN
-    red_norm = np.sqrt(normalize(dset.read(c1)))/2+.5
-    blue_norm = np.sqrt(normalize(dset.read(c2)))/2+.5
-    # Stack bands
-    nrg = np.dstack((red_norm, (red_norm+blue_norm)/2, blue_norm))
-    # View the color composite
-    plt.imshow(nrg)  
 #heel NL niet geschaald
-plotrb(dataset3,4,5)    
+rasteruts1.plotrb(dataset3,4,5)    
 # -
 
 fig, ax = plt.subplots()
@@ -498,120 +346,35 @@ np.sum(sr1 )
 # -
 
 
-gridNL100c = createNLgrid(100,calcgdir+'/oriTN2.tif',6,'Ut')
+lasttifname=calcgdir+'/oriTN2-Ut.tif'
+gridNL100c = rasteruts1.createNLgrid(100,lasttifname,8,'Ut')
 
-
-def makegridcorr (df,grid):
-    shapesusd = ((geom,value) for geom, value in zip( df.geometry, df.index+1))
-    imageout = rasterio.features.rasterize(
-            shapes=shapesusd,
-            merge_alg=rasterio.features.MergeAlg.replace,
-#            all_touched=True,
-            default_value=0,
-            out_shape=grid.shape,
-            transform=grid.transform)
-    return imageout
-dfrefs= makegridcorr (itotUtr,gridNL100c)
+dfrefs= rasteruts1.makegridcorr (itotUtr,gridNL100c)
 
 plt.imshow(dfrefs, cmap='pink')
+plt.colorbar()
 
-# +
-import numba
-#from numba.utils import IS_PY3
-from numba.decorators import jit
-
-@jit
-def _docountpixarea(img,hival,retval):
-    for hh in range(img.shape[0]):
-        for ww in range(img.shape[1]):
-            if img[hh,ww] >0 & img[hh,ww] <=hival:
-                retval[int(img[hh,ww])-1] +=1
-
-def countpixarea(img,ncats):    
-    retval=np.zeros(ncats,dtype=int)
-    _docountpixarea(img,ncats,retval)
-    return retval
-
-def findmiss(indf,img):
-    oppix= countpixarea(img,len(indf))
-    oppix[oppix==0]
-    print(len(indf),len(oppix))
-    indf['area_pix']=oppix*100*100
-    indf['area_diff']=indf['area_pix']-indf['area_geo']
-    rv=indf[oppix==0]
-    return rv
-    
-missptdf= findmiss(itotUtr,dfrefs)
+missptdf= rasteruts1.findmiss(itotUtr,dfrefs)
 print(missptdf.index)
 missptdf[['area_pix','area_diff','area_geo']]    
-# -
 
 import seaborn
 seaborn.scatterplot(data=itotUtr,x='area_geo',y='area_pix')
 
+dfrefs2=rasteruts1.testmissfill(dfrefs,missptdf,gridNL100c,itotUtr)  
 
-# +
-def addmakegridcorr (df,grid):
-    shapesusd = ((geom,value) for geom, value in zip( df["center"], df.index))
-    imageout = rasterio.features.rasterize(
-            shapes=shapesusd,            
-            merge_alg=rasterio.features.MergeAlg.add,
-            default_value=0,
-            out_shape=grid.shape,
-            transform=grid.transform)
-    return imageout
-missptimg= addmakegridcorr (missptdf,gridNL100c)
-print(np.sum(missptimg))
+imagelst=rasteruts1.mkimgpixavgs(gridNL100c,dfrefs,True,fietskern1,
+                                 itotUtr[['O_MXI22T','O_MXI22N']])    
 
-@jit
-def fillmiss(imgori,imgmiss):
-    for hh in range(imgmiss.shape[0]):
-        for ww in range(imgmiss.shape[1]):
-            if imgmiss[hh,ww] >0:
-                imgori[hh,ww] = imgmiss[hh,ww]
+len(imagelst)
 
-dfrefs2= dfrefs.copy()               
-fillmiss(dfrefs2,missptimg)
-print(np.sum(dfrefs2-dfrefs))
-missptdf2= findmiss(itotUtr,dfrefs2)
-print(missptdf2.index)
-missptdf2[['area_pix','area_diff','area_geo']] 
+np.array(imagelst).shape
 
-
-# +
-def fillvalues(image,idximg,indat):
-    for hh in range(idximg.shape[0]):
-        for ww in range(idximg.shape[1]):
-            if idximg[hh,ww] >0:
-                image[hh,ww] = indat[int(idximg[hh,ww])-1] 
-
-def mkimgpixavgs(grid,idximg,indf):
-    grid.write(idximg,1)
-    putidx=2
-    oppix= countpixarea(idximg,len(indf))
-    normarr=oppix.copy()
-    normarr[normarr==0] = 1e-6
-    image=np.zeros(idximg.shape)
-    fillvalues(image,idximg,oppix)
-    grid.write(image,putidx)
-    for col in indf.columns:
-        putidx+=1
-        image=np.zeros(idximg.shape)
-        normval = indf[col] /normarr
-        fillvalues(image,idximg,normval)
-        grid.write(image,putidx)        
-        putidx+=1
-        imagef= convfietsimg(image ) 
-        grid.write(imagef,putidx)        
-        print(np.sum(indf[col]), np.sum(image),np.sum(imagef) )
-    return grid
-
-mkimgpixavgs(gridNL100c,dfrefs,itotUtr[['O_MXI22T','O_MXI22N']])    
-# -
+plt.imshow(imagelst[0])
+plt.colorbar()
 
 gridNL100c.close()
-
-dataset4 = rasterio.open(calcgdir+'/oriTN2.tif')
+dataset4 = rasterio.open(lasttifname)
 
 stat4s1=rasterstats.zonal_stats( itotUtr[ "geometry"], dataset4.read(3),
                               affine=dataset3.transform, stats='sum mean')
@@ -644,6 +407,29 @@ sr1=itotUtr[['GSD_MXI22T','GSD_MXI22T','GSM_MXI22T','GSM_MXI22T','O_MXI22T',
 np.sum(sr1 )
 # -
 
+#maar nu hebben we ook een veel sneller alternatief voor rasterstats.zonal_stats
+catlst=dataset4.read(1)
+stat4s1s = rasteruts1.sumpixarea(catlst,len(itotUtr),dataset4.read(3) )
+stat4s2s = rasteruts1.sumpixarea(catlst,len(itotUtr),dataset4.read(5) )
+stat4s1c = rasteruts1.countpixarea(catlst,len(itotUtr) )
+stat4s2c = rasteruts1.countpixarea(catlst,len(itotUtr) )
+stat4s1a = stat4s1s / stat4s1c 
+stat4s1a = stat4s1s / stat4s1c 
+
+if 1==1:
+    itotUtr['GSD_MXI22T'] = np.fromiter((s['sum'] for s in stat4s1),float) 
+    itotUtr['GSD_MXI22N'] = np.fromiter((s['sum'] for s in stat4s2),float) 
+    itotUtr['GSM_MXI22T'] = np.fromiter((s['mean'] for s in stat4s1),float) * \
+            itotUtr['area_pix']  /100/100
+    itotUtr['GSM_MXI22N'] = np.fromiter((s['mean'] for s in stat4s2),float) * \
+             itotUtr['area_pix']   /100/100
+    itotUtr['DMD_MXI22T'] = abs(itotUtr['GSD_MXI22T'] - stat4s1s ) 
+    itotUtr['DMM_MXI22T'] = abs(itotUtr['GSM_MXI22T'] - stat4s1a * \
+            itotUtr['area_pix']  /100/100 )
+sr2=itotUtr[['GSD_MXI22T','GSD_MXI22T','GSM_MXI22T','GSM_MXI22T','O_MXI22T',
+             'DMD_MXI22T','DMM_MXI22T'] ]
+np.sum(sr2 )
+
 fig, ax = plt.subplots()
 base=itotUtr.boundary.plot(color='green',ax=ax,alpha=.3);
 rasterio.plot.show((dataset4,3),cmap='Reds',ax=ax,alpha=0.5)
@@ -655,5 +441,47 @@ base=itotUtr.boundary.plot(color='green',ax=ax,alpha=.3);
 rasterio.plot.show((dataset4,4),cmap='Reds',ax=ax,alpha=0.5)
 rasterio.plot.show((dataset4,6),cmap='Blues',ax=ax,alpha=0.5)
 setaxhtn(ax)
+
+#mogen we ook rekenen? -> NEE
+dwerk=dataset4.read(6)-dataset4.read(4)
+#notice that axis transformation has vanished -> it does not work
+fig, ax = plt.subplots()
+base=itotUtr.boundary.plot(color='green',ax=ax,alpha=.3);
+rasterio.plot.show(dwerk, cmap='OrRd',ax=ax)
+setaxhtn(ax)
+
+fig, ax = plt.subplots()
+base=itotUtr.boundary.plot(color='green',ax=ax,alpha=.3);
+rasterio.plot.show((dataset4,7), cmap='OrRd',ax=ax)
+setaxutr(ax)
+
+fig, ax = plt.subplots()
+base=itotUtr.boundary.plot(color='green',ax=ax,alpha=.3);
+rasterio.plot.show((dataset4,8), cmap='OrRd',ax=ax)
+setaxutr(ax)
+
+# +
+#en maak landelijk
+# -
+
+lasttifname=calcgdir+'/oriTN2-NL.tif'
+gridNL100d = rasteruts1.createNLgrid(100,lasttifname,8,'')
+
+dfrefsd= rasteruts1.makegridcorr (Rf_net_buurt,gridNL100d)
+
+missptdfd= rasteruts1.findmiss(Rf_net_buurt,dfrefsd)
+
+dfrefs2d=rasteruts1.testmissfill(dfrefsd,missptdfd,gridNL100d,Rf_net_buurt)  
+
+imagelstd=rasteruts1.mkimgpixavgs(gridNL100d,dfrefsd,True,fietskern1,
+                                 Rf_net_buurt[['O_MXI22T','O_MXI22N']])   
+
+gridNL100d.close()
+dataset5 = rasterio.open(lasttifname)
+
+fig, ax = plt.subplots()
+base=Rf_net_buurt.boundary.plot(color='green',ax=ax,alpha=.3);
+rasterio.plot.show((dataset5,8), cmap='OrRd',ax=ax)
+setaxutr(ax)
 
 

@@ -102,7 +102,7 @@ buurtendata.dtypes
 
 print(gemeentendata.dtypes)
 
-
+print(gemeentendata.columns)
 
 #Okay: postcode is alleen soort van indicator
 recspb =buurtendata[['BU_CODE','BU_NAAM']].groupby(['BU_CODE']).count().reset_index()
@@ -235,7 +235,110 @@ for year in range(2018,2023):
     pc6hnryr =ODiN2readpkl.getpc6hnryr(year) 
     print(pc6hnryr.dtypes)
 
+import rasteruts1
+import rasterio
+calcgdir="../intermediate/calcgrids"
 
+
+# +
+def setaxhtn(ax):
+    ax.set_xlim(left=137000, right=143000)
+    ax.set_ylim(bottom=444000, top=452000)
+    
+def setaxutr(ax):
+    ax.set_xlim(left=113000, right=180000)
+    ax.set_ylim(bottom=480000, top=430000)
+
+
+# -
+
+lasttifname=calcgdir+'/cbsbuurtin-Ut.tif'
+buurtinwgrid = rasteruts1.createNLgrid(100,lasttifname,8,'Ut')
+
+dfrefs= rasteruts1.makegridcorr (buurtendata,buurtinwgrid)
+
+buurtendata['area_geo'] = buurtendata.area
+
+#veel niet gevonden uit landelijk !
+missptdf= rasteruts1.findmiss(buurtendata,dfrefs)
+
+import seaborn
+seaborn.scatterplot(data=buurtendata,x='area_geo',y='area_pix')
+
+buurtexcols= ['AANT_INW','AANT_MAN', 'AANT_VROUW']
+imagelst=rasteruts1.mkimgpixavgs(buurtinwgrid,dfrefs,False,False,
+                                 buurtendata[buurtexcols])  
+
+buurtinwgrid.close()
+
+buurtinwgrid = rasterio.open(lasttifname)
+
+rogirdtifname=calcgdir+'/oriTN2-Ut.tif'
+rofinwgrid = rasterio.open(rogirdtifname)
+
+fig, ax = plt.subplots()
+base=buurtendata.boundary.plot(color='green',ax=ax,alpha=.3);
+rasterio.plot.show((buurtinwgrid,2), cmap='OrRd',ax=ax)
+rasteruts1.setaxutr(ax)
+
+fig, ax = plt.subplots()
+base=buurtendata.boundary.plot(color='green',ax=ax,alpha=.3);
+rasterio.plot.show((rofinwgrid,2), cmap='OrRd',ax=ax)
+rasteruts1.setaxutr(ax)
+
+sambuurt1= np.abs( buurtinwgrid.read(2) - rofinwgrid.read(2))<1.5+rofinwgrid.read(2)/10
+plt.imshow(sambuurt1,origin='lower')
+plt.colorbar()
+
+difbuurtsize=  buurtinwgrid.read(2) + 0*rofinwgrid.read(2)
+plt.imshow(difbuurtsize,origin='lower')
+plt.colorbar()
+
+fig, ax = plt.subplots()
+base=buurtendata.boundary.plot(color='green',ax=ax,alpha=.3);
+rasterio.plot.show((buurtinwgrid,5),cmap='Reds',ax=ax,alpha=0.5)
+rasterio.plot.show((buurtinwgrid,4),cmap='Blues',ax=ax,alpha=0.5)
+setaxutr(ax)
+
+buurtimsums = list(np.sum(buurtinwgrid.read(i+2)[False == np.isnan(buurtinwgrid.read(i+2))]) for i in range(4)) 
+buurtimsums
+
+print(np.sum(buurtendata[buurtexcols]))
+
+from sklearn import linear_model
+buurtcorrM = (False == np.isnan(buurtinwgrid.read(1+2))) & \
+               sambuurt1 & (rofinwgrid.read(3) >0) & ( buurtinwgrid.read(1+2) >0)
+columns=['Inwoners','WoonOppervlak']
+buurtcorr= pd.DataFrame( np.array ( (buurtinwgrid.read(1+2)[buurtcorrM ],
+                                      rofinwgrid.read(3)[buurtcorrM ] ) ), index=columns).T 
+buurtcorr.dtypes
+
+lm = linear_model.LinearRegression(fit_intercept=True)
+model = lm.fit(np.log(buurtcorr['WoonOppervlak'].values.reshape(-1, 1)),
+               np.log(buurtcorr['Inwoners'].values.reshape(-1, 1))) 
+#lm.fit(buurtcorr['WoonOppervlak'],buurtcorr['Inwoners']) 
+buurtcorr['Predict']=np.exp(model.predict(np.log(buurtcorr['WoonOppervlak'].values.reshape(-1, 1))))
+buurtcorr['Predictu']=buurtcorr['Predict']*np.exp(.5)
+buurtcorr['Predictl']=buurtcorr['Predict']*np.exp(-.5)
+print( model.coef_, model.intercept_)
+fig, ax = plt.subplots(figsize=(6, 4))
+seaborn.lineplot(data=buurtcorr,x='WoonOppervlak',y='Predict', color='g',ax=ax)
+seaborn.lineplot(data=buurtcorr,x='WoonOppervlak',y='Predictu', color='r',ax=ax)
+seaborn.lineplot(data=buurtcorr,x='WoonOppervlak',y='Predictl', color='r',ax=ax)
+seaborn.scatterplot(data=buurtcorr,x='WoonOppervlak',y='Inwoners',ax=ax)
+
+buurtratioa =  np.where(buurtcorrM , np.log(buurtinwgrid.read(1+2)) - \
+                        (np.log(rofinwgrid.read(3)) * model.coef_ + model.intercept_ ),\
+                        np.nan)
+buurtratio =  np.where(abs(buurtratioa)< .5,buurtratioa,np.nan)
+plt.imshow(buurtratio,origin='lower', cmap='plasma')
+plt.colorbar()
+
+buurtratiox =  np.where(abs(buurtratioa)> 1,buurtratioa,np.nan)
+plt.imshow(buurtratiox, origin='lower', cmap='plasma')
+plt.colorbar()
+
+plt.hist(buurtratio[~ np.isnan(buurtratio)])
 
 print("Finished")
 
