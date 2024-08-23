@@ -59,6 +59,8 @@ Rf_net_buurt.columns
 
 Rf_net_buurt
 
+pip install itables
+
 Rf_net_buurt['area_geo'] = Rf_net_buurt.area
 Rf_net_buurt['center']= Rf_net_buurt.representative_point()
 Rf_net_buurt['area_geo_diff'] = Rf_net_buurt['Shape_Area'] - Rf_net_buurt['area_geo']
@@ -351,11 +353,13 @@ gridNL100c = rasteruts1.createNLgrid(100,lasttifname,8,'Ut')
 
 dfrefs= rasteruts1.makegridcorr (itotUtr,gridNL100c)
 
+dfrefs.dtype
+
 plt.imshow(dfrefs, cmap='pink')
 plt.colorbar()
 
 missptdf= rasteruts1.findmiss(itotUtr,dfrefs)
-print(missptdf.index)
+print( len(missptdf.index), missptdf.index)
 missptdf[['area_pix','area_diff','area_geo']]    
 
 import seaborn
@@ -464,14 +468,29 @@ setaxutr(ax)
 #en maak landelijk
 # -
 
+#dit was een onbeschreven prerequisite, omdat we index gebruiken als rij nummer, en 
+# ook bij dfrefsd
+Rf_net_buurt=Rf_net_buurt.reset_index()
+
 lasttifname=calcgdir+'/oriTN2-NL.tif'
 gridNL100d = rasteruts1.createNLgrid(100,lasttifname,8,'')
 
 dfrefsd= rasteruts1.makegridcorr (Rf_net_buurt,gridNL100d)
 
+plt.imshow(dfrefsd!=0, cmap='pink')
+plt.colorbar()
+
+dfrefsd.dtype
+len(Rf_net_buurt)
+
 missptdfd= rasteruts1.findmiss(Rf_net_buurt,dfrefsd)
+print( len(missptdfd.index), missptdfd.index)
 
 dfrefs2d=rasteruts1.testmissfill(dfrefsd,missptdfd,gridNL100d,Rf_net_buurt)  
+
+itotUtr[['O_MXI22T','O_MXI22N']].dtypes
+
+Rf_net_buurt[['O_MXI22T','O_MXI22N']].dtypes
 
 imagelstd=rasteruts1.mkimgpixavgs(gridNL100d,dfrefsd,True,fietskern1,
                                  Rf_net_buurt[['O_MXI22T','O_MXI22N']])   
@@ -480,8 +499,7 @@ gridNL100d.close()
 dataset5 = rasterio.open(lasttifname)
 
 fig, ax = plt.subplots()
-base=Rf_net_buurt.boundary.plot(color='green',ax=ax,alpha=.3);
-rasterio.plot.show((dataset5,8), cmap='OrRd',ax=ax)
-setaxutr(ax)
+#base=Rf_net_buurt.boundary.plot(color='green',ax=ax,alpha=.3);
+rasterio.plot.show((dataset5,4), cmap='OrRd',ax=ax)
 
 

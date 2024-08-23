@@ -252,8 +252,10 @@ def setaxutr(ax):
 
 # -
 
-lasttifname=calcgdir+'/cbsbuurtin-Ut.tif'
-buurtinwgrid = rasteruts1.createNLgrid(100,lasttifname,8,'Ut')
+buurtendata=buurtendata.reset_index()
+
+lasttifname=calcgdir+'/cbsbuurtin-NL.tif'
+buurtinwgrid = rasteruts1.createNLgrid(100,lasttifname,8,'')
 
 dfrefs= rasteruts1.makegridcorr (buurtendata,buurtinwgrid)
 
@@ -273,7 +275,7 @@ buurtinwgrid.close()
 
 buurtinwgrid = rasterio.open(lasttifname)
 
-rogirdtifname=calcgdir+'/oriTN2-Ut.tif'
+rogirdtifname=calcgdir+'/oriTN2-NL.tif'
 rofinwgrid = rasterio.open(rogirdtifname)
 
 fig, ax = plt.subplots()
@@ -318,19 +320,21 @@ model = lm.fit(np.log(buurtcorr['WoonOppervlak'].values.reshape(-1, 1)),
                np.log(buurtcorr['Inwoners'].values.reshape(-1, 1))) 
 #lm.fit(buurtcorr['WoonOppervlak'],buurtcorr['Inwoners']) 
 buurtcorr['Predict']=np.exp(model.predict(np.log(buurtcorr['WoonOppervlak'].values.reshape(-1, 1))))
-buurtcorr['Predictu']=buurtcorr['Predict']*np.exp(.5)
-buurtcorr['Predictl']=buurtcorr['Predict']*np.exp(-.5)
+buurtcorr['Predictu']=buurtcorr['Predict']*np.exp(1)
+buurtcorr['Predictl']=buurtcorr['Predict']*np.exp(-1)
 print( model.coef_, model.intercept_)
 fig, ax = plt.subplots(figsize=(6, 4))
 seaborn.lineplot(data=buurtcorr,x='WoonOppervlak',y='Predict', color='g',ax=ax)
 seaborn.lineplot(data=buurtcorr,x='WoonOppervlak',y='Predictu', color='r',ax=ax)
 seaborn.lineplot(data=buurtcorr,x='WoonOppervlak',y='Predictl', color='r',ax=ax)
 seaborn.scatterplot(data=buurtcorr,x='WoonOppervlak',y='Inwoners',ax=ax)
+ax.set_xscale('log')
+ax.set_yscale('log')
 
 buurtratioa =  np.where(buurtcorrM , np.log(buurtinwgrid.read(1+2)) - \
                         (np.log(rofinwgrid.read(3)) * model.coef_ + model.intercept_ ),\
                         np.nan)
-buurtratio =  np.where(abs(buurtratioa)< .5,buurtratioa,np.nan)
+buurtratio =  np.where(abs(buurtratioa)< 1,buurtratioa,np.nan)
 plt.imshow(buurtratio,origin='lower', cmap='plasma')
 plt.colorbar()
 
@@ -341,5 +345,156 @@ plt.colorbar()
 plt.hist(buurtratio[~ np.isnan(buurtratio)])
 
 print("Finished")
+
+# +
+#alle transformaties zijn voorbereid per wijk. Nu naar voorzieningen kijken
+
+# +
+#eerst voorzienigen reeken, ook als validatie methode van toewijzen aan een wijk
+# -
+
+measlist =dat_85560_mc
+#print(measlist)
+cidx=np.array(measlist.Index)
+#print (cidx)
+bcolnm = np.array(buurtendata.columns)[[cidx]]
+#print(bcolnm)
+print(np.array([cidx,bcolnm, measlist.Identifier] ).T)
+
+bcolnm = pd.DataFrame( (buurtendata.columns),columns=["ColnmBu"] )
+bcolnm['Index'] = bcolnm.index
+bcolnm.to_excel("../output/chkblox.xlsx")
+#print(np.array([cidx,bcolnm, measlist.Identifier] ).T)
+
+np.isnan(buurtendata).agg('sum')
+
+bcol2 = pd.DataFrame( (buurtendata.dtypes),columns=["ColTyp"] )
+bcol2['ColnmBu'] = buurtendata.columns
+oktyps=[np.float64,np.int64]
+#print(bcol2)
+bcol2s= bcol2[True== (bcol2['ColTyp'].isin(oktyps) )]
+bcol2n= buurtendata.loc[:,bcol2s['ColnmBu'] ]
+#print(bcol2n)
+bcol2nan=  pd.DataFrame( (( bcol2n).isna()==False).agg('sum'),columns=["NumNan"] )
+bcol2nan['ColnmBu'] = bcol2nan.index
+print(bcol2nan)
+bcol3 =bcol2.merge(bcol2nan)
+bcol3
+bcol3.to_excel("../output/chkblox.xlsx")
+
+# +
+#dit zijn velden met de gemiddelde atstanden tot het DICHTSTBIJZIJNDE object
+#dat houdt in dat als het NIET in de wijk is, de kortste afstanden zullen beginnen
+#met halve wijk afstand minus deze gemiddelde afstand
+#dat houdt in dat als het WEL in de wijk is, de aanname kan zijn dat ca de helft van de
+#inwoners er op die afstand kan zijn.
+#nog steeds kan er voorkeur zijn voor grotere / ander merk
+#aanname kan ook zijn dat bezoek aan DAGLM op houdt SUPERM begint
+
+# +
+#plan2: schrijf NIET genormeerd veld met gemiddelde afstanden
+# smooth dit (samen met vetd index !=0) met een breed gaussisch grid (5 km breed, gaauss =200m)
+# aan de hand van deze waarden zijn dan gebruiksbanden te bepalen
+# bijv: winkel start 500 mtr voor korste tot 2 * gem afstand,
+# en dan lineair oplopend met afstandsbin in die band (=1 > afstand)
+# -
+
+smsc1 = np.array(buurtendata.columns[buurtendata.columns.str.contains('AV3')].str.replace('AV3',''))
+print(smsc1)
+smscs= smsc1[1:3]
+smscs
+
+lmsc1 = np.array(buurtendata.columns[buurtendata.columns.str.contains('AV20')].str.replace('AV20',''))
+lmsc2 = np.array(buurtendata.columns[buurtendata.columns.str.contains('AV20')].str.replace('AV20','_'))
+print(lmsc1)
+
+amsc1 = np.array(buurtendata.columns[buurtendata.columns.str.contains('AF_')].str.replace('AF_','_'))
+mmsc1=np.concatenate((smsc1,lmsc1,lmsc2))
+rmsc1 =amsc1[False==np.isin(amsc1,mmsc1)]
+print(rmsc1)
+
+feattstgrd=calcgdir+'/cbsfeattst.tif'
+smftg1 = rasteruts1.createNLgrid(100,lasttifname,len(smscs)*8,'')
+
+buurtendata['center']= buurtendata.representative_point()
+
+
+# +
+#now some kernel and transformations
+#note: for gaussian: ony can do 2 1d convolutions
+def roundfilt(gridstep,dist):
+    maxkernrng= int(dist/gridstep+2)*gridstep
+    x = np.linspace(-maxkernrng,+maxkernrng, int(2*maxkernrng/gridstep+1))
+    y = np.linspace(-maxkernrng,+maxkernrng, int(2*maxkernrng/gridstep+1))
+    X, Y = np.meshgrid(x, y)
+    Z = np.int8(np.sqrt(X*X+Y*Y) <dist)
+    return Z
+
+print(roundfilt(100,660) )
+
+#example fietskern1= kernelfietspara()
+#example dcalc=(fietskern1['Z2D']-fietskern1['Z'])
+#example print(np.max(np.abs(dcalc)) )
+
+# +
+#read back points, using rasterio directly
+
+import numba
+#from numba.utils import IS_PY3
+from numba.decorators import jit
+
+#@jit
+def addobjvals(img,coords,values):
+    for obj in range(coords.shape[0]): 
+        img[coords[obj,1],coords[obj,0]] += values[obj]
+        
+#@jit
+def getobjvals(img,coords,values):
+    for obj in range(coords.shape[0]): 
+        values[obj]= img[coords[obj,1],coords[obj,0]]         
+
+def gridoncenters (grid,r1):
+    corrgrid = np.zeros([grid.width, grid.height],dtype=np.int32)    
+    addobjvals(corrgrid,r1,range(len(r1)))
+    valtst = np.zeros (len(r1),dtype=np.int32)
+    getobjvals(corrgrid,r1,valtst)
+    print(valtst[abs(valtst - range(len(r1)) ) > 1e-6])
+    return corrgrid
+
+def centergridcoords (grid,ctrser):
+    r1= np.array(rasterio.transform.rowcol(grid.transform,xs=ctrser.x,ys=ctrser.y)).T
+    return r1
+    
+ctrxform = centergridcoords (smftg1,buurtendata[ "center"]) 
+gridoncenters (smftg1,ctrxform)
+# -
+
+
+
+# +
+def mktagrds(grid,bdf,selbase,r1):
+    fig, ax = plt.subplots(figsize=(6, 4))
+    bdf['geoavgdist'] = np.sqrt(bdf['area_geo']/2000000 )
+    filter1km=roundfilt(100,660) 
+    for tag in selbase:
+        f1km="AV1"+tag
+        f3km="AV3"+tag
+        f5km="AV5"+tag
+        af  ="AF"+tag
+        kpf1=bdf[bdf[f1km]>0]        
+        #seaborn.scatterplot(data=kpf1,x='geoavgdist',y=af,ax=ax)
+        hasbuurt= np.float32(gridoncenters (grid,r1) !=0)
+        aantbuurfd= rasteruts1.convfiets2d(hasbuurt,filter1km)
+        nbuurt1km = np.zeros (len(r1),dtype=np.int32)
+        getobjvals(aantbuurfd,r1,nbuurt1km)
+        bdf['nbuurt1km']=nbuurt1km
+#        print(bdf[bdf['nbuurt1km']>1])
+#'nbuurt1km',
+        stats1km=bdf.groupby([f3km])[af].agg('count')
+        print(stats1km)
+        
+
+mktagrds(smftg1,buurtendata,smscs,ctrxform)
+# -
 
 

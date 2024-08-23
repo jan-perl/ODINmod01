@@ -342,7 +342,9 @@ def testmissfill(dfrefsi,missptdfi,gridNL100ci,itotUtri):
 
 
 # +
-#@jit werkt niet
+#from numba.utils import IS_PY3
+from numba.decorators import jit
+@jit
 def fillvalues(image,idximg,indat):
     for hh in range(idximg.shape[0]):
         for ww in range(idximg.shape[1]):
@@ -353,15 +355,17 @@ def mkimgpixavgs(grid,idximg,addfietsf,kern1,indf):
     ilst=[idximg]
     putidx=2
     oppix= countpixarea(idximg,len(indf))
-    normarr=oppix.copy()
-    normarr[normarr==0] = 1e-6
-    image=np.zeros(idximg.shape)
-    fillvalues(image,idximg,oppix)
+#    print("normarr ",normarr.dtype,len(normarr))
+    image=np.zeros(idximg.shape,dtype=np.float32)
+    fillvalues(image,idximg,np.float32(oppix))
     ilst.append(image.copy())
+    normarr=oppix.copy()
+    normarr[np.isnan(normarr) | (normarr==0)] = 1
     for col in indf.columns:
         putidx+=1
-        image=np.zeros(idximg.shape)
-        normval = indf[col] /normarr
+        image=np.zeros(idximg.shape,dtype=np.float32)
+        normval = np.float32(indf[col]) /normarr
+#        print(col,normval.dtype,len(normval))
         fillvalues(image,idximg,normval)
         ilst.append(image.copy())
         if addfietsf:
@@ -378,7 +382,6 @@ def mkimgpixavgs(grid,idximg,addfietsf,kern1,indf):
             ilst.append(imager.copy())
     grid.write(np.array(ilst),list(i+1 for i in range(putidx))  )  
     return ilst
-
 #example imagelst=mkimgpixavgs(gridNL100c,dfrefs,True,itotUtr[['O_MXI22T','O_MXI22N']])    
 # -
 
