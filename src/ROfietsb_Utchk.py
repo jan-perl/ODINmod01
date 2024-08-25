@@ -89,7 +89,10 @@ prov_mxitots
 
 prov_mxitots[['PV_MXI22']].plot()
 
-itotUtr= Rf_net_buurt[Rf_net_buurt['PV_NAAM']=='Utrecht'].copy()
+#buurten excl ongelukkig kleine laatste buurt
+itotUtr= Rf_net_buurt[(Rf_net_buurt['PV_NAAM']=='Utrecht') & 
+                      (Rf_net_buurt['BU_CODE']!='BU19613901')].copy().reset_index()
+itotUtr
 
 itotUtr.plot(column="MXI_22",legend=True, cmap='OrRd')
 
@@ -413,10 +416,10 @@ np.sum(sr1 )
 
 #maar nu hebben we ook een veel sneller alternatief voor rasterstats.zonal_stats
 catlst=dataset4.read(1)
-stat4s1s = rasteruts1.sumpixarea(catlst,len(itotUtr),dataset4.read(3) )
-stat4s2s = rasteruts1.sumpixarea(catlst,len(itotUtr),dataset4.read(5) )
-stat4s1c = rasteruts1.countpixarea(catlst,len(itotUtr) )
-stat4s2c = rasteruts1.countpixarea(catlst,len(itotUtr) )
+stat4s1s = rasteruts1.sumpixarea(catlst,dataset4.read(3) )
+stat4s2s = rasteruts1.sumpixarea(catlst,dataset4.read(5) )
+stat4s1c = rasteruts1.countpixarea(catlst )
+stat4s2c = rasteruts1.countpixarea(catlst )
 stat4s1a = stat4s1s / stat4s1c 
 stat4s1a = stat4s1s / stat4s1c 
 

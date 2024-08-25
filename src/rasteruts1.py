@@ -242,11 +242,32 @@ def plotrb(dset,c1,c2):
 
 # -
 
+class GridArgError(Exception):
+    pass
+
+
 def makegridcorr (df,grid):
     shapesusd = ((geom,value) for geom, value in zip( df.geometry, df.index+1))
     imageout = rasterio.features.rasterize(
             shapes=shapesusd,
             merge_alg=rasterio.features.MergeAlg.replace,
+#            all_touched=True,
+            default_value=0,
+            out_shape=grid.shape,
+            transform=grid.transform)
+    if(np.max(imageout) != len(df)):
+        print (('info: high proj, len df ',np.max(imageout) , len(df) ))
+        raise(GridArgError("makegridcorr: Last element not projected"))
+    return imageout
+#example dfrefs= makegridcorr (itotUtr,gridNL100c)
+
+
+#zet er nieuwe punten bij
+def addmakegridcorr (df,grid):
+    shapesusd = ((geom,value) for geom, value in zip( df.geometry, df.index+1))
+    imageout = rasterio.features.rasterize(
+            shapes=shapesusd,
+            merge_alg=rasterio.features.MergeAlg.add,
 #            all_touched=True,
             default_value=0,
             out_shape=grid.shape,
@@ -267,13 +288,16 @@ def _docountpixarea(img,hival,retval):
             if (img[hh,ww] >0) and (img[hh,ww] <=hival):
                 retval[int(img[hh,ww])-1] +=1
 
-def countpixarea(img,ncats):    
+def countpixarea(img):  
+    ncats=int(np.max(img))
     retval=np.zeros(ncats,dtype=int)
     _docountpixarea(img,ncats,retval)
     return retval
 
 def findmiss(indf,img):
-    oppix= countpixarea(img,len(indf))
+    oppix= countpixarea(img)
+    if len(indf)!=len(oppix):
+        raise(GridArgError("findmiss: Incompatible length passed"))        
     oppix[oppix==0]
     print(len(indf),len(oppix))
     indf['area_pix']=oppix*100*100
@@ -298,7 +322,8 @@ def _dosumpixarea(img,hival,valarr,retval):
             if (img[hh,ww] >0) and (img[hh,ww] <=hival):
                 retval[int(img[hh,ww])-1] += valarr[hh,ww]
 
-def sumpixarea(img,ncats,valarr):    
+def sumpixarea(img,valarr):    
+    ncats=int(np.max(img))
     retval=np.zeros(ncats,dtype=np.float32)
     _dosumpixarea(img,ncats,valarr,retval)
     return retval
@@ -310,15 +335,6 @@ import seaborn
 #example seaborn.scatterplot(data=itotUtr,x='area_geo',y='area_pix')
 
 # +
-def addmakegridcorr (df,grid):
-    shapesusd = ((geom,value) for geom, value in zip( df["center"], df.index))
-    imageout = rasterio.features.rasterize(
-            shapes=shapesusd,            
-            merge_alg=rasterio.features.MergeAlg.add,
-            default_value=0,
-            out_shape=grid.shape,
-            transform=grid.transform)
-    return imageout
 
 @jit
 def fillmiss(imgori,imgmiss):
@@ -351,20 +367,27 @@ def fillvalues(image,idximg,indat):
             if idximg[hh,ww] >0:
                 image[hh,ww] = indat[int(idximg[hh,ww])-1] 
 
-def mkimgpixavgs(grid,idximg,addfietsf,kern1,indf):
+def mkimgpixavgs(grid,idximg,addfietsf,kern1,indf,donorm=True):
     ilst=[idximg]
-    putidx=2
-    oppix= countpixarea(idximg,len(indf))
+    ncats=int(np.max(idximg))
+    if len(indf)!=ncats:
+        raise(GridArgError("mkimgpixavgs: Incompatible length passed"))        
+    
+    oppix= countpixarea(idximg)
 #    print("normarr ",normarr.dtype,len(normarr))
     image=np.zeros(idximg.shape,dtype=np.float32)
     fillvalues(image,idximg,np.float32(oppix))
+    putidx=2
     ilst.append(image.copy())
     normarr=oppix.copy()
     normarr[np.isnan(normarr) | (normarr==0)] = 1
     for col in indf.columns:
         putidx+=1
         image=np.zeros(idximg.shape,dtype=np.float32)
-        normval = np.float32(indf[col]) /normarr
+        if donorm:
+            normval = np.float32(indf[col]) /normarr
+        else:
+            normval = np.float32(indf[col]) 
 #        print(col,normval.dtype,len(normval))
         fillvalues(image,idximg,normval)
         ilst.append(image.copy())
@@ -373,8 +396,9 @@ def mkimgpixavgs(grid,idximg,addfietsf,kern1,indf):
             imagef= convfietsimg(image ,kern1) 
             ilst.append(imagef.copy())
             print(np.sum(indf[col]), np.sum(image),np.sum(imagef) )
+#en voeg, ALLEEN VOOR LAATSTE PAAR, ratios en ratios smooth toe            
     if addfietsf:
-        for col in indf.columns:
+        for col in range(2):
             putidx+=1
             imager= ilst[putidx-1-2*len(indf.columns)]/ \
                     np.where(ilst[putidx+1-2*len(indf.columns)]>100,
@@ -383,6 +407,48 @@ def mkimgpixavgs(grid,idximg,addfietsf,kern1,indf):
     grid.write(np.array(ilst),list(i+1 for i in range(putidx))  )  
     return ilst
 #example imagelst=mkimgpixavgs(gridNL100c,dfrefs,True,itotUtr[['O_MXI22T','O_MXI22N']])    
-# -
+# +
+#read back points, using rasterio directly
+
+import numba
+#from numba.utils import IS_PY3
+from numba.decorators import jit
+
+#@jit
+def addobjvals(img,coords,values):
+    for obj in range(coords.shape[0]): 
+        img[coords[obj,1],coords[obj,0]] += values[obj]
+        
+#@jit
+def getobjvals(img,coords,values):
+    for obj in range(coords.shape[0]): 
+        values[obj]= img[coords[obj,1],coords[obj,0]]         
+
+def gridoncenters (grid,r1):
+    corrgrid = np.zeros([grid.width, grid.height],dtype=np.int32)    
+    addobjvals(corrgrid,r1,range(len(r1)))
+    valtst = np.zeros (len(r1),dtype=np.int32)
+    getobjvals(corrgrid,r1,valtst)
+    print(valtst[abs(valtst - range(len(r1)) ) > 1e-6])
+    return corrgrid
+
+def centergridcoords (grid,ctrser):
+    r1= np.array(rasterio.transform.rowcol(grid.transform,xs=ctrser.x,ys=ctrser.y)).T
+    return r1
+    
+#ctrxform = centergridcoords (smftg1,buurtendata[ "center"]) 
+#gridoncenters (smftg1,ctrxform)
 
 
+# +
+#now some kernel and transformations
+#note: for gaussian: ony can do 2 1d convolutions
+def roundfilt(gridstep,dist):
+    maxkernrng= int(dist/gridstep+2)*gridstep
+    x = np.linspace(-maxkernrng,+maxkernrng, int(2*maxkernrng/gridstep+1))
+    y = np.linspace(-maxkernrng,+maxkernrng, int(2*maxkernrng/gridstep+1))
+    X, Y = np.meshgrid(x, y)
+    Z = np.int8(np.sqrt(X*X+Y*Y) <dist)
+    return Z
+
+print(roundfilt(100,660) )

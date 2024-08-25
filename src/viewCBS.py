@@ -34,6 +34,13 @@ import contextily as cx
 import xyzservices.providers as xyz
 import matplotlib.pyplot as plt
 
+import rasteruts1
+import rasterio
+calcgdir="../intermediate/calcgrids"
+
+pd.set_option("display.max_rows", 200)
+pd.set_option("display.min_rows", 20)
+
 #import ODiN2pd
 import ODiN2readpkl
 
@@ -88,7 +95,9 @@ dat_85560_mc[dat_85560_mc['Title'].str.contains(r'innen')]
 
 dat_85560
 
-gemeentendata ,  wijkgrensdata ,    buurtendata = ODiN2readpkl.getgwb(2020)    
+gemeentendata ,  wijkgrensdata ,    buurtendata = ODiN2readpkl.getgwb(2020)   
+
+buurtendata= buurtendata.sort_values(by=['BU_CODE']).reset_index()
 
 # +
 #gemeentendata_c ,  wijkgrensdata_c ,    buurtendata_c = getgwb(2021)    
@@ -235,10 +244,9 @@ for year in range(2018,2023):
     pc6hnryr =ODiN2readpkl.getpc6hnryr(year) 
     print(pc6hnryr.dtypes)
 
-import rasteruts1
-import rasterio
-calcgdir="../intermediate/calcgrids"
 
+# +
+#schrijven en plotten
 
 # +
 def setaxhtn(ax):
@@ -250,33 +258,61 @@ def setaxutr(ax):
     ax.set_ylim(bottom=480000, top=430000)
 
 
+# +
+#begin schrijven buurtendata met de index als start
+#dfrefs is uit eerste beeld van output te halen
+#area_pix wordt toegevoegd aan df, moet na lezen opnieuw gemaakt
+#rasteruts1.findmiss(indf,dfrefs)
 # -
 
-buurtendata=buurtendata.reset_index()
+stryear='2020'
+cbspc4data =pd.read_pickle("../intermediate/CBS/pc4data_"+stryear+".pkl")
+cbspc4data= cbspc4data.sort_values(by=['postcode4']).reset_index()
+
+
+# +
+#let op: gaat uit van gesorteerd en reset_index dataframa
+def make1stgridgeo (tifname,indf,usecols,nanval):
+    if (np.max(indf.index -np.array(range(len(indf)))) !=0):
+        raise(GridArgError("make1stgridgeo: Index not in order (sorting not checked)"))        
+    grid = rasteruts1.createNLgrid(100,tifname,8,'')
+    dfrefs= rasteruts1.makegridcorr (indf,grid)
+    #veel niet gevonden uit landelijk !
+    indf['area_geo'] = indf.area
+    missptdf= rasteruts1.findmiss(indf,dfrefs)
+    for col in usecols:
+        indf[col]=np.where(indf[col] == nanval,0,indf[col])
+    imagelst=rasteruts1.mkimgpixavgs(grid,dfrefs,False,False, indf[usecols],True)  
+    grid.close()
+    grid = rasterio.open(tifname)
+    return grid
+
+pc4tifname=calcgdir+'/cbs2020pc4-NL.tif'
+pc4excols= ['aantal_inwoners','aantal_mannen', 'aantal_vrouwen']
+pc4inwgrid= make1stgridgeo (pc4tifname,cbspc4data,pc4excols,np.nan)
+# -
 
 lasttifname=calcgdir+'/cbsbuurtin-NL.tif'
-buurtinwgrid = rasteruts1.createNLgrid(100,lasttifname,8,'')
-
-dfrefs= rasteruts1.makegridcorr (buurtendata,buurtinwgrid)
-
-buurtendata['area_geo'] = buurtendata.area
-
-#veel niet gevonden uit landelijk !
-missptdf= rasteruts1.findmiss(buurtendata,dfrefs)
-
-import seaborn
-seaborn.scatterplot(data=buurtendata,x='area_geo',y='area_pix')
-
 buurtexcols= ['AANT_INW','AANT_MAN', 'AANT_VROUW']
-imagelst=rasteruts1.mkimgpixavgs(buurtinwgrid,dfrefs,False,False,
-                                 buurtendata[buurtexcols])  
-
-buurtinwgrid.close()
-
-buurtinwgrid = rasterio.open(lasttifname)
+buurtinwgrid= make1stgridgeo (lasttifname,buurtendata,buurtexcols,np.nan)
 
 rogirdtifname=calcgdir+'/oriTN2-NL.tif'
 rofinwgrid = rasterio.open(rogirdtifname)
+
+#verlate diagnostiek op area_pix uit 
+import seaborn
+fig, ax = plt.subplots()
+seaborn.scatterplot(data=buurtendata[buurtendata['area_pix']>0],x='area_geo',y='area_pix',ax=ax)
+ax.set_xscale('log')
+ax.set_yscale('log')
+
+import seaborn
+fig, ax = plt.subplots()
+seaborn.scatterplot(data=cbspc4data[cbspc4data['area_pix']>0],x='area_geo',y='area_pix',ax=ax)
+ax.set_xscale('log')
+ax.set_yscale('log')
+
+cbspc4data[cbspc4data['area_geo']>2e8]
 
 fig, ax = plt.subplots()
 base=buurtendata.boundary.plot(color='green',ax=ax,alpha=.3);
@@ -366,8 +402,6 @@ bcolnm['Index'] = bcolnm.index
 bcolnm.to_excel("../output/chkblox.xlsx")
 #print(np.array([cidx,bcolnm, measlist.Identifier] ).T)
 
-np.isnan(buurtendata).agg('sum')
-
 bcol2 = pd.DataFrame( (buurtendata.dtypes),columns=["ColTyp"] )
 bcol2['ColnmBu'] = buurtendata.columns
 oktyps=[np.float64,np.int64]
@@ -435,39 +469,11 @@ print(roundfilt(100,660) )
 #example fietskern1= kernelfietspara()
 #example dcalc=(fietskern1['Z2D']-fietskern1['Z'])
 #example print(np.max(np.abs(dcalc)) )
-
-# +
-#read back points, using rasterio directly
-
-import numba
-#from numba.utils import IS_PY3
-from numba.decorators import jit
-
-#@jit
-def addobjvals(img,coords,values):
-    for obj in range(coords.shape[0]): 
-        img[coords[obj,1],coords[obj,0]] += values[obj]
-        
-#@jit
-def getobjvals(img,coords,values):
-    for obj in range(coords.shape[0]): 
-        values[obj]= img[coords[obj,1],coords[obj,0]]         
-
-def gridoncenters (grid,r1):
-    corrgrid = np.zeros([grid.width, grid.height],dtype=np.int32)    
-    addobjvals(corrgrid,r1,range(len(r1)))
-    valtst = np.zeros (len(r1),dtype=np.int32)
-    getobjvals(corrgrid,r1,valtst)
-    print(valtst[abs(valtst - range(len(r1)) ) > 1e-6])
-    return corrgrid
-
-def centergridcoords (grid,ctrser):
-    r1= np.array(rasterio.transform.rowcol(grid.transform,xs=ctrser.x,ys=ctrser.y)).T
-    return r1
-    
-ctrxform = centergridcoords (smftg1,buurtendata[ "center"]) 
-gridoncenters (smftg1,ctrxform)
 # -
+
+#read back points, using rasterio directly
+ctrxform = rasteruts1.centergridcoords (smftg1,buurtendata[ "center"]) 
+rasteruts1.gridoncenters (smftg1,ctrxform)
 
 
 
@@ -483,10 +489,10 @@ def mktagrds(grid,bdf,selbase,r1):
         af  ="AF"+tag
         kpf1=bdf[bdf[f1km]>0]        
         #seaborn.scatterplot(data=kpf1,x='geoavgdist',y=af,ax=ax)
-        hasbuurt= np.float32(gridoncenters (grid,r1) !=0)
+        hasbuurt= np.float32(rasteruts1.gridoncenters (grid,r1) !=0)
         aantbuurfd= rasteruts1.convfiets2d(hasbuurt,filter1km)
         nbuurt1km = np.zeros (len(r1),dtype=np.int32)
-        getobjvals(aantbuurfd,r1,nbuurt1km)
+        rasteruts1.getobjvals(aantbuurfd,r1,nbuurt1km)
         bdf['nbuurt1km']=nbuurt1km
 #        print(bdf[bdf['nbuurt1km']>1])
 #'nbuurt1km',

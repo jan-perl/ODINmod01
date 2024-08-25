@@ -21,19 +21,20 @@ import numpy as np
 import seaborn as sns
 from sklearn.linear_model import LinearRegression
 
+import re
+
 import geopandas
 import contextily as cx
 import xyzservices.providers as xyz
 import matplotlib.pyplot as plt
 
-if 1==0:
-    cbspc4data = geopandas.read_file("../data/CBS/PC4STATS/cbs_pc4_2022_v1.gpkg")
-    cbspc4data['postcode4'] = pd.to_numeric(cbspc4data['postcode4'])
-    stryear='2022'
-    cbspc4data.to_pickle("../intermediate/CBS/pc4data_"+stryear+".pkl") 
+import rasteruts1
+import rasterio
+calcgdir="../intermediate/calcgrids"
 
-stryear='2022'
+stryear='2020'
 cbspc4data =pd.read_pickle("../intermediate/CBS/pc4data_"+stryear+".pkl")
+cbspc4data= cbspc4data.sort_values(by=['postcode4']).reset_index()
 
 cbspc4data['oppervlak'] = cbspc4data.area
 
@@ -62,60 +63,25 @@ cbspc4datahtn = cbspc4data[(cbspc4data['postcode4']>3990) & (cbspc4data['postcod
 phtn = cbspc4datahtn.to_crs(epsg=plot_crs).plot()
 cx.add_basemap(phtn, source= prov0)
 
-if 0==1:
-    cbspc6data = geopandas.read_file("../data/CBS/PC6STATS/cbs_pc6_2022_v2.gpkg")
-    #cbspc6data['postcode6'] = pd.to_numeric(cbspc4data['postcode6'])
-    stryear='2022'
-    cbspc6data.to_pickle("../intermediate/CBS/pc6data_"+stryear+".pkl") 
+pc4tifname=calcgdir+'/cbs2020pc4-NL.tif'
+pc4excols= ['aantal_inwoners','aantal_mannen', 'aantal_vrouwen']
+pc4inwgrid= rasterio.open(pc4tifname)
 
-cbspc6data =pd.read_pickle("../intermediate/CBS/pc6data_"+stryear+".pkl")
+#rudifunset
+Rf_net_buurt=pd.read_pickle("../intermediate/rudifun_Netto_Buurt_o.pkl") 
+Rf_net_buurt.reset_index(inplace=True,drop=True)
+rudifuntifname=calcgdir+'/oriTN2-NL.tif'
+rudifungrid= rasterio.open(rudifuntifname)
 
-cbspc6data['oppervlak'] = cbspc6data.area
+#nu nog MXI overzetten naar PC4 ter referentie
 
-cbspc6data.dtypes
 
-cbspc6data.plot()
 
-cbspc6data.plot(column="aantal_woningen",legend=True, cmap='OrRd')
-
-cbspc6data.columns
-
-cbspc6data.columns.tolist()
-
-cbspc6data['PC4']= cbspc6data['postcode6'].str[0:4].astype('int64')
-htnpc6data=cbspc6data[(cbspc6data['PC4'] >3990) & (cbspc6data['PC4'] <3999) ].copy()
-
-htnpc6data["dichtstbijzijnde_treinstation_afstand_in_km"][htnpc6data["dichtstbijzijnde_treinstation_afstand_in_km"] >=-90000].max()
-
-htnpc6inw= htnpc6data[htnpc6data["aantal_inwoners"] >=-90000]
-phtn=htnpc6inw.to_crs(epsg=3857). \
-          plot(column="aantal_inwoners",legend=True, cmap='OrRd',alpha=.7)
-cx.add_basemap(phtn, source= prov0)
-
-# +
-#now circles instead of areas
-htnpc6inwr2= htnpc6data[htnpc6data["aantal_inwoners"] >=-90000].copy()
-htnpc6inwr2[ "center"]= htnpc6inwr2.representative_point()
-htnpc6inwr3= htnpc6inwr2.copy()
-#htnpc6inwr3.set_geometry ( "center", inplace = True)
-htnpc6inwr3.set_geometry (  htnpc6inwr3.representative_point(), inplace = True)
-#htnpc6inwr3= htnpc6inwr3.set_geometry ( "center", inplace = False)
-
-phtn3=htnpc6inwr3.to_crs(epsg=3857). \
-          plot(column="aantal_inwoners",legend=True, cmap='OrRd',alpha=.7)
-cx.add_basemap(phtn3, source= prov0)
-# -
-
-htnpc6inwr3['geometry']
-
-htnpc6data[htnpc6data["aantal_inwoners"] >200]
-
-htnpc6data['PC5']= cbspc6data['postcode6'].str[0:5]
-hvnpc6data=htnpc6data[htnpc6data['PC5']== '3992P']
-hvnpc6data[hvnpc6data["aantal_inwoners"] >=-90000].plot(column="aantal_inwoners",legend=True, cmap='OrRd')
 
 #import ODiN2pd
 import ODiN2readpkl
+
+
 
 ODiN2readpkl.allodinyr.dtypes
 
@@ -151,6 +117,57 @@ specvaltab
 allodinyr=ODiN2readpkl.allodinyr
 len(allodinyr.index)
 
+
+# +
+#nu ODIN ranges opzetten
+#we veranderen NIETS aan odin data
+#wel presenteren we het steeds als cumulatieve sommen tot een bepaalde bin
+
+# +
+#maak summmatie tabellen (joinbaar)
+def pickAnrs(myspecvals,xvar,newmaxbndidx):
+    orimin=1    
+    allKAfstV=myspecvals [ (myspecvals ['Code'] !=largranval) & 
+                           (myspecvals ['Code'] !='<missing>') & 
+#                           ((myspecvals ['Code']).astype('int64') >= orimin) & 
+                           (myspecvals ['Variabele_naam'] ==xvar) ][['Code','Code_label']].\
+                           copy().reset_index(drop=True)    
+    allKAfstV['Code']= allKAfstV['Code'].astype('int64')
+    orimax=np.max(allKAfstV['Code'])
+    allKAfstV['MaxAfst'] = list(re.sub(r',','.',re.sub(r' km.*$','',re.sub(r'^.* tot ','',s)  ))\
+                                for s in allKAfstV['Code_label'] )
+    mindispdist=0.1
+    allKAfstV.loc[0,'MaxAfst']=mindispdist
+    allKAfstV['MaxAfst'] =allKAfstV['MaxAfst'].astype('float32')
+    lastval = orimax
+    oarr=np.array(allKAfstV['Code'])
+    if 1==1:
+        oxlatKAfstV = allKAfstV[allKAfstV['Code']>=orimin] [['Code']] .rename( 
+                                 columns={'Code':'KAfstV'})
+        oxlatKAfstV['KAfstCluCode'] =  orimax
+        xlatKAfstV = oxlatKAfstV.copy()
+        for n in newmaxbndidx:     
+            if n>0:
+                toapp = oxlatKAfstV[oxlatKAfstV['KAfstV']<=n].copy()
+                toapp ['KAfstCluCode'] =  n
+                xlatKAfstV= xlatKAfstV.append(toapp) .reset_index(drop=True)                      
+    else:
+        for ir in range(len(allKAfstV)):
+            i= len(allKAfstV)-ir-1
+            if oarr[i] in newmaxbndidx or oarr[i] ==0:
+                lastval = oarr[i] 
+            oarr[i] = lastval
+    allKAfstV['KAfstCluCode']=oarr
+#    print(allKAfstV)   
+    selKAfstV= allKAfstV.iloc[ newmaxbndidx, ]
+    selKAfstV.loc[ orimax , "MaxAfst"]  =0    
+    return (  [  selKAfstV[['KAfstCluCode',"MaxAfst"]] , xlatKAfstV ])
+
+useKAfstV,xlatKAfstV  = pickAnrs (specvaltab,'KAfstV',[5,8,-1] )
+print(xlatKAfstV)   
+print(useKAfstV)   
+# -
+
 usePC4MXI=True
 fietswijk1pc4= ODiN2readpkl.fietswijk1pc4
 if usePC4MXI:
@@ -171,6 +188,110 @@ if 0==1:
     print(allodinyr2.dtypes)
     len(allodinyr2.index)
 
+
+def mkfietswijk3pc4(pc4data,pc4grid,rudigrid):
+    pc4lst=pc4grid.read(1)
+    outdf=pc4data[['postcode4','aantal_inwoners']].rename(columns={'postcode4':'PC4'} )
+    outdf['aantal_inwoners_gr2'] = rasteruts1.sumpixarea(pc4lst,pc4grid.read(3) )
+    outdf['S_MXI22_BWN'] = rasteruts1.sumpixarea(pc4lst,rudifungrid.read(3) )
+    outdf['S_MXI22_BAT'] = rasteruts1.sumpixarea(pc4lst,rudifungrid.read(5) )
+    outdf['S_MXI22_BAN'] = outdf['S_MXI22_BWN'] - outdf['S_MXI22_BAT'] 
+    if usePC4MXI:
+        outdf['S_MXI22_NS'] = outdf['S_MXI22_BWN']  / (outdf['S_MXI22_BWN']  + outdf['S_MXI22_BAN'] )
+        outdf['S_MXI22_BB'] = outdf['S_MXI22_NS']
+    
+    outdf['aantal_inwoners_d2'] = outdf['aantal_inwoners_gr2'] -outdf['aantal_inwoners']
+    return outdf
+fietswijk3pc4=mkfietswijk3pc4(cbspc4data,pc4inwgrid,rudifungrid)
+bd=fietswijk3pc4 [abs(fietswijk3pc4['aantal_inwoners_d2'] ) > 1 ]
+
+
+# +
+def cartesian_product(*arrays):
+    la = len(arrays)
+    dtype = np.result_type(*arrays)
+    arr = np.empty([len(a) for a in arrays] + [la], dtype=dtype)
+    for i, a in enumerate(np.ix_(*arrays)):
+        arr[...,i] = a
+    return arr.reshape(-1, la)  
+
+#from https://stackoverflow.com/questions/53699012/performant-cartesian-product-cross-join-with-pandas
+def cartesian_product_multi(*dfs):
+    idx = cartesian_product(*[np.ogrid[:len(df)] for df in dfs])
+    return pd.DataFrame(
+        np.column_stack([df.values[idx[:,i]] for i,df in enumerate(dfs)]))
+
+
+
+# +
+#eerst een dataframe dat
+#2) per lengteschaal, en PC variabelen eerst geografisch sommeert dan waarde ophaalt per punt
+#   bijv BAM BAT of  (BAM*BAT)/(BAM+BAT)
+#en dit dan per PC 4 sommeert
+#dit zijn min of meer statische utigangstabellen waarop de modellen dan door kunnen gaan
+#Hierna kan daar dan op gemodelleerd worden (data is niet geo meer maar per PC4)
+#let op dit beschrijft het NAAR deel van de reis: het van deel 
+#dit moet nog vermenigvuligd worden met het vergelijkbare (heel locale) tuple ->
+#dus steeds 9 kolommen LW LO LM x OW OO OM 
+#radius =0: some over hele land voor O
+def mkgeoschparafr (pc4data,pc4grid,rudigrid,myKAfstV):
+    pc4lst=pc4grid.read(1)
+    outdf=pc4data[['postcode4','aantal_inwoners']].rename(columns={'postcode4':'PC4'} )
+    outdf['KAfstCluCode'] = np.max(myKAfstV["KAfstCluCode"])
+    outdf['MaxAfst'] = 0
+    outdfst= outdf.copy()
+    
+    R=dict()
+    R_LW= rudifungrid.read(3)
+    R['LW']= R_LW
+    R_LT= rudifungrid.read(5)
+    R_LO =  R_LT- R_LW        
+    R['LO'] =  R_LO
+#    R['LM'] =  (R_LO* R_LW) / (R_LO + R_LW+1e-10)
+
+    for lkey in R.keys():
+        lvals = rasteruts1.sumpixarea(pc4lst,R[lkey])
+        for okey in ('OW','OO','OM'):
+            colnam="M_"+ lkey +"_" + okey
+#            print(colnam)
+            outdf[colnam] = lvals            
+    R_LW_land= np.sum(R_LW)
+    R_LO_land= np.sum(R_LO)
+    
+    for index, row in myKAfstV[myKAfstV['MaxAfst']!=0].iterrows():        
+        outdfadd=outdfst.copy()
+        outdfadd['KAfstCluCode']= row["KAfstCluCode"]
+        outdfadd['MaxAfst'] = row["MaxAfst"]
+        print(row["KAfstCluCode"], row["MaxAfst"])
+        filt=rasteruts1.roundfilt(100,row["MaxAfst"])
+
+        F=dict()
+        F_OW = rasteruts1.convfiets2d(R_LW, filt ) /R_LW_land
+        F['OW'] =  F_OW  
+        F_OT = rasteruts1.convfiets2d(R_LT, filt ) /R_LO_land
+        F_OO =  F_OT- F_OW        
+        F['OO'] =  F_OO 
+        F['OM'] =  (F_OO* F_OW) / (F_OO + F_OW+1e-10)
+
+        for lkey in R.keys():
+            for okey in ('OW','OO','OM'):
+                lvals = rasteruts1.sumpixarea(pc4lst,R[lkey]*F[okey])
+                colnam="M_"+ lkey +"_" + okey
+#                print(colnam,(lvals[np.isnan(lvals)]))
+                outdfadd[colnam] = lvals            
+        
+        outdf=outdf.append(outdfadd)
+    print(len(outdfst))
+    return(outdf)
+
+geoschpc4=mkgeoschparafr(cbspc4data,pc4inwgrid,rudifungrid,useKAfstV)
+geoschpc4
+
+
+# +
+#geoschpc4 is een mooi dataframe met generieke woon en werk parameters
+#Er is nog wel een mogelijk verzadigings effect daar waar de waarden voor
+#grotere afstanden die van de landelijke waarden benaderen
 
 # +
 #print(allodinyr2)
@@ -207,10 +328,10 @@ def addparscol (df,coltoadd):
             PCcols=["AankPC","VertPC"]
             if 0 &  ~ (srcarr[0] in PCcols):
                 print ("Error in addparscol: col ",srcarr[0]," not usable for ", coltoadd)
-            elif 0 & ~ (srcarr[2] in list(fietswijk1pc4.columns)):
+            elif 0 & ~ (srcarr[2] in list(fietswijk3pc4.columns)):
                 print ("Error in addparscol: col ",srcarr[2]," not usable for ", coltoadd)
             else:
-                fwin4 = fietswijk1pc4[['PC4',srcarr[2]]]
+                fwin4 = fietswijk3pc4[['PC4',srcarr[2]]]
                 df=df.merge(fwin4,left_on=srcarr[0], right_on='PC4',how='left')
                 df=df.rename(columns={srcarr[2]:coltoadd})
         else:
@@ -219,6 +340,108 @@ def addparscol (df,coltoadd):
     return (df)
 naarhuis = allodinyr [allodinyr ['Doel'] ==1 ]
 addparscol(naarhuis,"AankPC/rudifun/S_MXI22_BB").dtypes
+
+
+# +
+#dan een dataframe dat
+#2) per lengteschaal, 1 PC (van of naar en anderegroepen (maar bijv ook Motief ODin data verzamelt)
+
+def mkdfverplxypc4 (df,myspecvals,xvar,pltgrp,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4,ngrp):
+    xsrcarr=  xvar.split ('/')
+    xvarPC = xsrcarr[0]
+    dfvrecs = df [(df['Verpl']==1 ) & (df[xvarPC] > 500)  ]   
+    dfvrecs=addparscol(dfvrecs,pltgrp)
+#    oprecs = df [df['OP']==1]
+    pstats = dfvrecs[[pltgrp, 'KAfstV',xvarPC,'FactorV']].groupby([pltgrp, 'KAfstV', xvarPC]).sum().reset_index()
+    print(len(pstats))
+    pstatsc = pstats[pstats ['KAfstV'] >0].merge(myxlatKAfstV,how='left').drop( columns='KAfstV')
+    print(len(pstatsc))
+    pstatsc = pstatsc.groupby([pltgrp, 'KAfstCluCode', xvarPC]).sum().reset_index()
+    print(len(pstatsc))
+    pstatsc=pstatsc.rename(columns={xvarPC:'PC4'}).merge(mygeoschpc4,how='left')
+    return(pstatsc)
+
+#code werk nog niet 
+
+
+naarhuis = allodinyr [allodinyr ['Doel'] ==1 ]    
+indatverplgr = mkdfverplxypc4 (naarhuis,specvaltab,
+                                'AankPC/rudifun/S_MXI22_BWN','MotiefV','Naar huis',
+                                useKAfstV,xlatKAfstV,geoschpc4,100)
+indatverplgr
+# -
+
+from sklearn.linear_model import LinearRegression
+from scipy.optimize import nnls
+import seaborn
+
+
+# +
+def _regressgrp(indf, yvar, xvars,pcols):  
+#        reg_nnls = LinearRegression(fit_intercept=False )
+        y_train=indf[yvar]
+        X_train=indf[xvars]
+#        print (X_train)
+        fit1 = nnls(X_train, y_train)    
+        rv=pd.DataFrame(fit1[0],index=pcols).T
+        return(rv)
+
+
+def dofitdatverplgr(indf,pltgrp):
+#    indf = indf[(indf['MaxAfst']!=95.0) & (indf[pltgrp]<3) ]
+    colvacols = indf.columns
+    colpacols = np.array( list ( (re.sub(r'M_','P_',s) for s in list(colvacols) ) ) )
+    colvacols2 = colvacols[colvacols != colpacols]
+    colpacols2 = colpacols[colvacols != colpacols]
+    rf= indf.groupby([pltgrp ,'KAfstCluCode' ]).apply(
+            _regressgrp, 'FactorV', colvacols2, colpacols2).reset_index()
+    indf = indf.merge(rf,how='left')
+    blk1=indf[colvacols2 ]
+    blk2=indf[colpacols2 ]
+#    print(blk1)
+    s2= np.sum(np.array(blk1)*np.array(blk2),axis=1)
+    indf['FactorEst'] =s2
+    indf['DiffEst'] =indf['FactorV']-s2
+    return(indf)
+
+
+fitdatverplgr = dofitdatverplgr(indatverplgr,'MotiefV')
+seaborn.scatterplot(data=fitdatverplgr,x="FactorEst",y="DiffEst")
+# -
+
+seaborn.scatterplot(data=fitdatverplgr[fitdatverplgr['MaxAfst']==0],x="FactorEst",y="DiffEst")
+
+pllanddiff= cbspc4data.merge(fitdatverplgr[(fitdatverplgr['MaxAfst']==0) 
+                    &  (fitdatverplgr ['MotiefV'] ==4 )][['PC4','DiffEst','FactorEst','FactorV']],
+            how='left',left_on=('postcode4'), right_on = ('PC4'))
+print ( (len(cbspc4data), len(pllanddiff) ) )
+if 1==1:
+    pland= pllanddiff.plot(column= 'DiffEst',
+                                cmap='jet',legend=True,alpha=.6)
+else:    
+    pland= pllanddiff.to_crs(epsg=plot_crs).plot(column= 'DiffEst',
+                                cmap='jet',legend=True,alpha=.6)
+    cx.add_basemap(pland, source= prov0)
+#plland.plot( column= 'DiffEst', Legend=True)
+
+pllanddiff.index
+
+
+# +
+def quicklandpc4plot(pc4df,pc4grid,pc4dfcol):
+    idximg=pc4grid.read(1)
+    print( np.min(idximg),np.max(idximg) )
+    image=np.zeros(idximg.shape,dtype=np.float32)
+    print( np.min(pc4df[pc4dfcol] ),np.max(pc4df[pc4dfcol] ) )
+    rasteruts1.fillvalues(image,idximg,np.float32(pc4df[pc4dfcol]) )
+    print( np.min(image),np.max(image) )
+    fig, ax = plt.subplots()
+    nlextent=[0,280000,300000, 625000]
+    #image = np.isnan(image)
+    plt.imshow(image,cmap='jet',alpha=.6,extent=nlextent)
+    plt.colorbar()
+    
+quicklandpc4plot(pllanddiff,pc4inwgrid,'DiffEst')
 
 
 # +

@@ -179,21 +179,55 @@ for year in range(2018,2023):
     pc6hnryr =cnvpc6hnryr(year) 
     print(pc6hnryr.dtypes)
 
-# +
+
+def getcbspc4data(year):
+    if year==2023:
+         print('nog niet')
+    elif year==2022:
+        data = geopandas.read_file("../data/CBS/PC4STATS/cbs_pc4_2022_v1.gpkg")
+    elif year==2021:
+        data = geopandas.read_file("../data/CBS/PC4STATS/cbs_pc4_2021_v2.gpkg")
+    elif year==2020:
+        data = geopandas.read_file("../data/CBS/PC4STATS/cbs_pc4_2020_vol.gpkg")
+    elif year==2019:
+        data = geopandas.read_file("../data/CBS/PC4STATS/cbs_pc4_2019_vol.gpkg")
+    data['postcode4'] = pd.to_numeric(data['postcode4'])
+    stryear=str(year)    
+    data.to_pickle("../intermediate/CBS/pc4data_"+stryear+".pkl") 
+    return (data)
+
+
+
 #basic PC4 data
-cbspc4data = geopandas.read_file("../data/CBS/PC4STATS/cbs_pc4_2022_v1.gpkg")
-cbspc4data['postcode4'] = pd.to_numeric(cbspc4data['postcode4'])
+#2023 werkt nog niet
+for year in range(2019,2023):
+    cbspc4data=getcbspc4data(year) 
+    print(cbspc4data.dtypes)
 
-stryear='2022'
-cbspc4data.to_pickle("../intermediate/CBS/pc4data_"+stryear+".pkl") 
 
-# +
-#basic PC6 data
-cbspc6data = geopandas.read_file("../data/CBS/PC6STATS/cbs_pc6_2022_v2.gpkg")
+def getcbspc6data(year):
+    if year==2023:        
+        data = geopandas.read_file("../data/CBS/PC6STATS/cbs_pc6_2023_v1.gpkg")
+    elif year==2022:
+        data = geopandas.read_file("../data/CBS/PC6STATS/cbs_pc6_2022_v2.gpkg")
+    elif year==2021:
+        data = geopandas.read_file("../data/CBS/PC6STATS/cbs_pc6_2021_vol.gpkg")
+    elif year==2020:
+        data = geopandas.read_file("../data/CBS/PC6STATS/cbs_pc6_2020_vol.gpkg")
+    elif year==2019:
+        data = geopandas.read_file("../data/CBS/PC6STATS/cbs_pc6_2019_vol.gpkg")
+    print(data.dtypes)     
+    data['PC4']= data['postcode6'].str[0:4].astype('int64')
+    stryear=str(year)    
+    data.to_pickle("../intermediate/CBS/pc6data_"+stryear+".pkl") 
+    return (data)
+#let op postcode6 veld heet verschillend in verschillende jaren
 
-#cbspc6data['postcode6'] = pd.to_numeric(cbspc4data['postcode6'])
-stryear='2022'
-cbspc6data.to_pickle("../intermediate/CBS/pc6data_"+stryear+".pkl") 
-# -
+
+#basic PC6 data, heel groot. Daarom alleen 2022 houden
+#for year in range(2019,2024):
+for year in range(2022,2023):
+    cbspc6data=getcbspc6data(year) 
+    print(cbspc6data.dtypes) 
 
 print("Finished")
