@@ -38,6 +38,8 @@ import rasteruts1
 import rasterio
 calcgdir="../intermediate/calcgrids"
 
+from sklearn import linear_model
+
 pd.set_option("display.max_rows", 200)
 pd.set_option("display.min_rows", 20)
 
@@ -343,32 +345,48 @@ buurtimsums
 
 print(np.sum(buurtendata[buurtexcols]))
 
-from sklearn import linear_model
+# +
+
 buurtcorrM = (False == np.isnan(buurtinwgrid.read(1+2))) & \
                sambuurt1 & (rofinwgrid.read(3) >0) & ( buurtinwgrid.read(1+2) >0)
 columns=['Inwoners','WoonOppervlak']
 buurtcorr= pd.DataFrame( np.array ( (buurtinwgrid.read(1+2)[buurtcorrM ],
                                       rofinwgrid.read(3)[buurtcorrM ] ) ), index=columns).T 
 buurtcorr.dtypes
+# -
 
-lm = linear_model.LinearRegression(fit_intercept=True)
-model = lm.fit(np.log(buurtcorr['WoonOppervlak'].values.reshape(-1, 1)),
-               np.log(buurtcorr['Inwoners'].values.reshape(-1, 1))) 
-#lm.fit(buurtcorr['WoonOppervlak'],buurtcorr['Inwoners']) 
-buurtcorr['Predict']=np.exp(model.predict(np.log(buurtcorr['WoonOppervlak'].values.reshape(-1, 1))))
-buurtcorr['Predictu']=buurtcorr['Predict']*np.exp(1)
-buurtcorr['Predictl']=buurtcorr['Predict']*np.exp(-1)
-print( model.coef_, model.intercept_)
-fig, ax = plt.subplots(figsize=(6, 4))
-seaborn.lineplot(data=buurtcorr,x='WoonOppervlak',y='Predict', color='g',ax=ax)
-seaborn.lineplot(data=buurtcorr,x='WoonOppervlak',y='Predictu', color='r',ax=ax)
-seaborn.lineplot(data=buurtcorr,x='WoonOppervlak',y='Predictl', color='r',ax=ax)
-seaborn.scatterplot(data=buurtcorr,x='WoonOppervlak',y='Inwoners',ax=ax)
-ax.set_xscale('log')
-ax.set_yscale('log')
+
+
+# +
+def loglogregrplot(indf,xcol,ycol):
+    lm = linear_model.LinearRegression(fit_intercept=True)
+    model = lm.fit(np.log(indf[xcol].values.reshape(-1, 1)),
+                   np.log(indf[ycol].values.reshape(-1, 1))) 
+    #lm.fit(indf[xcol],indf[ycol]) 
+    indf['Predict']=np.exp(model.predict(np.log(indf[xcol].values.reshape(-1, 1))))
+    indf['Predictu']=indf['Predict']*np.exp(1)
+    indf['Predictl']=indf['Predict']*np.exp(-1)
+    print( model.coef_, model.intercept_)
+    fig, ax = plt.subplots(figsize=(6, 4))
+    seaborn.lineplot(data=indf,x=xcol,y='Predict', color='g',ax=ax)
+    seaborn.lineplot(data=indf,x=xcol,y='Predictu', color='r',ax=ax)
+    seaborn.lineplot(data=indf,x=xcol,y='Predictl', color='r',ax=ax)
+    seaborn.scatterplot(data=indf,x=xcol,y=ycol,ax=ax)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    print(fig)
+    return model
+    
+buurtlogmod= loglogregrplot(buurtcorr,'WoonOppervlak','Inwoners' )
+# -
+
+buurtcorr['inwperare']= 10000*buurtcorr['Inwoners' ]/ buurtcorr['WoonOppervlak']
+buurtcorr['pctow']= buurtcorr['WoonOppervlak']/buurtendata['area_geo' ]
+buurtcorr2 = buurtcorr[  (~ np.isnan (buurtcorr['pctow']))  &  (~ np.isnan (buurtcorr['inwperare']))]
+loglogregrplot(buurtcorr2,'pctow','inwperare' )
 
 buurtratioa =  np.where(buurtcorrM , np.log(buurtinwgrid.read(1+2)) - \
-                        (np.log(rofinwgrid.read(3)) * model.coef_ + model.intercept_ ),\
+                        (np.log(rofinwgrid.read(3)) * buurtlogmod.coef_ + buurtlogmod.intercept_ ),\
                         np.nan)
 buurtratio =  np.where(abs(buurtratioa)< 1,buurtratioa,np.nan)
 plt.imshow(buurtratio,origin='lower', cmap='plasma')

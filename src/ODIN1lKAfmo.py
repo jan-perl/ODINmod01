@@ -32,6 +32,11 @@ import rasteruts1
 import rasterio
 calcgdir="../intermediate/calcgrids"
 
+from sklearn.linear_model import LinearRegression
+from scipy.optimize import nnls
+from sklearn import linear_model
+import seaborn
+
 stryear='2020'
 cbspc4data =pd.read_pickle("../intermediate/CBS/pc4data_"+stryear+".pkl")
 cbspc4data= cbspc4data.sort_values(by=['postcode4']).reset_index()
@@ -287,11 +292,72 @@ def mkgeoschparafr (pc4data,pc4grid,rudigrid,myKAfstV):
 geoschpc4=mkgeoschparafr(cbspc4data,pc4inwgrid,rudifungrid,useKAfstV)
 geoschpc4
 
-
 # +
 #geoschpc4 is een mooi dataframe met generieke woon en werk parameters
 #Er is nog wel een mogelijk verzadigings effect daar waar de waarden voor
 #grotere afstanden die van de landelijke waarden benaderen
+# -
+
+#nu een kijken:
+#inw / geo opp , #inw / wo  wo / geo opp
+#dit is voor buurten al gedaan in viewCBS
+#hergebruik code
+print(largranval)
+ODINmissint = -99997 
+
+
+# +
+def loglogregrplot(indf,xcol,ycol):
+    print ((np.min(indf[xcol] ),np.min(indf[ycol]))) 
+    
+    lm = linear_model.LinearRegression(fit_intercept=True)
+    model = lm.fit(np.log(indf[xcol].values.reshape(-1, 1)),
+                   np.log(indf[ycol].values.reshape(-1, 1))) 
+    #lm.fit(indf[xcol],indf[ycol]) 
+    indf['Predict']=np.exp(model.predict(np.log(indf[xcol].values.reshape(-1, 1))))
+    indf['Predictu']=indf['Predict']*np.exp(1)
+    indf['Predictl']=indf['Predict']*np.exp(-1)
+    print( model.coef_, model.intercept_)
+    fig, ax = plt.subplots(figsize=(6, 4))
+    seaborn.lineplot(data=indf,x=xcol,y='Predict', color='g',ax=ax)
+    seaborn.lineplot(data=indf,x=xcol,y='Predictu', color='r',ax=ax)
+    seaborn.lineplot(data=indf,x=xcol,y='Predictl', color='r',ax=ax)
+    seaborn.scatterplot(data=indf,x=xcol,y=ycol,ax=ax)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    print(fig)
+    return model
+
+
+#een replicatie is genoeg en verwijder NAs
+geoschpc4r1=geoschpc4[(geoschpc4['MaxAfst']==0 ) &(  ~ np.isnan(geoschpc4['M_LW_OW'])) & 
+                     ( ~ np.isnan(geoschpc4['aantal_inwoners'])) &
+                     ( geoschpc4['aantal_inwoners'] != ODINmissint )]
+
+geoschpc4r2= cbspc4data[['postcode4','oppervlak'] ] .merge (geoschpc4r1 ,left_on=('postcode4'), right_on = ('PC4') )
+
+buurtlogmod= loglogregrplot(geoschpc4r2,'M_LW_OW','aantal_inwoners' )
+
+# +
+#enigszine onverwacht komnt hier dezelfde relatie uit al in wijken en buurten
+#wat dit betreft lijken postcodes dus homogeen
+# -
+
+buurtlogmod= loglogregrplot(geoschpc4r2,'oppervlak','aantal_inwoners' )
+
+buurtlogmod= loglogregrplot(geoschpc4r2,'oppervlak','M_LW_OW' )
+
+# +
+#Poging2: uit behouwings ratio
+geoschpc4r2['m2perinw']= geoschpc4r2['M_LW_OW']/geoschpc4r2['aantal_inwoners' ]
+geoschpc4r2['inwperare']= 10000*geoschpc4r2['aantal_inwoners' ]/ geoschpc4r2['M_LW_OW']
+geoschpc4r2['pctow']= geoschpc4r2['M_LW_OW']/geoschpc4r2['oppervlak' ]
+buurtlogmod= loglogregrplot(geoschpc4r2,'pctow','inwperare' )
+
+#deze ratio zouden we ook op buurtniveau kunnen berekenen
+# -
+
+
 
 # +
 #print(allodinyr2)
@@ -369,11 +435,6 @@ indatverplgr = mkdfverplxypc4 (naarhuis,specvaltab,
                                 'AankPC/rudifun/S_MXI22_BWN','MotiefV','Naar huis',
                                 useKAfstV,xlatKAfstV,geoschpc4,100)
 indatverplgr
-# -
-
-from sklearn.linear_model import LinearRegression
-from scipy.optimize import nnls
-import seaborn
 
 
 # +

@@ -47,6 +47,7 @@ excols= ['Wogem', 'AutoHhl', 'MRDH', 'Utr', 'FqLopen', 'FqMotor', 'WrkVervw', 'W
 
 # +
 largranval = -9999999999
+ODINmissint = -99997 
 def mkspecvaltab(indbk): 
     lastlbl=''
     nrec=int(len(indbk))
