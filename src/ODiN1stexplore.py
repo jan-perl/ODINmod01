@@ -14,6 +14,8 @@
 
 # +
 #een set doorsnedes van ODiN gegevens
+#voor exploratie
+#traag door eerst pc6 plotjes
 # -
 
 import pandas as pd
@@ -193,8 +195,9 @@ def mkpltverplpp (df,collvar):
     
 #datpltverplpp = mkpltverplpp (ODiN2pd.df_2019)
 datpltverplpp = mkpltverplpp (allodinyr,'OPID')
-
-
+#conclusie: meestal even aantal verplaatsingen. 
+#sinds Corona meer oneven (ommetjes ?)
+#Eens kijken of dit nog op te delen is in naar huis (40 % van de ritten) overige
 # -
 
 #todo: check waarom ifs niet werken
@@ -438,6 +441,14 @@ naarhuis = allodinyr [allodinyr ['Doel'] ==1 ]
 #datpltverplp = mkpltverplp (allodinyr,specvaltab,'Doel','Jaar','Alle ritten')
 #datpltverplp = mkpltverplp (allodinyr,specvaltab,'VertUur','Jaar','Alle ritten')
 datpltverplp = mkpltverplp (naarhuis,specvaltab,'AankPC/rudifun/S_MXI22_GB','Jaar','Alle ritten')
+
+# +
+#Overzicht doel
+#40 % is naar huis
+#rest ander doel
+#TODO: uitzoeken 1) welk deel 2 ritten /dag heeft 
+
+datpltverplp = mkpltverplp (allodinyr,specvaltab,'Doel','Jaar','Alle ritten')
 # -
 
 datpltverplp = mkpltverplp (allodinyr,specvaltab,'MotiefV','Jaar','Alle ritten')

@@ -206,11 +206,11 @@ def convfietsimg(img,kern1):
            np.apply_along_axis(lambda sl: np.convolve(sl,kern1['K1D'],mode='same'),0, img) )
 
 
-def convfiets2d(image,kern1):
+def convfiets2d(image,kern1,bdim=32):
     # We preallocate the result array:
     result = np.empty_like(image)
     # We use blocks of 32x32 pixels:
-    blockdim = (32, 32)
+    blockdim = (bdim, bdim)
 #    print('Blocks dimensions:', blockdim)
 
     # We compute grid dimensions big enough to cover the whole image:
@@ -451,4 +451,4 @@ def roundfilt(gridstep,dist):
     Z = np.int8(np.sqrt(X*X+Y*Y) <dist)
     return Z
 
-print(roundfilt(100,660) )
+#print(roundfilt(100,660) )
