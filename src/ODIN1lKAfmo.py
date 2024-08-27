@@ -312,7 +312,7 @@ def mkgeoschparafr (pc4data,pc4grid,rudigrid,myKAfstV,p_LW,p_LO):
         print(("blklen" ,len(outdfst), "outlen" ,len(outdf)) )
     return(outdf)
 
-geoschpc4all=mkgeoschparafr(cbspc4data,pc4inwgrid,rudifungrid,useKAfstV,1.2,2.0)
+geoschpc4all=mkgeoschparafr(cbspc4data,pc4inwgrid,rudifungrid,useKAfstV,1.2,1.0)
 geoschpc4 = geoschpc4all
 # -
 
@@ -784,17 +784,19 @@ rv
 
 
 # +
+#let op p_LO ongelijk 1 geeft vooral veel negatieve waarden en dus NAs, die punten tellen dan niet mee in chi^2
 def chisqsampler (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV):
     lw = np.linspace(1.1,1.3,3)
     oa = np.linspace(1.6,2.0,3)
     lo = np.linspace(1.7,2.0,3)
-    p_LW,p_LO = np.meshgrid(lw, lo)
-    l_OA=2.0
+    p_LW,p_OA= np.meshgrid(lw, oa)
+#    l_OA=2.0
 #    l_LW=1.2
-    print( (p_LW,p_LO))
-    myfunc =lambda  l_LW,l_LO  :trypowerland (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,l_LW,l_LO,l_OA)
+    c_LO=1.0
+#    print( (p_LW,p_LO))
+    myfunc =lambda  l_LW,l_OA  :trypowerland (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,l_LW,c_LO,l_OA)
     vfunc = np.vectorize(myfunc)
-    z= ( vfunc(p_LW,p_LO) )
+    z= ( vfunc(p_LW,p_OA) )
     z=np.array(z)
     return z
 chitries= chisqsampler (cbspc4data,pc4inwgrid,rudifungrid,useKAfstVland,xlatKAfstV)    
