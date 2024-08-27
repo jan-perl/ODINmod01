@@ -172,8 +172,8 @@ def pickAnrs(myspecvals,xvar,newmaxbndidx):
     selKAfstV.loc[ orimax , "MaxAfst"]  =0    
     return (  [  selKAfstV[['KAfstCluCode',"MaxAfst"]] , xlatKAfstV ])
 
-useKAfstV,xlatKAfstV  = pickAnrs (specvaltab,'KAfstV',[5,8,-1] )
-print(xlatKAfstV)   
+useKAfstV,xlatKAfstV  = pickAnrs (specvaltab,'KAfstV',[1,2,3,4,5,8,-1] )
+#print(xlatKAfstV)   
 print(useKAfstV)   
 # -
 
@@ -485,7 +485,7 @@ testmergelst  ('AankPC',['MotiefV','isnaarhuis'])
 #dan een dataframe dat
 #2) per lengteschaal, 1 PC (van of naar en anderegroepen (maar bijv ook Motief ODin data verzamelt)
 
-def mkdfverplxypc4 (df,myspecvals,xvarPC,pltgrps,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4,ngrp):
+def mkdfverplxypc4d1 (df,myspecvals,xvarPC,pltgrps,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4,ngrp):
     dfvrecs = df [(df['Verpl']==1 ) & (df[xvarPC] > 500)  ]   
     for pgrp in pltgrps:
         dfvrecs=addparscol(dfvrecs,pltgrps)
@@ -507,13 +507,40 @@ def mkdfverplxypc4 (df,myspecvals,xvarPC,pltgrps,selstr,myKAfstV,myxlatKAfstV,my
 #    print(vollandrecs)
     print( ( "alle land combinaties", len(vollandrecs) , len(mygeoschpc4)* len(dfgrps)) )
     pstatsc=pstatsc.rename(columns={xvarPC:'PC4'}).merge(vollandrecs,how='right')
+    pstatsc['GeoInd'] = xvarPC
+    if 1==1:
+        explhere = myspecvals [myspecvals['Variabele_naam'] == pltgrps[0]].copy()
+        explhere['Code'] = pd.to_numeric(explhere['Code'],errors='coerce')
+#        print(explhere)
+        pstatsc=pstatsc.merge(explhere,left_on=pltgrps[0], right_on='Code', how='left')    
+        pstatsc['GrpExpl'] = pstatsc[pltgrps[0]].astype(str) + pstatsc[pltgrps[1]].astype(str) + " : " + pstatsc['Code_label']    
+        pstatsc= pstatsc.drop(columns=['Code','Code_label'])
+    else:
+        pstatsc['GrpExpl']=''
     print( ( "return rdf", len(pstatsc)) )
+    
     return(pstatsc)
 
 #code werk nog niet 
 
-indatverplgr = mkdfverplxypc4 (allodinyr ,specvaltab,
-                                'AankPC',['MotiefV','isnaarhuis'],'Motief en isnaarhuis',
+def mkdfverplxypc4 (df,myspecvals,pltgrps,selstr,myKAfstV,myxlatKAfstV,geoschpc4in,ngrp):
+    mygeoschpc4 = geoschpc4in
+    if 1==1:
+        for lkey in ('LW','LO'):
+            colnamAL="M_"+ lkey +"_AL"
+            okey='OA'
+            colnam="M_"+ lkey +"_" + okey
+            mygeoschpc4[colnam] = mygeoschpc4[colnamAL] * (np.power(mygeoschpc4['MaxAfst']*0.01,2) )
+#            okey='AO'
+#            colnam="M_"+ lkey +"_" + okey
+#            mygeoschpc4.drop(inplace=True,columns=colnam)
+    rv1= mkdfverplxypc4d1 (df,myspecvals,'AankPC',pltgrps,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4,ngrp)
+    rv2= mkdfverplxypc4d1 (df,myspecvals,'VertPC',pltgrps,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4,ngrp)
+    rv= rv1.append(rv2) .reset_index(drop=True)   
+    return rv
+
+
+indatverplgr = mkdfverplxypc4 (allodinyr ,specvaltab,['MotiefV','isnaarhuis'],'Motief en isnaarhuis',
                                 useKAfstV,xlatKAfstV,geoschpc4,100)
 indatverplgr
 # +
@@ -530,8 +557,8 @@ def choose_cutoff(indat,hasfitted):
             for okey in ('OW','OO'):
                 colnam="M_"+ lkey +"_" + okey
 #                print(colnam,(lvals[np.isnan(lvals)]))
-                outframe['ALsafe'] = outframe['ALsafe'] & (outframe[colnam] > 0.05  * outframe[colnamAL])
-                outframe['osafe'] = outframe['osafe'] & (outframe[colnam] < 0.02 * outframe[colnamAL])
+                outframe['ALsafe'] = outframe['ALsafe'] & (outframe[colnam] > 0.2  * outframe[colnamAL])
+                outframe['osafe'] = outframe['osafe'] & (outframe[colnam] < 0.01 * outframe[colnamAL])
         outframe['ALsafe'] = outframe['ALsafe'] | (outframe['MaxAfst']==0)
         outframe['osafe'] = outframe['osafe'] & (outframe['MaxAfst']!=0)
     if 1==1:
@@ -539,7 +566,7 @@ def choose_cutoff(indat,hasfitted):
         for lkey in ('LW','LO'):
             colnamAL="M_"+ lkey +"_AL"
             outframe[colnamAL] = outframe[colnamAL] * ((outframe['ALsafe']).astype(int))
-            for okey in ('OW','OO','OM'):
+            for okey in ('OW','OO','OM','OA'):
                 colnam="M_"+ lkey +"_" + okey
 #                print(colnam,(lvals[np.isnan(lvals)]))
                 outframe[colnam] = outframe[colnam] * ((outframe['osafe']).astype(int))
@@ -562,13 +589,13 @@ def _regressgrp(indf, yvar, xvars,pcols):
 #        print(('o',len(indf)) )
         y_train=indf[yvar]
         X_train=indf[xvars]
-        if 0==1:
+        if 1==1:
             #smask = ~ (np.isnan(y_train) | np.isnan(np.sum(X_train)) )
             smask =  (y_train >0) & (np.sum(X_train,axis=1) >0) 
             indf= indf[smask]
             y_train=indf[yvar]
             X_train=indf[xvars]
-            print(('f', len(indf)))
+#            print(('f', len(indf)))
         else:
             y_train[np.isnan(y_train)]=0.1
         if(len(indf)==0) :
@@ -585,7 +612,12 @@ def dofitdatverplgr(indf,topreddf,pltgrp):
     colpacols = np.array( list ( (re.sub(r'M_','P_',s) for s in list(colvacols) ) ) )
     colvacols2 = colvacols[colvacols != colpacols]
     colpacols2 = colpacols[colvacols != colpacols]
-    rf= indf.groupby(pltgrp +['KAfstCluCode' ]).apply(
+    Fitperscale=False
+    if Fitperscale:
+        fitgrp=pltgrp +['KAfstCluCode','GeoInd'  ]
+    else:
+        fitgrp=pltgrp + ['GeoInd' ]
+    rf= indf.groupby(fitgrp ).apply(
             _regressgrp, 'FactorV', colvacols2, colpacols2).reset_index()
     outdf = topreddf.merge(rf,how='left')
     colpacols2alch = np.array( list ( (re.sub(r'_AL','_xx',s) for s in list(colvacols2) ) ) )
@@ -621,10 +653,10 @@ seaborn.scatterplot(data=fitdatverplgr,x="M_LM_AL",y="DiffEst")
 
 seaborn.scatterplot(data=fitdatverplgr,x="M_LO_AL",y="DiffEst")
 
-gr5km=fitdatverplgr[fitdatverplgr['MaxAfst']==15].copy()
-gr5km['linpmax']=gr5km['FactorEstAL']/ gr5km['FactorEstNAL']
-gr5km['linpch']= gr5km['FactorEst']/ gr5km['FactorEstNAL']
-gr5km['drat']= gr5km['FactorV']/ gr5km['FactorEst']
+gr5km=fitdatverplgr[fitdatverplgr['MaxAfst']==5].copy()
+gr5km['linpmax']=gr5km['FactorEstNAL']/ gr5km['FactorEstAL']
+gr5km['linpch']= gr5km['FactorEst']/ gr5km['FactorEstAL']
+gr5km['drat']= gr5km['FactorV']/ gr5km['FactorEstAL']
 fig, ax = plt.subplots()
 seaborn.scatterplot(data=gr5km,x="linpmax",y="drat",ax=ax)
 ax.set_xscale('log')
@@ -636,9 +668,36 @@ ax.set_yscale('log')
 
 fitdatverplgr[fitdatverplgr['MaxAfst']==0]
 
-fitdatverplgr[fitdatverplgr['MaxAfst']==0].groupby (['MotiefV','isnaarhuis']).agg('mean')
+paratab=fitdatverplgr[fitdatverplgr['MaxAfst']==0].groupby (['MotiefV','isnaarhuis','GeoInd']).agg('mean')
+paratab.to_excel("../output/fitparatab1.xlsx")
+paratab
 
-fitdatverplgr.groupby (['MotiefV','isnaarhuis','MaxAfst']).agg('mean')
+fitdatverplgr.groupby (['MotiefV','isnaarhuis','GeoInd','MaxAfst']).agg('mean')
+
+
+def pltmotdistgrp (mydati):
+    mydat=pd.DataFrame(mydati)    
+    opdel=['MaxAfst','GeoInd','MotiefV','GrpExpl']
+    fsel=['FactorEst','FactorV']
+    rv2= mydat.groupby (opdel)[fsel].agg(['sum']).reset_index()
+    rv2.columns=opdel+fsel
+    bigmot= rv2[(rv2['MaxAfst']==0) & (rv2['FactorV']>4e9)  ].groupby('MotiefV').agg(['count']).reset_index()
+    print(bigmot)
+    rv2['MaxAfst']=np.where(rv2['MaxAfst']==0 ,100,rv2['MaxAfst'])
+    rv2['MaxAfst']=rv2['MaxAfst'] * np.where(rv2['GeoInd']=='AankPC',1,1.02)
+    rv2['Qafst']=np.min((rv2['MaxAfst']  *0+1e10, rv2['MaxAfst'] *rv2['MaxAfst'] *2e8 ),axis=0)
+    rvs = rv2[np.isin(rv2['MotiefV'],bigmot['MotiefV'])]
+#    rv2['MotiefV']=rv2['MotiefV'].astype(int).astype(str)
+    fig, ax = plt.subplots()
+    seaborn.scatterplot(data=rvs,x='MaxAfst',y='FactorV',hue='GrpExpl',ax=ax)
+    seaborn.lineplot(data=rvs,x='MaxAfst',y='FactorEst',hue='GrpExpl',ax=ax)
+    seaborn.lineplot(data=rvs,x='MaxAfst',y='Qafst',ax=ax)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    # Put a legend to the right of the current axis
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    return (rv2)
+ov=pltmotdistgrp(fitdatverplgr)
 
 
 def calcchidgrp (mydati):
@@ -646,9 +705,18 @@ def calcchidgrp (mydati):
     mydat['chisq'] = mydat['DiffEst'] ** 2
     mydat['insq'] = mydat['FactorV'] ** 2
     csel=['chisq','insq']
-    rv= mydat.groupby (['MaxAfst'])[csel].agg(['sum'])
-    rv.columns=csel
+    opdel=['MaxAfst','GeoInd']
+    rv= mydat.groupby (opdel)[csel].agg(['sum']).reset_index()
+    rv.columns=opdel+csel
     rv['ChiRat'] = rv['chisq']/ rv['insq']
+    mydat['HeeftEst']=(np.isnan(mydat['FactorEst'])==False).astype(int)
+    mydat['HeeftFV']=(np.isnan(mydat['FactorV'])==False).astype(int)
+    fsel=['FactorEst','FactorV','HeeftEst','HeeftFV']
+    rv2= mydat.groupby (opdel)[fsel].agg(['sum']).reset_index()
+    rv2.columns=opdel+fsel
+#    print(rv2)
+    rv2['EstRat'] = rv2['FactorEst']/ rv2['FactorV']
+    rv=rv.merge(rv2,how='left')
     return rv
 calcchidgrp(fitdatverplgr)
 
@@ -659,8 +727,7 @@ def trypowerland (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,p_LW,p_LO):
     mygeoschpc4= mkgeoschparafr(pc4data,pc4grid,rudigrid,myKAfstV,p_LW,p_LO)
     myxlatKAfstV=myKAfstV[['KAfstCluCode']].merge(inxlatKAfstV,how='left')
 #    print (myxlatKAfstV)
-    mydatverplgr = mkdfverplxypc4 (allodinyr ,specvaltab,
-                                'AankPC',['MotiefV','isnaarhuis'],'Motief en isnaarhuis',
+    mydatverplgr = mkdfverplxypc4 (allodinyr ,specvaltab ,['MotiefV','isnaarhuis'],'Motief en isnaarhuis',
                                 myKAfstV,xlatKAfstV,mygeoschpc4,100)
     cut2=  choose_cutoff(indatverplgr,False)  
     mydatverplgr = dofitdatverplgr(cut2,mydatverplgr,['MotiefV','isnaarhuis'])
@@ -669,6 +736,8 @@ def trypowerland (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,p_LW,p_LO):
     
 rv=trypowerland(cbspc4data,pc4inwgrid,rudifungrid,useKAfstVland,xlatKAfstV,1.3,1.0)
 rv
+# -
+
 
 
 # +
@@ -707,7 +776,7 @@ print ( (len(cbspc4data), len(pllanddiff) ) )
 
 pllanddiffam= cbspc4data[['postcode4']].merge(fitdatverplgr[(fitdatverplgr['MaxAfst']==0) ] ,
                                                              how='left',left_on=('postcode4'), right_on = ('PC4'))
-pllanddiffam[abs(pllanddiffam['DiffEst']>1.5e7)]
+pllanddiffam[abs(pllanddiffam['DiffEst']>1.5e7)].groupby(['postcode4','MotiefV'])[['isnaarhuis']].agg('count')
 
 # +
 #inspectie
@@ -979,40 +1048,5 @@ datpltverplp = mkpltverplp (allodinyr,specvaltab,'KAfstV','Jaar','Alle ritten')
 
 #maak andere grafiek met zo veel categorieen
 datpltverplp = mkpltverplp (allodinyr,specvaltab,'VertUur','Jaar','Alle ritten')
-
-#neem alleen ritten naar huis, Aankomst is dan wonen: 
-naarhuis = allodinyr [allodinyr ['Doel'] ==1 ]
-datpltverplp = mkpltverplp (naarhuis,specvaltab,'AankPC/rudifun/S_MXI22_GB','Jaar','Naar huis')
-
-datpltverplp = mkpltverplp (allodinyr,specvaltab,'VertPC/rudifun/S_MXI22_GB','AankPC/rudifun/S_MXI22_GB','Alle ritten')
-
-datpltverplp = mkpltverplp (allodinyr,specvaltab,'Doel','AankPC/rudifun/S_MXI22_GB','Alle ritten')
-
-datpltverplp = mkpltverplp (allodinyr,specvaltab,'Doel','VertPC/rudifun/S_MXI22_GB','Alle ritten')
-
-#naar huis: aankomst is wonen: 
-datpltverplp = mkpltverplp (naarhuis,specvaltab,'KHvm','AankPC/rudifun/S_MXI22_GB','Naar huis')
-
-#naar huis: aankomst is wonen: 
-datpltverplp = mkpltverplp (naarhuis,specvaltab,'KAfstV','AankPC/rudifun/S_MXI22_GB','Naar huis')
-
-#naar huis: aankomst is wonen, als functie van oppervlakte dichtheid: 
-datpltverplp = mkpltverplp (naarhuis,specvaltab,'KAfstV','AankPC/rudifun/S_MXI22_GG','Naar huis')
-
-#naar huis: vertrel is utiliteit: 
-datpltverplp = mkpltverplp (naarhuis,specvaltab,'KHvm','VertPC/rudifun/S_MXI22_GB','Naar huis')
-
-#neem alleen ritten naar werk, Aankomst is dan werken: 
-naarwerk= allodinyr [allodinyr ['Doel'] ==2 ]
-datpltverplp = mkpltverplp (naarwerk,specvaltab,'AankPC/rudifun/S_MXI22_GB','Jaar','Naar werk')
-
-#neem alleen ritten naar werk, Aankomst is dan wonen
-datpltverplp = mkpltverplp (naarwerk,specvaltab,'VertPC/rudifun/S_MXI22_GB','Jaar','Naar werk')
-
-#neem alleen ritten naar werk, Aankomst is dan werken: 
-datpltverplp = mkpltverplp (naarwerk,specvaltab,'KHvm','AankPC/rudifun/S_MXI22_GB','Naar werk')
-
-#neem alleen ritten naar werk, Aankomst is dan werken: 
-datpltverplp = mkpltverplp (naarwerk,specvaltab,'KAfstV','AankPC/rudifun/S_MXI22_GB','Naar werk')
 
 
