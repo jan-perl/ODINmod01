@@ -14,14 +14,18 @@
 
 # +
 #Modellering van ODIN gegevens obv ruimtelijk dichtheden
+# -
 
-# +
 #todo
 #actieve modes per afstandsklasse en type
 #gemiddelde afstand per afstandsklasse en type
 #active mode kms en passive mode kms per PC naar & van (let op: dubbeltelling)
 #referentie reiskms actieve modes
 #vergelijking co2 uitstoot active modes met kentallen
+
+
+# +
+#todo
 #fit tov fractie (l komt uit data FactorVL)
 #waarde:  p=1/(1/l + 1/f) -> f= 1/ (1/p - 1/l) -> divergeert dus alleen als w>.1, anders 0
 #gewicht: w= l/ (l-p) -> aparte kolom
@@ -305,6 +309,9 @@ geoschpc4land=mkgeoschparafr(cbspc4data,pc4inwgcache,rudifungcache,useKAfstVland
 geoschpc4land
 
 odinverplgr=pd.read_pickle("../intermediate/ODINcatVN01db.pkl")
+def deffactorv(rv):
+    rv['FactorV'] = rv['FactorVGen'] + 0* rv['FactorVSpec']
+deffactorv(odinverplgr)
 
 
 # +
@@ -316,12 +323,12 @@ odinverplgr=pd.read_pickle("../intermediate/ODINcatVN01db.pkl")
 
 def mkvannaarcol(rv,verpldf,xvarPC):
     dfvrecs = verpldf [verpldf ['GeoInd'] == xvarPC]
-    pstats = dfvrecs.groupby('PC4')[['FactorVGen']].sum().reset_index()
+    pstats = dfvrecs.groupby('PC4')[['FactorV']].sum().reset_index()
     outvar='TotaalV'+xvarPC
 #    pstats=pstats.rename(columns={xvarPC:'PC4'})
 #    print(pstats)
     addfj = rv.merge(pstats,how='left')
-    rv[outvar] = addfj['FactorVGen']
+    rv[outvar] = addfj['FactorV']
     print(len(pstats))
     
 mkvannaarcol(geoschpc4land,odinverplgr,'AankPC')
@@ -425,10 +432,11 @@ geenwoonexpA= loglogregrplot(geogeenwoon,'M_LO_AL','TotaalVAankPC')
 # +
 #print(allodinyr2)
 #allodinyr = allodinyr2
-# -
 
+# +
 #todo: check waarom ifs niet werken
-#print(fietswijk1pc4.columns)
+#todo: opmerken dat srcarr[0] niet meer van belang is bij gebruik odinverplgr
+
 def addparscol (df,coltoadd):
     if "/" in coltoadd:
         srcarr=  coltoadd.split ('/')
@@ -441,34 +449,13 @@ def addparscol (df,coltoadd):
                 print ("Error in addparscol: col ",srcarr[2]," not usable for ", coltoadd)
             else:
                 fwin4 = fietswijk3pc4[['PC4',srcarr[2]]]
-                df=df.merge(fwin4,left_on=srcarr[0], right_on='PC4',how='left')
+                df=df.merge(fwin4,on='PC4',how='left')
                 df=df.rename(columns={srcarr[2]:coltoadd})
         else:
             print ("Error in addparscol: source ",srcarr[1]," not found for", coltoadd)
 #    print ("addparscol: nrecords: ",len(df.index))
     return (df)
-#was:              addparscol(allodinyr ,"AankPC/rudifun/S_MXI22_BB").dtypes
-
-
-# +
-def cartesian_product(*arrays):
-    la = len(arrays)
-    dtype = np.result_type(*arrays)
-    arr = np.empty([len(a) for a in arrays] + [la], dtype=dtype)
-    for i, a in enumerate(np.ix_(*arrays)):
-        arr[...,i] = a
-    return arr.reshape(-1, la)  
-
-#from https://stackoverflow.com/questions/53699012/performant-cartesian-product-cross-join-with-pandas
-def cartesian_product_multi(*dfs):
-#todo set columns
-    idx = cartesian_product(*[np.ogrid[:len(df)] for df in dfs])
-    rv= pd.DataFrame(
-        np.column_stack([df.values[idx[:,i]] for i,df in enumerate(dfs)]))
-#    collst = ()
-#    rv.columns= list(mygeoschpc4.columns) + list(dfgrps.columns)
-    return rv
-
+addparscol(odinverplgr ,"AankPC/rudifun/S_MXI22_BB").dtypes
 
 
 # +
@@ -478,8 +465,8 @@ def cartesian_product_multi(*dfs):
 def mkdfverplxypc4d1 (pstatsc,pltgrps,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4):
     debug=True
 #    dfvrecs = df [(df['Verpl']==1 ) & (df[xvarPC] > 500)  ]   
-#    for pgrp in pltgrps:
-#        dfvrecs=addparscol(dfvrecs,pltgrps)
+    for pgrp in pltgrps:
+        dfvrecs=addparscol(pstatsc,pltgrps)
 
 
 #    dfgrps= useKAfstV   [  [ 'KAfstCluCode']] 
@@ -489,7 +476,7 @@ def mkdfverplxypc4d1 (pstatsc,pltgrps,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4):
     vollandrecs= mygeoschpc4
 #    print(vollandrecs)
     if debug:
-        print( ( "alle land combinaties", len(vollandrecs) , len(mygeoschpc4)* len(pstatsc)) )
+        print( ( "alle land combinaties", len(vollandrecs) , len(mygeoschpc4)) )
     pstatsc=pstatsc.merge(vollandrecs,how='right')
     if debug:
         print( ( "return rdf", len(pstatsc)) )
@@ -510,7 +497,7 @@ def mkdfverplxypc4 (dfg2,pltgrps,selstr,myKAfstV,myxlatKAfstV,geoschpc4in,p_OA):
 #            colnam="M_"+ lkey +"_" + okey
 #            mygeoschpc4.drop(inplace=True,columns=colnam)
     rv= mkdfverplxypc4d1 (dfg2,pltgrps,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4)
-    rv['FactorV'] = rv['FactorVGen'] + rv['FactorVSpec']
+    
     return rv
 
 fitgrps=['MotiefV','isnaarhuis']
@@ -872,10 +859,11 @@ elif 0==1:
 def mkpltverplxypc4 (df,myspecvals,xvar,pltgrp,selstr,ngrp):
     xsrcarr=  xvar.split ('/')
     xvarPC = xsrcarr[0]
-    dfvrecs = df [(df['Verpl']==1 ) & (df[xvarPC] > 500)  ]   
+    gvarPC='PC4'
+    dfvrecs = df [ (df[gvarPC] > 500) &(df['GeoInd']==xvarPC ) ]   
     dfvrecs=addparscol(dfvrecs,pltgrp)
 #    oprecs = df [df['OP']==1]
-    pstats = dfvrecs[[pltgrp, xvarPC,'FactorV']].groupby([pltgrp, xvarPC]).sum().reset_index()
+    pstats = dfvrecs[[pltgrp, gvarPC,'FactorV']].groupby([pltgrp, gvarPC]).sum().reset_index()
     pstats =addparscol(pstats,xvar)
     #print(pstats)
     denoms= pstats [[pltgrp, 'FactorV']].groupby([pltgrp]).sum().reset_index().rename(columns={'FactorV':'Denom'} )
@@ -887,8 +875,9 @@ def mkpltverplxypc4 (df,myspecvals,xvar,pltgrp,selstr,ngrp):
         pstatsn['GIDX'] = pd.qcut(pstatsn[xvar], ngrp)
         pstatsn = pstatsn.groupby([pltgrp,'GIDX']).mean().reset_index()
     
-    vardescr = dbk_2022_cols [dbk_2022_cols['Variabele_naam_ODiN_2022'] == xvar] ['Variabele_label_ODiN_2022']
+#    vardescr = dbk_2022_cols [dbk_2022_cols['Variabele_naam_ODiN_2022'] == xvar] ['Variabele_label_ODiN_2022']
 #    print(vardescr)
+    vardescr=[]
     if len(vardescr) ==0:
         vardescr = ""        
         heeftlrv = True
@@ -898,9 +887,12 @@ def mkpltverplxypc4 (df,myspecvals,xvar,pltgrp,selstr,ngrp):
                             (myspecvals ['Variabele_naam'] ==xvar) ] ) !=0
 #    print(vardescr,heeftlrv)
 
-    grplrv = len(myspecvals [ (myspecvals ['Code'] ==largranval) & 
+    if 0==0:
+        grplrv=True
+    else:
+        grplrv = len(myspecvals [ (myspecvals ['Code'] ==largranval) & 
                             (myspecvals ['Variabele_naam'] ==pltgrp) ] ) !=0
-    if ~grplrv:
+    if grplrv==False:
         explhere = myspecvals [myspecvals['Variabele_naam'] == pltgrp].copy()
         explhere['Code'] = pd.to_numeric(explhere['Code'],errors='coerce')
 #   print(explhere)
@@ -925,8 +917,11 @@ def mkpltverplxypc4 (df,myspecvals,xvar,pltgrp,selstr,ngrp):
     return(pstatsn)
    
 #naarhuis = allodinyr [allodinyr ['Doel'] ==1 ]    
-#datpltverplp = mkpltverplxypc4 (naarhuis,specvaltab,
-#                                'AankPC/rudifun/S_MXI22_BWN','MotiefV','Naar huis',100)
+naarhuis= odinverplgr [odinverplgr ['isnaarhuis'] ==6 ]
+#dummy voor specvaltab
+dspecvaltab={'Code':0 , 'Variabele_naam':'none'}
+datpltverplp = mkpltverplxypc4 (naarhuis,dspecvaltab,
+                                'AankPC/rudifun/S_MXI22_BWN','MotiefV','Naar huis',100)
 
 
 # +
@@ -947,10 +942,12 @@ def mkpltverplxypc4 (df,myspecvals,xvar,pltgrp,selstr,ngrp):
 def mkfitverplxypc4 (df,myspecvals,xvar,pltgrp,selstr,ngrp):
     xsrcarr=  xvar.split ('/')
     xvarPC = xsrcarr[0]
-    dfvrecs = df [(df['Verpl']==1 ) & (df[xvarPC] > 500)  ]   
+    gvarPC='PC4'
+    dfvrecs = df [ (df[gvarPC] > 500) &(df['GeoInd']==xvarPC ) ]   
+    
     dfvrecs=addparscol(dfvrecs,pltgrp)
 #    oprecs = df [df['OP']==1]
-    pstats = dfvrecs[[pltgrp, xvarPC,'FactorV']].groupby([pltgrp, xvarPC]).sum().reset_index()
+    pstats = dfvrecs[[pltgrp, gvarPC,'FactorV']].groupby([pltgrp, gvarPC]).sum().reset_index()
     pstats =addparscol(pstats,xvar)
     #print(pstats)
     denoms= pstats [[pltgrp, 'FactorV']].groupby([pltgrp]).sum().reset_index().rename(columns={'FactorV':'Denom'} )
@@ -962,8 +959,9 @@ def mkfitverplxypc4 (df,myspecvals,xvar,pltgrp,selstr,ngrp):
         pstatsn['GIDX'] = pd.qcut(pstatsn[xvar], ngrp)
         pstatsn = pstatsn.groupby([pltgrp,'GIDX']).mean().reset_index()
     
-    vardescr = dbk_2022_cols [dbk_2022_cols['Variabele_naam_ODiN_2022'] == xvar] ['Variabele_label_ODiN_2022']
+    #vardescr = dbk_2022_cols [dbk_2022_cols['Variabele_naam_ODiN_2022'] == xvar] ['Variabele_label_ODiN_2022']
 #    print(vardescr)
+    vardescr=[]
     if len(vardescr) ==0:
         vardescr = ""        
         heeftlrv = True
@@ -973,9 +971,12 @@ def mkfitverplxypc4 (df,myspecvals,xvar,pltgrp,selstr,ngrp):
                             (myspecvals ['Variabele_naam'] ==xvar) ] ) !=0
 #    print(vardescr,heeftlrv)
 
-    grplrv = len(myspecvals [ (myspecvals ['Code'] ==largranval) & 
+    if 0==0:
+        grplrv=True
+    else:
+        grplrv = len(myspecvals [ (myspecvals ['Code'] ==largranval) & 
                             (myspecvals ['Variabele_naam'] ==pltgrp) ] ) !=0
-    if ~grplrv:
+    if grplrv==False:
         explhere = myspecvals [myspecvals['Variabele_naam'] == pltgrp].copy()
         explhere['Code'] = pd.to_numeric(explhere['Code'],errors='coerce')
 #   print(explhere)
@@ -999,21 +1000,23 @@ def mkfitverplxypc4 (df,myspecvals,xvar,pltgrp,selstr,ngrp):
     chart.set_ylabels(ylab)
     return(pstatsn)
    
-naarhuis = allodinyr [allodinyr ['Doel'] ==1 ]    
-datpltverplp = mkfitverplxypc4 (naarhuis,specvaltab,
-                                'AankPC/rudifun/S_MXI22_BWN','MotiefV','Naar huis',100)
-# -
 
-datpltverplp = mkpltverplxypc4 (naarhuis,specvaltab,'VertPC/rudifun/S_MXI22_BWN',
-                                'Jaar','Naar huis',100)
+datpltverplp = mkfitverplxypc4 (naarhuis,dspecvaltab,
+                                'AankPC/rudifun/S_MXI22_BWN','MotiefV','Naar huis',100)
+
+# +
+#Geen jaar onderscheid meer
+#datpltverplp = mkpltverplxypc4 (naarhuis,dspecvaltab,'VertPC/rudifun/S_MXI22_BWN',
+#                                'Jaar','Naar huis',100)
+# -
 
 haarhuisapart = addparscol(naarhuis,'VertPC/rudifun/S_MXI22_BWN')
 haarhuisapart = haarhuisapart[ (haarhuisapart['VertPC/rudifun/S_MXI22_BWN'] <1e3 ) | 
                                (haarhuisapart['VertPC/rudifun/S_MXI22_BWN'] >2e6 ) ]
 
-haarhuisapart.groupby(['VertPC']).agg({'VertPC':'count','VertPC/rudifun/S_MXI22_BWN':'mean'} )
+haarhuisapart.groupby(['PC4']).agg({'PC4':'count','VertPC/rudifun/S_MXI22_BWN':'mean'} )
 
-cbspc4data.merge(haarhuisapart, left_on='postcode4', right_on='VertPC', how='right').plot()
+cbspc4data.merge(haarhuisapart, left_on='postcode4', right_on='PC4', how='right').plot()
 
 
 # +
@@ -1023,7 +1026,12 @@ cbspc4data.merge(haarhuisapart, left_on='postcode4', right_on='VertPC', how='rig
 # maak groepen op aantallen postcodes (of oppervlakken ?)
 
 def mkpltverplp (df,myspecvals,collvar,normgrp,selstr):
-    dfvrecs = df [df['Verpl']==1]
+    xsrcarr=  collvar.split ('/')
+    xvarPC = xsrcarr[0]
+
+    gvarPC='PC4'
+    dfvrecs = df [ (df[gvarPC] > 500) &(df['GeoInd']==xvarPC ) ]   
+
     dfvrecs=addparscol(dfvrecs,collvar)
     dfvrecs=addparscol(dfvrecs,normgrp)
 #    oprecs = df [df['OP']==1]
@@ -1033,7 +1041,8 @@ def mkpltverplp (df,myspecvals,collvar,normgrp,selstr):
     #print(denoms)
     pstatsn = pstats.merge(denoms,how='left')
     pstatsn['FractV'] = pstatsn['FactorV'] *100.0/ pstatsn['Denom']
-    vardescr = dbk_2022_cols [dbk_2022_cols['Variabele_naam_ODiN_2022'] == collvar] ['Variabele_label_ODiN_2022']
+    #vardescr = dbk_2022_cols [dbk_2022_cols['Variabele_naam_ODiN_2022'] == collvar] ['Variabele_label_ODiN_2022']
+    vardescr=[]
 #    print(vardescr)
     if len(vardescr) ==0:
         vardescr = ""        
@@ -1067,11 +1076,13 @@ def mkpltverplp (df,myspecvals,collvar,normgrp,selstr):
     chart.set_ylabels(ylab)
     return(pstatsn)
    
-naarhuis = allodinyr [allodinyr ['Doel'] ==1 ]
+#naarhuis = allodinyr [allodinyr ['Doel'] ==1 ]
 #datpltverplp = mkpltverplp (allodinyr,specvaltab,'Doel','Jaar','Alle ritten')
 #datpltverplp = mkpltverplp (allodinyr,specvaltab,'VertUur','Jaar','Alle ritten')
-datpltverplp = mkpltverplp (naarhuis,specvaltab,'AankPC/rudifun/S_MXI22_GB','Jaar','Alle ritten')
+datpltverplp = mkpltverplp (naarhuis,dspecvaltab,'AankPC/rudifun/S_MXI22_GB','MotiefV','Alle ritten')
 # -
+
+allrithuis= odinverplgr
 
 datpltverplp = mkpltverplp (allodinyr,specvaltab,'MotiefV','Jaar','Alle ritten')
 

@@ -23,40 +23,19 @@
 #active mode kms en passive mode kms per PC naar & van (let op: dubbeltelling)
 #referentie reiskms actieve modes
 #vergelijking co2 uitstoot active modes met kentallen
+
 #fit tov fractie (l komt uit data FactorVL)
 #waarde:  p=1/(1/l + 1/f) -> f= 1/ (1/p - 1/l) -> divergeert dus alleen als w>.1, anders 0
 #gewicht: w= l/ (l-p) -> aparte kolom
 
 # +
-#visualiseer relaties getallen, bijv. het 50 % punt(beide componenten gelijk groot) in km
-#ook: bijdrage per ring / oppervlak -> multipliers per ring visualiseren
-#omdat additief model _. som van componenten is ook terug te rekenen
-#uitgaande van 1 PC : som model daar =1
-#ga uit ven centrum punt postcode
-#-maak grid met grootste ring
-#-trek bijdrages vorige ring er helemaal van af (die komen later)
-#bepaal coefficienten voor  'OW','OO','OM','OA' als som van alle groepen in ring
-#tel op zodat een relatie plaatje op buurt/wijk niveau ontstaat
-#valdeer dat de sommen voor die PC kloppen met model uitkomst
+#splits code op; DIT DEEL is:
 
-# +
-#splits code op
 #- analyse top PC4 per Motief voor 2 ritten op dag en niet woon kant
 #- t.o.v. gebieds oppervlak
 #- bij top PC4 maak annotatie naar 1 of meerdere PC6 mogelijk
 # maak ook afstandsklassen tabel (met index per indeling naam) en schrijf naar pkl
 
-#
-#- maak grid met die toewijzing op 1 pixel & visualiseer met 5 km smooth
-#- maak gridder routines in apart werkboek en save de output pkl
-#- selecteer alleen grootste naarhuis - motief combinaties , rest: houdt van/naar, motief rest
-#      *van/ naar samen selecteren !
-#- 
-
-# +
-#beschrijf kenmerken
-#volledig additief
-# binnen cirkels
 # -
 
 # scenarios
@@ -481,7 +460,7 @@ xlatKAfstV.to_pickle("../intermediate/ODINcatVN01xKA.pkl")
 
 odinverplgr.to_pickle("../intermediate/ODINcatVN01db.pkl")
 
-#mooi, nu analyses welke raar zijn
+# mooi, nu analyses welke raar zijn
 
 
 print("Finished")
