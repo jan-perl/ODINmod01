@@ -146,110 +146,35 @@ rudifungcache = getcachedgrids(rudifungrid)
 
 
 
-#import ODiN2pd
-import ODiN2readpkl
-
-
-
-ODiN2readpkl.allodinyr.dtypes
-
-
-def chklevstat(df,grpby,dbk,vnamcol,myNiveau):
-    chkcols = dbk [ (dbk.Niveau == myNiveau) & ~ ( dbk[vnamcol].isin( excols) )]
-    for chkcol in chkcols[vnamcol]:
-        nonadf= df[~ ( df[chkcol].isna() |  df[grpby].isna() ) ]
-#        print (chkcol)
-#        print (nonadf['RitID'])
-#        sdvals= nonadf. groupby([grpby]) [chkcol].std_zero()
-        sdvals= nonadf. groupby([grpby]) [chkcol].agg(['min','max']).reset_index()
-#        print(sdvals)
-        sdrng = (sdvals.iloc[:,2] != sdvals.iloc[:,1]).replace({True: 1, False: 0})
-#        print(sdrng)
-        maxsd=sdrng.max()
-        #als alle standaard deviaties 0 zijm, zijn de waarden homogeen in de groep
-        if maxsd !=0:
-            print (chkcol,maxsd)
-
-
-dbk_2022 = ODiN2readpkl.dbk_allyr
-dbk_2022_cols = dbk_2022 [~ dbk_2022.Variabele_naam_ODiN_2022.isna()]
-dbk_2022_cols [ dbk_2022_cols.Niveau.isna()]
-
-# +
-largranval =ODiN2readpkl.largranval 
-
-specvaltab = ODiN2readpkl.mkspecvaltab(dbk_2022)
-specvaltab
-# -
-
-allodinyr=ODiN2readpkl.allodinyr
-len(allodinyr.index)
-
-
 # +
 #nu ODIN ranges opzetten
 #we veranderen NIETS aan odin data
 #wel presenteren we het steeds als cumulatieve sommen tot een bepaalde bin
-
-# +
-#maak summmatie tabellen (joinbaar)
-def pickAnrs(myspecvals,xvar,newmaxbndidx):
-    orimin=1    
-    allKAfstV=myspecvals [ (myspecvals ['Code'] !=largranval) & 
-                           (myspecvals ['Code'] !='<missing>') & 
-#                           ((myspecvals ['Code']).astype('int64') >= orimin) & 
-                           (myspecvals ['Variabele_naam'] ==xvar) ][['Code','Code_label']].\
-                           copy().reset_index(drop=True)    
-    allKAfstV['Code']= allKAfstV['Code'].astype('int64')
-    orimax=np.max(allKAfstV['Code'])
-    allKAfstV['MaxAfst'] = list(re.sub(r',','.',re.sub(r' km.*$','',re.sub(r'^.* tot ','',s)  ))\
-                                for s in allKAfstV['Code_label'] )
-    mindispdist=0.1
-    allKAfstV.loc[0,'MaxAfst']=mindispdist
-    allKAfstV['MaxAfst'] =allKAfstV['MaxAfst'].astype('float32')
-    lastval = orimax
-    oarr=np.array(allKAfstV['Code'])
-    if 1==1:
-        oxlatKAfstV = allKAfstV[allKAfstV['Code']>=orimin] [['Code']] .rename( 
-                                 columns={'Code':'KAfstV'})
-        oxlatKAfstV['KAfstCluCode'] =  orimax
-        xlatKAfstV = oxlatKAfstV.copy()
-        for n in newmaxbndidx:     
-            if n>0:
-                toapp = oxlatKAfstV[oxlatKAfstV['KAfstV']<=n].copy()
-                toapp ['KAfstCluCode'] =  n
-                xlatKAfstV= xlatKAfstV.append(toapp) .reset_index(drop=True)                      
-    else:
-        for ir in range(len(allKAfstV)):
-            i= len(allKAfstV)-ir-1
-            if oarr[i] in newmaxbndidx or oarr[i] ==0:
-                lastval = oarr[i] 
-            oarr[i] = lastval
-    allKAfstV['KAfstCluCode']=oarr
-#    print(allKAfstV)   
-    selKAfstV= allKAfstV.iloc[ newmaxbndidx, ]
-    selKAfstV.loc[ orimax , "MaxAfst"]  =0    
-    return (  [  selKAfstV[['KAfstCluCode',"MaxAfst"]] , xlatKAfstV ])
-
-useKAfstV,xlatKAfstV  = pickAnrs (specvaltab,'KAfstV',[1,2,3,4,5,6,7,8,-1] )
-#print(xlatKAfstV)   
-print(useKAfstV)   
 # -
 
-useKAfstVQ,xlatKAfstVQ  = pickAnrs (specvaltab,'KAfstV',[1,2,3,4,-1] )
+useKAfstV=pd.read_pickle("../intermediate/ODINcatVN01uKA.pkl")
+xlatKAfstV=pd.read_pickle("../intermediate/ODINcatVN01xKA.pkl")
+
+useKAfstVQ  = useKAfstV [useKAfstV ["MaxAfst"] <4]
 #print(xlatKAfstV)   
 print(useKAfstVQ)   
 
+# +
+#import ODiN2pd
+#import ODiN2readpkl
+# -
+
 usePC4MXI=True
-fietswijk1pc4= ODiN2readpkl.fietswijk1pc4
-if usePC4MXI:
-    fietswijk1pc4['S_MXI22_NS'] = fietswijk1pc4['S_MXI22_BWN']  / (fietswijk1pc4['S_MXI22_BWN']  + fietswijk1pc4['S_MXI22_BAN'] )
-    fietswijk1pc4['S_MXI22_BB'] = fietswijk1pc4['S_MXI22_NS']
-fietswijk1pc4['S_MXI22_BG'] = fietswijk1pc4['S_MXI22_BBN'] / fietswijk1pc4['S_MXI22_BGN']     
-fietswijk1pc4['S_MXI22_GB'] = pd.qcut(fietswijk1pc4['S_MXI22_BB'], 10)
-fietswijk1pc4['S_MXI22_GG'] = pd.qcut(fietswijk1pc4['S_MXI22_BG'], 10)
-fietswijk1pc4['PC4'] =  pd.to_numeric(fietswijk1pc4['PC4'] ,errors='coerce')
-print(fietswijk1pc4.dtypes)
+if 0==1:
+    fietswijk1pc4= ODiN2readpkl.fietswijk1pc4
+    if usePC4MXI:
+        fietswijk1pc4['S_MXI22_NS'] = fietswijk1pc4['S_MXI22_BWN']  / (fietswijk1pc4['S_MXI22_BWN']  + fietswijk1pc4['S_MXI22_BAN'] )
+        fietswijk1pc4['S_MXI22_BB'] = fietswijk1pc4['S_MXI22_NS']
+    fietswijk1pc4['S_MXI22_BG'] = fietswijk1pc4['S_MXI22_BBN'] / fietswijk1pc4['S_MXI22_BGN']     
+    fietswijk1pc4['S_MXI22_GB'] = pd.qcut(fietswijk1pc4['S_MXI22_BB'], 10)
+    fietswijk1pc4['S_MXI22_GG'] = pd.qcut(fietswijk1pc4['S_MXI22_BG'], 10)
+    fietswijk1pc4['PC4'] =  pd.to_numeric(fietswijk1pc4['PC4'] ,errors='coerce')
+    print(fietswijk1pc4.dtypes)
 if 0==1:
     fwin4 = fietswijk1pc4 [['PC4','S_MXI22_GB','S_MXI22_BB','S_MXI22_GG','S_MXI22_BG']]
     allodinyr2 = allodinyr.merge(fwin4,left_on='AankPC', right_on='PC4',how='left')
@@ -277,35 +202,15 @@ def mkfietswijk3pc4(pc4data,pc4grid,rudigrid):
     if usePC4MXI:
         outdf['S_MXI22_NS'] = outdf['S_MXI22_BWN']  / (outdf['S_MXI22_BWN']  + outdf['S_MXI22_BAN'] )
         outdf['S_MXI22_BB'] = outdf['S_MXI22_NS']
-    outdf['S_MXI22_BG'] = fietswijk1pc4['S_MXI22_BWN'] / pc4data['oppervlak']        
-    outdf['S_MXI22_GB'] = pd.qcut(fietswijk1pc4['S_MXI22_BB'], 10)
-    outdf['S_MXI22_GG'] = pd.qcut(fietswijk1pc4['S_MXI22_BG'], 10)
+
+    outdf['S_MXI22_BG'] = outdf['S_MXI22_BWN'] / pc4data['oppervlak']        
+    outdf['S_MXI22_GB'] = pd.qcut(outdf['S_MXI22_BB'], 10)
+    outdf['S_MXI22_GG'] = pd.qcut(outdf['S_MXI22_BG'], 10)
     outdf['aantal_inwoners_d2'] = outdf['aantal_inwoners_gr2'] -outdf['aantal_inwoners']
     return outdf
 #fietswijk3pc4=mkfietswijk3pc4(cbspc4data,pc4inwgrid,rudifungrid)
 fietswijk3pc4=mkfietswijk3pc4(cbspc4data,pc4inwgcache,rudifungcache)
 bd=fietswijk3pc4 [abs(fietswijk3pc4['aantal_inwoners_d2'] ) > 1 ]
-
-
-# +
-def cartesian_product(*arrays):
-    la = len(arrays)
-    dtype = np.result_type(*arrays)
-    arr = np.empty([len(a) for a in arrays] + [la], dtype=dtype)
-    for i, a in enumerate(np.ix_(*arrays)):
-        arr[...,i] = a
-    return arr.reshape(-1, la)  
-
-#from https://stackoverflow.com/questions/53699012/performant-cartesian-product-cross-join-with-pandas
-def cartesian_product_multi(*dfs):
-#todo set columns
-    idx = cartesian_product(*[np.ogrid[:len(df)] for df in dfs])
-    rv= pd.DataFrame(
-        np.column_stack([df.values[idx[:,i]] for i,df in enumerate(dfs)]))
-#    collst = ()
-#    rv.columns= list(mygeoschpc4.columns) + list(dfgrps.columns)
-    return rv
-
 
 
 # +
@@ -323,7 +228,7 @@ def mkgeoschparafr (pc4data,pc4grid,rudigrid,myKAfstV,p_LW,p_LO):
     debug=False
     #pc4lst=pc4grid.read(1)
     pc4lst=pc4grid[1]
-    outdf=pc4data[['postcode4','aantal_inwoners']].rename(columns={'postcode4':'PC4'} )
+    outdf=pc4data[['postcode4','aantal_inwoners','oppervlak']].rename(columns={'postcode4':'PC4'} )
     outdf['KAfstCluCode'] = np.max(myKAfstV["KAfstCluCode"])
     outdf['MaxAfst'] = 0
     outdfst= outdf.copy()
@@ -399,26 +304,37 @@ useKAfstVland = useKAfstV [useKAfstV['MaxAfst']==0]
 geoschpc4land=mkgeoschparafr(cbspc4data,pc4inwgcache,rudifungcache,useKAfstVland,1.2,2.0)
 geoschpc4land
 
+odinverplgr=pd.read_pickle("../intermediate/ODINcatVN01db.pkl")
 
-def arrvannaarcol(adddf,verpldf,xvarPC):
-    dfvrecs = verpldf [verpldf['Verpl']==1]
-    gcols= [xvarPC]
-    pstats = dfvrecs[gcols+['FactorV']].groupby(gcols).sum().reset_index()
+
+# +
+#maak 2 kolommen met totalen aankomst en vertrek (alle categorrieen)
+#worden als kolommen aan addf geoschpc4land toegevoegd per PC
+#is eigenlijk alleen van belang voor diagnostische plots
+#en totalen hannen ook uit aggregaten gehaald kunnen wornde
+#TODO cleanup
+
+def mkvannaarcol(rv,verpldf,xvarPC):
+    dfvrecs = verpldf [verpldf ['GeoInd'] == xvarPC]
+    pstats = dfvrecs.groupby('PC4')[['FactorVGen']].sum().reset_index()
     outvar='TotaalV'+xvarPC
-    pstats=pstats.rename(columns={xvarPC:'PC4'})
+#    pstats=pstats.rename(columns={xvarPC:'PC4'})
 #    print(pstats)
-    addfj = adddf.merge(pstats,how='left')
-    adddf[outvar] = addfj['FactorV']
+    addfj = rv.merge(pstats,how='left')
+    rv[outvar] = addfj['FactorVGen']
     print(len(pstats))
-arrvannaarcol(geoschpc4land,allodinyr,'AankPC')
-arrvannaarcol(geoschpc4land,allodinyr,'VertPC')
+    
+mkvannaarcol(geoschpc4land,odinverplgr,'AankPC')
+mkvannaarcol(geoschpc4land,odinverplgr,'VertPC')
 
 # +
 #geoschpc4 is een mooi dataframe met generieke woon en werk parameters
 #Er is nog wel een mogelijk verzadigings effect daar waar de waarden voor
 #grotere afstanden die van de landelijke waarden benaderen
 # -
-
+#nog netjes importeren
+largranval = -9999999999
+ODINmissint = -99997 
 
 
 #nu een kijken:
@@ -453,13 +369,13 @@ def loglogregrplot(indfo,xcol,ycol):
     print(fig)
     return model
 
-
 #een replicatie is genoeg en verwijder NAs
 geoschpc4r1=geoschpc4land[(  ~ np.isnan(geoschpc4land['M_LW_AL'])) & 
                      ( ~ np.isnan(geoschpc4land['aantal_inwoners'])) &
                      ( geoschpc4land['aantal_inwoners'] != ODINmissint )]
 
-geoschpc4r2= cbspc4data[['postcode4','oppervlak'] ] .merge (geoschpc4r1 ,left_on=('postcode4'), right_on = ('PC4') )
+#geoschpc4r2= cbspc4data[['postcode4','oppervlak'] ] .merge (geoschpc4r1 ,left_on=('postcode4'), right_on = ('PC4') )
+geoschpc4r2 = geoschpc4r1
 
 buurtlogmod= loglogregrplot(geoschpc4r2,'M_LW_AL','aantal_inwoners' )
 
@@ -509,26 +425,6 @@ geenwoonexpA= loglogregrplot(geogeenwoon,'M_LO_AL','TotaalVAankPC')
 # +
 #print(allodinyr2)
 #allodinyr = allodinyr2
-
-# +
-#kijk eens naar totaal aantal verplaatsingen per persoon
-#dan nog NIET met factoren vermenigvuldigen
-def mkpltverplpp (df,collvar):
-    dfvrecs = df [df['Verpl']==1]
-#    oprecs = df [df['OP']==1]
-    pstats = dfvrecs.groupby(['Jaar', collvar]).count()[['VerplID']].reset_index()
-    #print(pstats)
-    phisto = pstats.groupby(['Jaar', 'VerplID']).count()[[collvar]].reset_index()
-#    print(phisto)
-    phisto[collvar] = phisto[collvar] *100.0/ len(dfvrecs.index)
-    sns.catplot(data=phisto, x="VerplID", y=collvar, hue="Jaar", kind="bar")
-    return(phisto)
-   
-    
-#datpltverplpp = mkpltverplpp (ODiN2pd.df_2019)
-datpltverplpp = mkpltverplpp (allodinyr,'OPID')
-
-
 # -
 
 #todo: check waarom ifs niet werken
@@ -551,54 +447,50 @@ def addparscol (df,coltoadd):
             print ("Error in addparscol: source ",srcarr[1]," not found for", coltoadd)
 #    print ("addparscol: nrecords: ",len(df.index))
     return (df)
-allodinyr['isnaarhuis'] =  np.where(allodinyr ['Doel'] ==1, 
-                    np.where(allodinyr ['VertLoc']<=2 , "7 rondje huis","6 naar huis" ),
-                    np.where(allodinyr ['VertLoc']<=2 , "5 van huis","4 ronde elders" ) )              
-addparscol(allodinyr ,"AankPC/rudifun/S_MXI22_BB").dtypes
+#was:              addparscol(allodinyr ,"AankPC/rudifun/S_MXI22_BB").dtypes
+
+
+# +
+def cartesian_product(*arrays):
+    la = len(arrays)
+    dtype = np.result_type(*arrays)
+    arr = np.empty([len(a) for a in arrays] + [la], dtype=dtype)
+    for i, a in enumerate(np.ix_(*arrays)):
+        arr[...,i] = a
+    return arr.reshape(-1, la)  
+
+#from https://stackoverflow.com/questions/53699012/performant-cartesian-product-cross-join-with-pandas
+def cartesian_product_multi(*dfs):
+#todo set columns
+    idx = cartesian_product(*[np.ogrid[:len(df)] for df in dfs])
+    rv= pd.DataFrame(
+        np.column_stack([df.values[idx[:,i]] for i,df in enumerate(dfs)]))
+#    collst = ()
+#    rv.columns= list(mygeoschpc4.columns) + list(dfgrps.columns)
+    return rv
+
 
 
 # +
 #dan een dataframe dat
 #2) per lengteschaal, 1 PC (van of naar en anderegroepen (maar bijv ook Motief ODin data verzamelt)
 
-def mkdfverplxypc4d1 (df,myspecvals,xvarPC,pltgrps,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4,ngrp):
-    debug=False
-    dfvrecs = df [(df['Verpl']==1 ) & (df[xvarPC] > 500)  ]   
-    for pgrp in pltgrps:
-        dfvrecs=addparscol(dfvrecs,pltgrps)
-#    oprecs = df [df['OP']==1]
-    gcols=pltgrps+ ['KAfstV',xvarPC]
-    #sommeer per groep per oorspronkelijke KAfstV, maar niet voor internationaal
-    pstats = dfvrecs[gcols+['FactorV']].groupby(gcols).sum().reset_index()
-    if debug:
-        print( ( "oorspr lengte groepen", len(pstats)) )
-    #nu kleiner dataframe, dupliceer records in groep
-    pstatsc = pstats[pstats ['KAfstV'] >0].merge(myxlatKAfstV,how='left').drop( columns='KAfstV')
-    if debug:    
-        print( ( "oorspr lengte groepen met duplicaten", len(pstats)) )
-    pstatsc = pstatsc.groupby(pltgrps +[ 'KAfstCluCode', xvarPC]).sum().reset_index()
-    if debug:
-        print( ( "lengte clusters", len(pstats)) )
-    dfgrps = pstatsc.groupby(pltgrps )[  [ 'KAfstCluCode']].count().reset_index().drop( columns='KAfstCluCode')
-    if debug:
-        print( ( "types opdeling", len(dfgrps)) )
+def mkdfverplxypc4d1 (pstatsc,pltgrps,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4):
+    debug=True
+#    dfvrecs = df [(df['Verpl']==1 ) & (df[xvarPC] > 500)  ]   
+#    for pgrp in pltgrps:
+#        dfvrecs=addparscol(dfvrecs,pltgrps)
+
+
+#    dfgrps= useKAfstV   [  [ 'KAfstCluCode']] 
     #let op: right mergen: ALLE postcodes meenemen, en niet waargenomen op lage waarde zetten
-    vollandrecs = cartesian_product_multi (mygeoschpc4, dfgrps)
-    vollandrecs.columns= list(mygeoschpc4.columns) + list(dfgrps.columns)
+#    vollandrecs = cartesian_product_multi (mygeoschpc4, dfgrps)
+#    vollandrecs.columns= list(mygeoschpc4.columns) + list(dfgrps.columns)
+    vollandrecs= mygeoschpc4
 #    print(vollandrecs)
     if debug:
-        print( ( "alle land combinaties", len(vollandrecs) , len(mygeoschpc4)* len(dfgrps)) )
-    pstatsc=pstatsc.rename(columns={xvarPC:'PC4'}).merge(vollandrecs,how='right')
-    pstatsc['GeoInd'] = xvarPC
-    if 1==1:
-        explhere = myspecvals [myspecvals['Variabele_naam'] == pltgrps[0]].copy()
-        explhere['Code'] = pd.to_numeric(explhere['Code'],errors='coerce')
-#        print(explhere)
-        pstatsc=pstatsc.merge(explhere,left_on=pltgrps[0], right_on='Code', how='left')    
-        pstatsc['GrpExpl'] = pstatsc[pltgrps[0]].astype(str) + pstatsc[pltgrps[1]].astype(str) + " : " + pstatsc['Code_label']    
-        pstatsc= pstatsc.drop(columns=['Code','Code_label'])
-    else:
-        pstatsc['GrpExpl']=''
+        print( ( "alle land combinaties", len(vollandrecs) , len(mygeoschpc4)* len(pstatsc)) )
+    pstatsc=pstatsc.merge(vollandrecs,how='right')
     if debug:
         print( ( "return rdf", len(pstatsc)) )
     
@@ -606,7 +498,7 @@ def mkdfverplxypc4d1 (df,myspecvals,xvarPC,pltgrps,selstr,myKAfstV,myxlatKAfstV,
 
 #code werk nog niet 
 
-def mkdfverplxypc4 (df,myspecvals,pltgrps,selstr,myKAfstV,myxlatKAfstV,geoschpc4in,ngrp,p_OA):
+def mkdfverplxypc4 (dfg2,pltgrps,selstr,myKAfstV,myxlatKAfstV,geoschpc4in,p_OA):
     mygeoschpc4 = geoschpc4in
     if 1==1:
         for lkey in ('LW','LO'):
@@ -617,14 +509,13 @@ def mkdfverplxypc4 (df,myspecvals,pltgrps,selstr,myKAfstV,myxlatKAfstV,geoschpc4
 #            okey='AO'
 #            colnam="M_"+ lkey +"_" + okey
 #            mygeoschpc4.drop(inplace=True,columns=colnam)
-    rv1= mkdfverplxypc4d1 (df,myspecvals,'AankPC',pltgrps,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4,ngrp)
-    rv2= mkdfverplxypc4d1 (df,myspecvals,'VertPC',pltgrps,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4,ngrp)
-    rv= rv1.append(rv2) .reset_index(drop=True)   
+    rv= mkdfverplxypc4d1 (dfg2,pltgrps,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4)
+    rv['FactorV'] = rv['FactorVGen'] + rv['FactorVSpec']
     return rv
 
 fitgrps=['MotiefV','isnaarhuis']
-indatverplgr = mkdfverplxypc4 (allodinyr ,specvaltab,fitgrps,'Motief en isnaarhuis',
-                                useKAfstV,xlatKAfstV,geoschpc4,100,2.0)
+indatverplgr = mkdfverplxypc4 (odinverplgr ,fitgrps,'Motief en isnaarhuis',
+                                useKAfstV,xlatKAfstV,geoschpc4,2.0)
 indatverplgr
 # +
 #originele code had copy. Kost veel geheugen en tijd
@@ -849,8 +740,9 @@ def trypowerland (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,pltgrps,p_LW,p_
     mygeoschpc4= mkgeoschparafr(pc4data,pc4grid,rudigrid,myKAfstV,p_LW,p_LO)
     myxlatKAfstV=myKAfstV[['KAfstCluCode']].merge(inxlatKAfstV,how='left')
 #    print (myxlatKAfstV)
-    mydatverplgr = mkdfverplxypc4 (allodinyr ,specvaltab ,pltgrps,'Motief en isnaarhuis',
-                                myKAfstV,xlatKAfstV,mygeoschpc4,100,p_OA)
+    mydatverplgr = mkdfverplxypc4 (odinverplgr ,fitgrps,'Motief en isnaarhuis',
+                                myKAfstV,xlatKAfstV,mygeoschpc4,2.0)
+    
     cut2i=  choose_cutoff(mydatverplgr,pltgrps,False,0)  
     myfitverplgr = dofitdatverplgr(cut2i,mydatverplgr,pltgrps)
     for r in range(2):
@@ -1032,9 +924,9 @@ def mkpltverplxypc4 (df,myspecvals,xvar,pltgrp,selstr,ngrp):
     chart.set_ylabels(ylab)
     return(pstatsn)
    
-naarhuis = allodinyr [allodinyr ['Doel'] ==1 ]    
-datpltverplp = mkpltverplxypc4 (naarhuis,specvaltab,
-                                'AankPC/rudifun/S_MXI22_BWN','MotiefV','Naar huis',100)
+#naarhuis = allodinyr [allodinyr ['Doel'] ==1 ]    
+#datpltverplp = mkpltverplxypc4 (naarhuis,specvaltab,
+#                                'AankPC/rudifun/S_MXI22_BWN','MotiefV','Naar huis',100)
 
 
 # +

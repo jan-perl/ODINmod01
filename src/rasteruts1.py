@@ -452,3 +452,39 @@ def roundfilt(gridstep,dist):
     return Z
 
 #print(roundfilt(100,660) )
+
+
+# -
+
+#sla images uit bestand op
+def getcachedgrids(src):
+    clst={}
+    for i in src.indexes:
+        clst[i] = src.read(i) 
+    return clst
+
+
+# +
+def cartesian_product(*arrays):
+    la = len(arrays)
+    dtype = np.result_type(*arrays)
+    arr = np.empty([len(a) for a in arrays] + [la], dtype=dtype)
+    for i, a in enumerate(np.ix_(*arrays)):
+        arr[...,i] = a
+    return arr.reshape(-1, la)  
+
+#from https://stackoverflow.com/questions/53699012/performant-cartesian-product-cross-join-with-pandas
+def cartesian_product_multi(*dfs):
+#todo set columns
+    idx = cartesian_product(*[np.ogrid[:len(df)] for df in dfs])
+    rv= pd.DataFrame(
+        np.column_stack([df.values[idx[:,i]] for i,df in enumerate(dfs)]))
+#    collst = ()
+#    rv.columns= list(mygeoschpc4.columns) + list(dfgrps.columns)
+    return rv
+
+# -
+
+
+
+
