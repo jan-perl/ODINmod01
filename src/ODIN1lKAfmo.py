@@ -91,6 +91,10 @@ from scipy.optimize import nnls
 from sklearn import linear_model
 import seaborn
 
+import numba
+#from numba.utils import IS_PY3
+from numba.decorators import jit
+
 stryear='2020'
 cbspc4data =pd.read_pickle("../intermediate/CBS/pc4data_"+stryear+".pkl")
 cbspc4data= cbspc4data.sort_values(by=['postcode4']).reset_index()
@@ -169,27 +173,6 @@ print(useKAfstVQ)
 # -
 
 usePC4MXI=True
-if 0==1:
-    fietswijk1pc4= ODiN2readpkl.fietswijk1pc4
-    if usePC4MXI:
-        fietswijk1pc4['S_MXI22_NS'] = fietswijk1pc4['S_MXI22_BWN']  / (fietswijk1pc4['S_MXI22_BWN']  + fietswijk1pc4['S_MXI22_BAN'] )
-        fietswijk1pc4['S_MXI22_BB'] = fietswijk1pc4['S_MXI22_NS']
-    fietswijk1pc4['S_MXI22_BG'] = fietswijk1pc4['S_MXI22_BBN'] / fietswijk1pc4['S_MXI22_BGN']     
-    fietswijk1pc4['S_MXI22_GB'] = pd.qcut(fietswijk1pc4['S_MXI22_BB'], 10)
-    fietswijk1pc4['S_MXI22_GG'] = pd.qcut(fietswijk1pc4['S_MXI22_BG'], 10)
-    fietswijk1pc4['PC4'] =  pd.to_numeric(fietswijk1pc4['PC4'] ,errors='coerce')
-    print(fietswijk1pc4.dtypes)
-if 0==1:
-    fwin4 = fietswijk1pc4 [['PC4','S_MXI22_GB','S_MXI22_BB','S_MXI22_GG','S_MXI22_BG']]
-    allodinyr2 = allodinyr.merge(fwin4,left_on='AankPC', right_on='PC4',how='left')
-    allodinyr2 = allodinyr2.rename ( columns= {'S_MXI22_GB': 'Aank_MXI22_GW', 'S_MXI22_BB': 'Aank_MXI22_BW' } )
-    allodinyr2 = allodinyr2.rename ( columns= {'S_MXI22_GG': 'Aank_MXI22_GG', 'S_MXI22_BG': 'Aank_MXI22_BG' } )
-    allodinyr2 = allodinyr2.merge(fwin4,left_on='VertPC', right_on='PC4',how='left')
-    allodinyr2 = allodinyr2.rename (columns= {'S_MXI22_GB': 'Vert_MXI22_GW', 'S_MXI22_BB': 'Vert_MXI22_BW' } )
-    allodinyr2 = allodinyr2.rename ( columns= {'S_MXI22_GG': 'Vert_MXI22_GG', 'S_MXI22_BG': 'Vert_MXI22_BG' } )
-    print(allodinyr2.dtypes)
-    len(allodinyr2.index)
-
 
 
 def mkfietswijk3pc4(pc4data,pc4grid,rudigrid):
@@ -254,6 +237,11 @@ def mkgeoschparafr (pc4data,pc4grid,rudigrid,myKAfstV,p_LW,p_LO):
         colnam="M_"+ lkey +"_AL"
         outdf[colnam] = lvals  
         outdfst[colnam] = lvals 
+        okey = "OA"
+        colnam="M_"+ lkey +"_" + okey
+        outdf[colnam] = 0
+#                print(colnam,(lvals[np.isnan(lvals)]))
+
         
         for okey in ('OW','OO','OM'):
             colnam="M_"+ lkey +"_" + okey
@@ -268,6 +256,7 @@ def mkgeoschparafr (pc4data,pc4grid,rudigrid,myKAfstV,p_LW,p_LO):
         outdfadd['MaxAfst'] = row["MaxAfst"]
 #        print(row["KAfstCluCode"], row["MaxAfst"])
         filt=rasteruts1.roundfilt(100,1000*row["MaxAfst"])
+        filtarea = np.sum(filt)
 
         F=dict()
         tstart= time.perf_counter()
@@ -280,6 +269,8 @@ def mkgeoschparafr (pc4data,pc4grid,rudigrid,myKAfstV,p_LW,p_LO):
         F['OM'] =  (F_OO* F_OW) / (F_OO + F_OW+1e-10)
         print ((row["KAfstCluCode"], row["MaxAfst"], filt.shape , tend-tstart, " seconds") ) 
 
+        outdf["M_"+ lkey +"_" + "OA" ] = outdf["M_"+ lkey +"_" + "AL" ] * filtarea
+        
         for lkey in R.keys():
             for okey in ('OW','OO','OM'):
                 lvals = rasteruts1.sumpixarea(pc4lst,np.multiply(R[lkey],F[okey]))
@@ -487,7 +478,7 @@ def mkdfverplxypc4d1 (pstatsc,pltgrps,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4):
 
 def mkdfverplxypc4 (dfg2,pltgrps,selstr,myKAfstV,myxlatKAfstV,geoschpc4in,p_OA):
     mygeoschpc4 = geoschpc4in
-    if 1==1:
+    if 1==0:
         for lkey in ('LW','LO'):
             colnamAL="M_"+ lkey +"_AL"
             okey='OA'
@@ -508,8 +499,10 @@ indatverplgr
 #originele code had copy. Kost veel geheugen en tijd
 #daarom verder met kolommen met een F_ (filtered)
 
-def choose_cutoff(indat,pltgrps,hasfitted,prevrres):
-    outframe=indat[['PC4','GrpExpl','MaxAfst','KAfstCluCode','GeoInd' ] +pltgrps]
+#oude versie: ieder record fit naar ofwel ALsafe of naar osafe, of nergens heen
+
+def choose_cutoffold(indat,pltgrps,hasfitted,prevrres):
+    outframe=indat[['PC4','GrpExpl','MaxAfst','KAfstCluCode','GeoInd' ] +pltgrps].copy(deep=False)
     if hasfitted:
         outframe['ALsafe'] = (prevrres['FactorEstNAL'] > 5.0 * prevrres['FactorEstAL'] ) | (outframe['MaxAfst']==0) 
         outframe['osafe']  = (prevrres['FactorEstNAL'] < 0.2 * prevrres['FactorEstAL'] ) & (outframe['MaxAfst']!=0)
@@ -536,17 +529,131 @@ def choose_cutoff(indat,pltgrps,hasfitted,prevrres):
                 colnamo="F_"+ lkey +"_" + okey
 #                print(colnam,(lvals[np.isnan(lvals)]))
                 outframe[colnamo] = indat[colnam] * ((outframe['osafe']).astype(int))
-    outframe['ALmult'] = ( (outframe['ALsafe']==False).astype(int))
+#    outframe['ALmult'] = ( (outframe['ALsafe']==False).astype(int))
     return outframe
 
-cut2=  choose_cutoff(indatverplgr,fitgrps,False,0)   
+cut2=  choose_cutoffold(indatverplgr,fitgrps,False,0)   
 cut2
+
+
+# +
+#todo
+#fit tov fractie (l komt uit data FactorVL)
+#waarde:  p=1/(1/l + 1/f) -> f= 1/ (1/p - 1/l) -> divergeert dus alleen als w>.1, anders 0
+#gewicht: w= (p * (1/p - 1/l))** (+ pow+1)   -> aparte kolom
+
+# +
+#originele code had copy. Kost veel geheugen en tijd
+#daarom verder met kolommen met een F_ (filtered)
+
+def choose_cutoffnw(indat,pltgrps,hasfitted,prevrres,curvpwr):
+    outframe=indat[['PC4','GrpExpl','MaxAfst','KAfstCluCode','GeoInd' ] +pltgrps].copy(deep=False)
+    minwgt=.5
+    recisAL=indat['MaxAfst']==0
+    if hasfitted:
+#        outframe['ALsafe'] = (prevrres['FactorEstNAL'] > 5.0 * prevrres['FactorEstAL'] ) | (outframe['MaxAfst']==0) 
+#        outframe['osafe']  = (prevrres['FactorEstNAL'] < 0.2 * prevrres['FactorEstAL'] ) & (outframe['MaxAfst']!=0)
+        outframe['EstVPAL']  =np.power(prevrres['FactorEstAL'],curvpwr)
+        outframe['EstVPo']   =np.power(prevrres['FactorEstNAL'],curvpwr)
+        outframe['EstVP']    =np.power(prevrres['FactorEst'],curvpwr)
+    else: 
+        wval1= indat[recisAL] [['FactorV','PC4','GeoInd'] +pltgrps].copy()
+        wval1= wval1.rename(columns={'FactorV':'EstVPAL'})
+        wval1['EstVPAL'] =np.power(wval1['EstVPAL'],curvpwr)
+        outframe=outframe.merge(wval1,how='left')
+        outframe['EstVP']  =np.power(indat['FactorV'],curvpwr)
+        outframe['EstVPo'] =np.where (recisAL,1e20,1e-9 )    
+    if 1==1:
+        outframe['FactorVP'] =np.power(indat['FactorV'],curvpwr)
+        denomo=  (1/outframe['EstVP']- 1/outframe['EstVPAL'])
+        outframe['osafe'] = np.where( outframe['EstVP'] * denomo <=0,0, np.power(
+                             outframe['EstVP']*denomo,  curvpwr+1) )  
+        outframe['osafe'] =np.where (outframe['osafe'] <minwgt,0,outframe['osafe'] )       
+        outframe['FactorVFo'] = np.where(outframe['EstVP']* denomo <=0,0, 
+                            np.power(denomo ,-1/curvpwr))
+        outframe['FactorVFo'] = indat['FactorV'] *outframe['FactorVFo'] /outframe['EstVP'] 
+    if hasfitted:
+        denomAL= (1/outframe['EstVP']- 1/outframe['EstVPo'])
+    else:
+        denomAL= (1/outframe['EstVP']- np.power(outframe['FactorVFo'],- curvpwr ) ) 
+    if 1==1:
+        outframe['FactorVFAL'] = np.where(outframe['EstVP']* denomAL <=0,0, 
+                            np.power(denomAL ,-1/curvpwr))
+        outframe['FactorVFAL'] = indat['FactorV'] *outframe['FactorVFAL'] /outframe['EstVP'] 
+        outframe['FactorVFAL'] = np.where (recisAL,indat['FactorV'],
+                            outframe['FactorVFAL'] )               
+    if hasfitted:
+        outframe['ALsafe'] = np.where( outframe['EstVP'] * denomAL <=0,0, np.power(
+                             outframe['EstVP']*denomAL,  curvpwr+1) )  
+        outframe['ALsafe'] = np.where (outframe['ALsafe'] <minwgt,0,outframe['ALsafe'] )  
+        outframe['ALsafe'] = np.where (recisAL,1.0,outframe['ALsafe'] )                             
+
+        chooseAL=np.where( (outframe['ALsafe'] > outframe['osafe'] )| recisAL ,1,0)
+        outframe['ALsafe'] = outframe['ALsafe'] *chooseAL
+        outframe['osafe'] = outframe['osafe'] *(1-chooseAL)
+    else:                
+        outframe['ALsafe'] = np.where (recisAL,1,0)
+    if 1==1:
+        if np.sum(outframe['osafe'] * outframe['ALsafe']) !=0:
+            raise ("Error: overlapping fits")
+        outframe['FactorVF'] = (outframe['FactorVFo']*outframe['osafe'] +
+                                outframe['FactorVFAL'] * outframe['ALsafe'] )
+        for lkey in ('LW','LO'):
+            colnamAL ="M_"+ lkey +"_AL"
+            colnamALo="F_"+ lkey +"_AL"
+            outframe[colnamALo] = indat[colnamAL] * outframe['ALsafe']
+            for okey in ('OW','OO','OM','OA'):
+                colnam ="M_"+ lkey +"_" + okey
+                colnamo="F_"+ lkey +"_" + okey
+#                print(colnam,(lvals[np.isnan(lvals)]))
+                outframe[colnamo] = indat[colnam] * outframe['osafe']
+#        outframe['osafe2'] =outframe['osafe']
+#        outframe['ALsafe2'] =outframe['ALsafe']
+        print( ( np.sum(outframe['ALsafe']),np.sum(outframe['osafe']),
+                 np.max(outframe['ALsafe']),np.max(outframe['osafe'])) )
+    return outframe
+
+def choose_cutoff(indat,pltgrps,hasfitted,prevrres,curvpwr):
+    if True:
+        return choose_cutoffnw(indat,pltgrps,hasfitted,prevrres,curvpwr)
+    else:
+        return choose_cutoffold(indat,pltgrps,hasfitted,prevrres)
+
+p_CP=1.0
+cut2=  choose_cutoff(indatverplgr,fitgrps,False,0,p_CP)   
+#cut2
 # -
 
-
-cut2 [(cut2['MaxAfst']!=0 ) & (cut2['FactorVF']!=0 )]
-
-cut2 [(cut2['MaxAfst']!=0 ) & (cut2['F_LW_AL']!=0 )]
+def fitinddiag(fitdf,motiefc,naarhuisc,geoindex,curvpwr):    
+    seldf = fitdf [ (fitdf ['MotiefV'] ==motiefc) &
+                  (fitdf ['isnaarhuis'] ==naarhuisc) &
+                  (fitdf ['GeoInd'] ==geoindex) & 
+                  (fitdf ['FactorVP'] >0)] .copy()
+    if False:
+        print(seldf[['EstVPAL','MotiefV']].groupby(['EstVPAL']).agg('count').\
+         groupby(['MotiefV',' isnaarhuis']).agg('count'))
+    pldf=    seldf[['osafe','ALsafe']].copy()
+    pldf['FactorVPrel'] =    seldf['FactorVP'] /  seldf['EstVPAL']  
+    sumchk = np.power (np.power(seldf['FactorVFo'],-curvpwr) + 
+                       np.power(seldf['FactorVFAL'] ,-curvpwr) , -curvpwr )
+    pldf['FactorVSrel'] = sumchk /  seldf['FactorVP']
+    pldf['FactorVFoCor'] =   np.where(seldf['osafe']==0,-.1,
+                                      seldf['FactorVFo'] /  seldf['FactorVP']  )
+    pldf['FactorVFALCor'] =   np.where(seldf['ALsafe']==0,-.1,
+                                seldf['FactorVFAL'] /  seldf['FactorVP'] )
+    if True:
+        print(pldf[pldf['FactorVFALCor'] >5])
+        print(seldf[pldf['FactorVFALCor'] >5])
+        print(pldf[( abs(pldf['FactorVSrel']-1) >1e-3) & (( abs(pldf['FactorVSrel']-0) >1e-3)) ])
+    plmelt =  pd.melt(pldf, 'FactorVPrel', var_name='cols',  value_name='vals')
+    
+    if False:
+        print(seldf.sort_values(by=['PC4','KAfstCluCode'])[['FactorVFo','FactorVP']] )
+    fig, ax = plt.subplots()    
+    seaborn.scatterplot(data=plmelt,x="FactorVPrel",y="vals", hue='cols', ax=ax)
+    ax.set_xscale('log')
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+fitinddiag(cut2,10,5,'VertPC',p_CP)    
 
 
 # +
@@ -572,7 +679,13 @@ def _regressgrp(indf, yvar, xvars,pcols):
         return(rv)
 
 
-def dofitdatverplgr(indf,topreddf,pltgrp):
+#@jit(parallel=True)
+def _fitsub(indf,fitgrp,_regressgrp,  colvacols2, colpacols2):
+    rf= indf.groupby(fitgrp ).apply( _regressgrp, 'FactorVF', colvacols2, colpacols2)
+    return rf
+    
+    
+def dofitdatverplgr(indf,topreddf,pltgrp,curvpwr):
 #    indf = indf[(indf['MaxAfst']!=95.0) & (indf[pltgrp]<3) ]
     debug=False
     colvacols = indf.columns
@@ -584,8 +697,7 @@ def dofitdatverplgr(indf,topreddf,pltgrp):
         fitgrp=pltgrp +['KAfstCluCode','GeoInd'  ]
     else:
         fitgrp=pltgrp + ['GeoInd' ]
-    rf= indf.groupby(fitgrp ).apply(
-            _regressgrp, 'FactorVF', colvacols2, colpacols2).reset_index()
+    rf= _fitsub(indf,fitgrp,_regressgrp,  colvacols2, colpacols2).reset_index()
     
     outdf = topreddf.merge(rf,how='left')
     #let op: voorspel uit M kolommen
@@ -612,7 +724,8 @@ def dofitdatverplgr(indf,topreddf,pltgrp):
         print ((s2al, s2))
     #s2ch= np.min( (np.where((s2==0),s2al,s2 ), np.where((s2al==0),s2,s2al ) ) ,axis=0)
     s2ch= np.where((s2==0),np.where(outdf['MaxAfst']==0, s2al,0), 
-                           np.where((s2al==0),s2,1/ (1/ s2+ 1/s2al )) )
+                           np.where((s2al==0),s2,
+                           np.power (np.power(s2,-curvpwr) + np.power(s2al,-curvpwr), -curvpwr )) )
     if (debug):
         print (s2ch)
     outdf['FactorEst'] = s2ch
@@ -620,14 +733,22 @@ def dofitdatverplgr(indf,topreddf,pltgrp):
     return(outdf)
 
 
-fitdatverplgr = dofitdatverplgr(cut2,indatverplgr,fitgrps)
+fitdatverplgr = dofitdatverplgr(cut2,indatverplgr,fitgrps,p_CP)
 seaborn.scatterplot(data=fitdatverplgr,x="FactorEst",y="DiffEst",hue="GeoInd")
 # -
 
+cut3=  choose_cutoff(indatverplgr,fitgrps,True,fitdatverplgr,p_CP)  
+cut3=  choose_cutoffold(indatverplgr,fitgrps,True,fitdatverplgr)  
+#cut3
+
+# +
+#fitinddiag(cut3,10,5,'VertPC',p_CP)    
+# -
+
 #voor de time being, overschrijf de vorige selectie gegevens
-for r in range(2):
-    cut3=  choose_cutoff(indatverplgr,fitgrps,True,fitdatverplgr)  
-    fitdatverplgr = dofitdatverplgr(cut3,indatverplgr,fitgrps)
+for r in range(0):
+    cut3=  choose_cutoff(indatverplgr,fitgrps,True,fitdatverplgr,p_CP)  
+    fitdatverplgr = dofitdatverplgr(cut3,indatverplgr,fitgrps,p_CP)
 seaborn.scatterplot(data=fitdatverplgr,x="FactorEst",y="DiffEst",hue="GeoInd")
 
 fitdatverplgr["x_LM_AL"] = fitdatverplgr["M_LW_AL"] * fitdatverplgr["M_LO_AL"]
@@ -722,7 +843,7 @@ calcchidgrp(fitdatverplgr)
 
 
 # +
-def trypowerland (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,pltgrps,p_LW,p_LO,p_OA):
+def trypowerland (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,pltgrps,p_LW,p_LO,p_OA,curvpwr):
     print((p_LW,p_LO,p_OA))
     mygeoschpc4= mkgeoschparafr(pc4data,pc4grid,rudigrid,myKAfstV,p_LW,p_LO)
     myxlatKAfstV=myKAfstV[['KAfstCluCode']].merge(inxlatKAfstV,how='left')
@@ -730,16 +851,17 @@ def trypowerland (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,pltgrps,p_LW,p_
     mydatverplgr = mkdfverplxypc4 (odinverplgr ,fitgrps,'Motief en isnaarhuis',
                                 myKAfstV,xlatKAfstV,mygeoschpc4,2.0)
     
-    cut2i=  choose_cutoff(mydatverplgr,pltgrps,False,0)  
-    myfitverplgr = dofitdatverplgr(cut2i,mydatverplgr,pltgrps)
+    cut2i=  choose_cutoff(mydatverplgr,pltgrps,False,0,curvpwr)  
+    myfitverplgr = dofitdatverplgr(cut2i,mydatverplgr,pltgrps,curvpwr)
     for r in range(2):
-        cut3i=  choose_cutoff(mydatverplgr,pltgrps,True,myfitverplgr) 
-        myfitverplgr = dofitdatverplgr(cut3i,mydatverplgr,pltgrps)
+        cut3i=  choose_cutoff(mydatverplgr,pltgrps,True,myfitverplgr,curvpwr) 
+        myfitverplgr = dofitdatverplgr(cut3i,mydatverplgr,pltgrps,curvpwr)
     rdf=calcchidgrp(myfitverplgr)
     return(np.sum(rdf['chisq'].reset_index().iloc[:,1]))
     
 #rv=trypowerland(cbspc4data,pc4inwgrid,rudifungrid,useKAfstVland,xlatKAfstV,1.3,1.0,2.0)
-rv=trypowerland(cbspc4data,pc4inwgcache,rudifungcache,useKAfstVland,xlatKAfstV,fitgrps,1.3,1.0,2.0)
+rv=trypowerland(cbspc4data,pc4inwgcache,rudifungcache,useKAfstVland,xlatKAfstV,fitgrps,
+                1.3,1.0,2.0,p_CP)
 rv
 # -
 
@@ -747,9 +869,6 @@ rv
 
 # +
 #let op p_LO ongelijk 1 geeft vooral veel negatieve waarden en dus NAs, die punten tellen dan niet mee in chi^2
-import numba
-#from numba.utils import IS_PY3
-from numba.decorators import jit
 
 #@jit(parallel=True)
 def chisqsampler (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,pltgrps):
@@ -760,8 +879,10 @@ def chisqsampler (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,pltgrps):
 #    l_OA=2.0
 #    l_LW=1.2
     c_LO=1.0
+    c_CP=1.0
 #    print( (p_LW,p_LO))
-    myfunc =lambda  l_LW,l_OA  :trypowerland (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,pltgrps,l_LW,c_LO,l_OA)
+    myfunc =lambda  l_LW,l_OA  :trypowerland (pc4data,pc4grid,rudigrid,
+                                              myKAfstV,inxlatKAfstV,pltgrps,l_LW,c_LO,l_OA,c_CP)
     vfunc = np.vectorize(myfunc)
     z= ( vfunc(p_LW,p_OA) )
     z=np.array(z)
@@ -794,7 +915,9 @@ print ( (len(cbspc4data), len(pllanddiff) ) )
 
 pllanddiffam= cbspc4data[['postcode4']].merge(fitdatverplgr[(fitdatverplgr['MaxAfst']==0) ] ,
                                                              how='left',left_on=('postcode4'), right_on = ('PC4'))
-pllanddiffam[abs(pllanddiffam['DiffEst']>1.5e7)].groupby(['postcode4','GrpExpl'])[['isnaarhuis']].agg('count')
+pllanddiffam['DiffAbs'] =abs(pllanddiffam['DiffEst'])
+pllanddiffam.sort_values(by='DiffAbs').tail(80).groupby(['postcode4','GrpExpl'])[['isnaarhuis','DiffEst']].agg(
+       {'isnaarhuis':'count','DiffEst':'mean'} )
 
 # +
 #inspectie
@@ -802,10 +925,12 @@ pllanddiffam[abs(pllanddiffam['DiffEst']>1.5e7)].groupby(['postcode4','GrpExpl']
 
 #chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(3511,3512,3584 )))]
 #chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(6511,6525 )))]
-chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(5611,5612 )))]
+chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(2513 ,2333)))]
+#chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(5611,5612 )))]
+#chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(2678,2691 )))]
 #chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(1012,1017,1043,1101,1118 )))]
 #chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(2262,2333,2511,2595 )))]
-pchkpckrt = chkpckrt.to_crs(epsg=plot_crs).plot()
+pchkpckrt = chkpckrt.to_crs(epsg=plot_crs).plot(alpha=.3)
 cx.add_basemap(pchkpckrt, source= prov0)
 # -
 
@@ -1081,16 +1206,5 @@ def mkpltverplp (df,myspecvals,collvar,normgrp,selstr):
 #datpltverplp = mkpltverplp (allodinyr,specvaltab,'VertUur','Jaar','Alle ritten')
 datpltverplp = mkpltverplp (naarhuis,dspecvaltab,'AankPC/rudifun/S_MXI22_GB','MotiefV','Alle ritten')
 # -
-
-allrithuis= odinverplgr
-
-datpltverplp = mkpltverplp (allodinyr,specvaltab,'MotiefV','Jaar','Alle ritten')
-
-datpltverplp = mkpltverplp (allodinyr,specvaltab,'KHvm','Jaar','Alle ritten')
-
-datpltverplp = mkpltverplp (allodinyr,specvaltab,'KAfstV','Jaar','Alle ritten')
-
-#maak andere grafiek met zo veel categorieen
-datpltverplp = mkpltverplp (allodinyr,specvaltab,'VertUur','Jaar','Alle ritten')
 
 

@@ -15,8 +15,8 @@
 # +
 #maak ODIN van/naar categorieen
 #en save naar pkl in intermediates
+# -
 
-# +
 #todo
 #actieve modes per afstandsklasse en type
 #gemiddelde afstand per afstandsklasse en type
@@ -24,9 +24,12 @@
 #referentie reiskms actieve modes
 #vergelijking co2 uitstoot active modes met kentallen
 
-#fit tov fractie (l komt uit data FactorVL)
-#waarde:  p=1/(1/l + 1/f) -> f= 1/ (1/p - 1/l) -> divergeert dus alleen als w>.1, anders 0
-#gewicht: w= l/ (l-p) -> aparte kolom
+
+# +
+#todo
+#OA klasse ook via convolutie -> voor bij grafieken
+#vannaar per postcode combinaite maken voor geselecteerde postcodes
+#  voor visualisatie, uit convolutie. Exporteer alleen !=0, bijvoorbeeld PCs in Utrecht
 
 # +
 #splits code op; DIT DEEL is:
@@ -52,6 +55,7 @@ from sklearn.linear_model import LinearRegression
 
 import re
 import time
+import io   
 
 import geopandas
 import contextily as cx
@@ -284,14 +288,23 @@ geoschpc4r1=odinschpc4[
                      ( ~ np.isnan(odinschpc4['aantal_inwoners'])) &
                      ( odinschpc4['aantal_inwoners'] != ODINmissint )]
 
-#geoschpc4r2= cbspc4data[['postcode4','oppervlak'] ] .merge (geoschpc4r1 ,left_on=('postcode4'), right_on = ('PC4') )
-geoschpc4r2=geoschpc4r1
+geoschpc4r2= cbspc4data[['postcode4','omgevingsadressendichtheid' ]] .merge (geoschpc4r1 ,left_on=('postcode4'), right_on = ('PC4') )
+#geoschpc4r2=geoschpc4r1
 #buurtlogmod= loglogregrplot(geoschpc4r2,'M_LW_AL','aantal_inwoners' )
 
 # +
 #enigszine onverwacht komnt hier dezelfde relatie uit al in wijken en buurten
 #wat dit betreft lijken postcodes dus homogeen
 # -
+
+geoschpc4r2['adrschat'] = geoschpc4r2['omgevingsadressendichtheid'] * geoschpc4r2['oppervlak']*1e-6
+buurtlogmod= loglogregrplot(geoschpc4r2,'adrschat','aantal_inwoners' )
+
+geoschpc4r2[geoschpc4r2['adrschat'] >1e5]
+
+geoschpc4r2[geoschpc4r2['oppervlak'] >1e8]
+
+geoschpc4r2[geoschpc4r2['adrschat'] <10]
 
 buurtlogmod= loglogregrplot(geoschpc4r2,'oppervlak','aantal_inwoners' )
 
@@ -344,9 +357,24 @@ def pcnietwoon(df):
     return rv
 allodinyr['OthPC'] =pcnietwoon(allodinyr)
 
+# +
+some_string="""OthPC,MotiefV,Comment
+1779,1,kassen werk/oppervl overschat
+2665,1,kassen werk/oppervl overschat
+2691,1,kassen werk/oppervl overschat
+5928,1,logistiek werk/oppervl overschat
+6525,6,radboud U
+3995,7,Houten Rond en Castellum
+3431,7,Nieuwegein City Plaza
+"""
+
+#read CSV string into pandas DataFrame
+highman = pd.read_csv(io.StringIO(some_string), sep=",")
+highman
+
 
 # +
-def surplusPCmotief(allpc4,df):
+def surplusPCmotief(allpc4,df,man):
     pc4data=allpc4[['postcode4','aantal_inwoners','oppervlak']].rename(columns={'postcode4':'OthPC'} ) .copy()
     pc4totaal = pc4data[['aantal_inwoners','oppervlak']].sum()
 #       .reset_index().rename(
@@ -360,12 +388,17 @@ def surplusPCmotief(allpc4,df):
     allemotief = allemotief.merge(motieftotaal,how='left')
     allemotief['oppfrac']=  allemotief['MotiefTot'] * allemotief['oppervlak']/ pc4totaal.oppervlak
 #    print(allemotief)
-    allemotief['siggrens'] = 2e6+  .001 *  allemotief['MotiefTot'] + .2*allemotief['oppfrac']
-    rv =allemotief[ allemotief['FactorV'] - allemotief['oppfrac'] >allemotief['siggrens']  ]
+    allemotief['siggrens'] = 1e6+  .002 *  allemotief['MotiefTot'] + .2*allemotief['oppfrac']
+    tehoog=abs(allemotief['FactorV'] - allemotief['oppfrac'])  >allemotief['siggrens'] 
+    man['flgman']=1
+    allemotief=allemotief.merge(man,how='left')
+    rv =allemotief[ tehoog | (False== np.isnan(allemotief['flgman']))  ]
     return rv
                                                                                             
-highpcs = surplusPCmotief(cbspc4data,allodinyr)
-highpcs.groupby('MotiefV')[['OthPC']].count()
+highpcs = surplusPCmotief(cbspc4data,allodinyr,highman)
+print(len(highpcs))
+print( highpcs.groupby('MotiefV')[['OthPC']].count() )
+print( highpcs.groupby('OthPC')[['MotiefV']].count() )
 highpcs.to_excel("../output/highmotiefPCs.xlsx")
 
 
@@ -438,16 +471,93 @@ def mkdfverplxypc4 (df,myspecvals,pltgrps,selstr,myKAfstV,myxlatKAfstV):
     df['FactorVGen']  = np.where(df['HighPCfls'],0, df['FactorV'] )
     df['FactorVSpec'] = np.where(df['HighPCfls'], df['FactorV'],0 )
 
-    rv1= mkdfverplxypc4d1 (df,myspecvals,'AankPC',pltgrps,isnhexpl,selstr,myKAfstV,myxlatKAfstV)
-    rv2= mkdfverplxypc4d1 (df,myspecvals,'VertPC',pltgrps,isnhexpl,selstr,myKAfstV,myxlatKAfstV)
-    rv= rv1.append(rv2) .reset_index(drop=True)   
+    fr2= (mkdfverplxypc4d1 (df,myspecvals,grp,pltgrps,isnhexpl,selstr,myKAfstV,myxlatKAfstV)
+            for grp in ['AankPC','VertPC'] )
+    rv=pd.concat(fr2).reset_index()
+#        rv1= mkdfverplxypc4d1 (df,myspecvals,'AankPC',pltgrps,isnhexpl,selstr,myKAfstV,myxlatKAfstV)
+#        rv2= mkdfverplxypc4d1 (df,myspecvals,'VertPC',pltgrps,isnhexpl,selstr,myKAfstV,myxlatKAfstV)
+#        rv= rv1.append(rv2) .reset_index(drop=True)   
     return rv
 
 fitgrps=['MotiefV','isnaarhuis']
 odinverplgr = mkdfverplxypc4 (allodinyr ,specvaltab,fitgrps,'Motief en isnaarhuis',
                                 useKAfstV,xlatKAfstV)
 odinverplgr
+# +
+#other file merge geo
+#other file addparsrecs
+
+#dan een dataframe dat
+#2) per lengteschaal, 1 PC (van of naar en anderegroepen (maar bijv ook Motief ODin data verzamelt)
+
+def mkdfverplklas1 (df,myspecvals,xvarPC,pltgrps,grp1map,myinfoflds,myKAfstV,myxlatKAfstV):
+    debug=False
+    dfvrecs = df [(df['Verpl']==1 ) & (df['AankPC'] > 500) & (df['VertPC'] > 500)  ]   
+#    oprecs = df [df['OP']==1]
+    gcols=pltgrps+ ['KAfstV',xvarPC]
+    #sommeer per groep per oorspronkelijke KAfstV, maar niet voor internationaal
+    pstats = dfvrecs[gcols+myinfoflds].groupby(gcols).sum().reset_index()
+    if debug:
+        print( ( "oorspr lengte groepen", len(pstats)) )
+    #nu kleiner dataframe, dupliceer records in groep
+    pstatsc = pstats[pstats ['KAfstV'] >0].merge(myxlatKAfstV,how='left').drop( columns='KAfstV')
+    if debug:    
+        print( ( "oorspr lengte groepen met duplicaten", len(pstats)) )
+    pstatsc = pstatsc.groupby(pltgrps +[ 'KAfstCluCode', xvarPC]).sum().reset_index()
+    if debug:
+        print( ( "lengte clusters", len(pstats)) )
+    dfgrps = pstatsc.groupby(pltgrps )[  [ 'KAfstCluCode']].count().reset_index().drop( columns='KAfstCluCode')
+    if debug:
+        print( ( "types opdeling", len(dfgrps)) )
+    #let op: right mergen: ALLE postcodes meenemen, en niet waargenomen op lage waarde zetten
+    vollandrecs =  dfgrps
+#    print(vollandrecs)
+    if debug:
+        print( ( "alle land combinaties", len(vollandrecs) , len(mygeoschpc4)* len(dfgrps)) )
+    pstatsc=pstatsc.rename(columns={xvarPC:'GrpVal'}).merge(vollandrecs,how='right')
+    pstatsc['GrpVal'] = pd.to_numeric(pstatsc['GrpVal'],errors='coerce')
+    pstatsc['GrpTyp'] = xvarPC
+    explhere1 = myspecvals [myspecvals['Variabele_naam'] == xvarPC].copy()
+    explhere1['Code'] = pd.to_numeric(explhere1['Code'],errors='coerce')
+#    print(explhere1)
+    pstatsc=pstatsc.merge(explhere1,left_on='GrpVal', right_on='Code', how='left').rename(
+       columns={'Code_label':'GrpV_label'}) 
+    pstatsc=pstatsc.drop(columns=['Code'])
+#    print(pstatsc)
+
+    if 1==1:
+        explhere = myspecvals [myspecvals['Variabele_naam'] == pltgrps[0]].copy()
+        explhere['Code'] = pd.to_numeric(explhere['Code'],errors='coerce')
+#        print(explhere)
+        pstatsc=pstatsc.merge(explhere,left_on=pltgrps[0], right_on='Code', how='left')    
+        pstatsc['GrpExpl'] = pstatsc[pltgrps[0]].astype(str) +  " "+ pstatsc[pltgrps[1]].astype(str) + \
+              " : " + pstatsc['Code_label'] + " "+ pstatsc[pltgrps[1]].map(grp1map)
+        pstatsc= pstatsc.drop(columns=['Code','Code_label'])
+    else:
+        pstatsc['GrpExpl']=''
+    if debug:
+        print( ( "return rdf", len(pstatsc)) )
+#    print(pstatsc)
+    return(pstatsc)
+
+#code werk nog niet 
+
+def mkdfverplklas (df,myspecvals,pltgrps,myinfogrps,myinfoflds,myKAfstV,myxlatKAfstV):
+    fr2= (mkdfverplklas1(df,myspecvals,grp,pltgrps,isnhexpl,myinfoflds,myKAfstV,myxlatKAfstV)
+            for grp in myinfogrps)
+    rv=pd.concat(fr2).reset_index()
+    return rv
+
+
+fitgrps=['MotiefV','isnaarhuis']
+infogrps=['KHvm','AankUur','VertUur']
+allodinyr['FactorHm']= allodinyr['FactorV'] * allodinyr['AfstS']
+infoflds=['FactorV','FactorHm']
+odinverplklinfo = mkdfverplklas (allodinyr ,specvaltab,fitgrps,infogrps,infoflds,
+                                useKAfstV,xlatKAfstV)
+odinverplklinfo
 # -
+
 odinverplgr[['FactorVGen','FactorVSpec']].sum()
 
 # +
@@ -459,6 +569,7 @@ useKAfstV.to_pickle("../intermediate/ODINcatVN01uKA.pkl")
 xlatKAfstV.to_pickle("../intermediate/ODINcatVN01xKA.pkl")
 
 odinverplgr.to_pickle("../intermediate/ODINcatVN01db.pkl")
+odinverplklinfo.to_pickle("../intermediate/ODINcatVN02db.pkl")
 
 # mooi, nu analyses welke raar zijn
 
