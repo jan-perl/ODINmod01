@@ -1,9 +1,6 @@
-# EVCDgen - Electric Vehicle Charging Demand generator v0.1
-This is a basic tool with the purpose of generating EV charging demand patterns out of regular mobility data. The tool converts anonymized single-day trip diaries of Dutch citizens to weekly EV mobility schedules and connects these schedules to a model that decides when and at what location (of type home/work/public) the EV starts to charge based on its State-of-Charge.
+# ODINmod01
+This is a basic set of tools to access ODIN data and do analyses.
 
-More information can be found in the related research paper, which is planned for presentation in the CIRED22 Workshop, 2-3 June 2022 [1].
-
-[1] Using mobility data and agent based models to generate future e-mobility charging demand patterns, B. Nijenhuis; S. C. Doumen; J. Hönen; G. Hoogsteen; CIRED22 Workshop, Porto.
 
 
 ## How to use:
@@ -11,9 +8,9 @@ The file uses input data from the Dutch Mobility study ODiN 2019 [2]. We cannot 
 
 (1) Get access to the ODiN data and place the datafile in ./data
 
-(2) Run prepareData.py to generate the necessary inputs for the schedule generator
+(2) Clone the pyshp repository in a folder next to this project
 
-(3) Run chargingProbability.py to generate charging probability curves
+(3) Get an output file fietswijk1.dbf from https://github.com/jan-perl/RO_fietsbalans and put it into inputs/
 
 (4) Run main.py
 
