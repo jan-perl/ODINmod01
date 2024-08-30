@@ -741,7 +741,7 @@ def mksumperklas(verpl,kenm,fg):
     print(kenmu.dtypes)
     ds=vg.merge(kenmu,how='left')
     print(ds.dtypes)
-    ds['FactorKm'] = 
+    ds['FactorKm'] = ds['FactorC'] * ds['RitAfst']
     ds=ds.drop(columns=[ "GrpVal","GrpV_label"])
     dssu=ds.groupby(fg+ ["GrpTyp",'GeoInd'] ).agg('sum').reset_index()    
     return dssu
