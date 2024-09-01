@@ -360,6 +360,10 @@ useKAfstVland = useKAfstV [useKAfstV['MaxAfst']==0]
 geoschpc4land=mkgeoschparafr(cbspc4data,pc4inwgcache,rudifungcache,useKAfstVland,expdefs)
 geoschpc4land
 
+from importlib import reload  # Python 3.4+
+if False:
+        foo = reload(ODINcatVNuse)
+
 #het inlezen van odinverplgr loopt in deze versie via ODINcatVNuse
 import ODINcatVNuse
 
@@ -586,11 +590,19 @@ def choose_cutoffold(indat,pltgrps,hasfitted,prevrres,pu):
     recisAL=indat['MaxAfst']==0
     wval1= indat[recisAL] [['FactorV','PC4','GeoInd'] +pltgrps].copy(deep=False)
     wval1= wval1.rename(columns={'FactorV':'EstVPAL'})
-    outframe=outframe.merge(wval1,how='left')
+    outframe=outframe.merge(wval1,how='left')    
+    outframe['FactorVFAL'] = indat['FactorV']  /outframe['EstVPAL'] 
+    outframe['FactorVFoCor'] =indat['FactorV'] 
+    outframe['FactorVFo'] = indat['FactorV']  /outframe['EstVPAL']
 
     if hasfitted:
         outframe['ALsafe'] = (prevrres['FactorEstNAL'] > 5.0 * prevrres['FactorEstAL'] ) | (outframe['MaxAfst']==0) 
-        outframe['osafe']  = (prevrres['FactorEstNAL'] < 0.2 * prevrres['FactorEstAL'] ) & (outframe['MaxAfst']!=0)
+        outframe['osafe']  = (prevrres['FactorEstNAL'] < 0.2 * prevrres['FactorEstAL'] ) | (indat['FactorV'] < .2 *  prevrres['FactorEstAL'] )
+        outframe['osafe']  = outframe['osafe']  & (outframe['MaxAfst']!=0)
+        outframe['FactorVFo'] = indat['FactorV']  /prevrres['FactorEstAL']
+#        outframe['FactorVFoCor'] =indat['FactorV']  * prevrres['FactorEstAL'] /outframe['EstVPAL'] 
+#        outframe['ALsafe'] = indat['FactorV'] > .9 * outframe['EstVPAL'] 
+#        outframe['osafe']  = (outframe['FactorVFoCor'] < 0.2 * prevrres['FactorEstAL'] ) & (outframe['MaxAfst']!=0)
     elif True:        
         outframe['ALsafe'] = indat['FactorV'] > .9 * outframe['EstVPAL'] 
         outframe['osafe'] =  indat['FactorV'] < .4 * outframe['EstVPAL'] 
@@ -599,6 +611,7 @@ def choose_cutoffold(indat,pltgrps,hasfitted,prevrres,pu):
     else:
         outframe['ALsafe'] =True
         outframe['osafe'] = True
+        outframe['FactorVFoCor'] =indat['FactorV'] 
         for lkey in ('LW','LO'):
             colnamAL="M_"+ lkey +"_AL"
             for okey in ('OW','OO'):
@@ -615,10 +628,8 @@ def choose_cutoffold(indat,pltgrps,hasfitted,prevrres,pu):
             raise ("Error: overlapping fits")
 
         outframe['FactorVP'] =indat['FactorV']
-        outframe['FactorVFo'] = indat['FactorV']  /outframe['EstVPAL'] 
-        outframe['FactorVFAL'] = indat['FactorV']  /outframe['EstVPAL'] 
-
-        outframe['FactorVF'] =indat['FactorV'] * (outframe['ALsafe'] +outframe['osafe'] )
+        outframe['FactorVF'] = ( indat['FactorV'] * outframe['ALsafe'] +
+                                  outframe['FactorVFoCor' ]* outframe['osafe']  )
         for lkey in ('LW','LO'):
             colnamAL ="M_"+ lkey +"_AL"
             colnamALo="F_"+ lkey +"_AL"
@@ -642,10 +653,12 @@ cut2=  choose_cutoffold(indatverplgr,fitgrps,False,0,expdefs)
 # -
 
 def pointspertype(cutdf):
-    cutcnt= cutdf.copy(deep=False)[['osafe','ALsafe','FactorVP','GrpExpl']]
-    cutcnt[['FactorVok']] =cutcnt[['FactorVP']] >0
-    cutcnt[['allrecs']] = cutcnt[['FactorVok']]*0+1
+    cutcnt= cutdf.copy(deep=False)[['osafe','ALsafe','FactorVP','GrpExpl','FactorVFAL']]
+    cutcnt['FactorVok'] =cutcnt['FactorVP'] >0
+    cutcnt['allrecs'] = cutcnt['FactorVok']*0+1
+    cutcnt['osafrat'] = cutcnt['FactorVFAL'] * cutcnt['osafe']
     rv= cutcnt.groupby('GrpExpl').agg('sum')
+    rv['osafrat'] = rv['osafrat'] / rv['osafe']
     return rv[rv['allrecs'] > 1000]
 pointspertype(cut2)
 
@@ -871,16 +884,19 @@ cut3=  choose_cutoff(indatverplgr,fitgrps,True,fitdatverplgr,expdefs)
 # -
 
 #voor de time being, overschrijf de vorige selectie gegevens
-for r in range(0):
+for r in range(2):
     cut3=  choose_cutoff(indatverplgr,fitgrps,True,fitdatverplgr,expdefs)  
     fitdatverplgr = dofitdatverplgr(cut3,indatverplgr,fitgrps,expdefs)
 fitdatverplgrx = fitdatverplgr[abs(fitdatverplgr["DiffEst"])> 2e6] 
 seaborn.scatterplot(data=fitdatverplgrx,x="FactorEst",y="DiffEst",hue="GeoInd")
 
 fitdatverplgr["x_LM_AL"] = fitdatverplgr["M_LW_AL"] * fitdatverplgr["M_LO_AL"]
-seaborn.scatterplot(data=fitdatverplgr,x="x_LM_AL",y="DiffEst",hue="GeoInd")
+fitdatverplgrx = fitdatverplgr[abs(fitdatverplgr["DiffEst"])> 2e6] 
+seaborn.scatterplot(data=fitdatverplgrx,x="x_LM_AL",y="DiffEst",hue="GeoInd")
 
-seaborn.scatterplot(data=fitdatverplgr,x="M_LO_AL",y="DiffEst",hue="GeoInd")
+seaborn.scatterplot(data=fitdatverplgrx,x="M_LO_AL",y="DiffEst",hue="GeoInd")
+
+pointspertype(cut3)
 
 gr5km=fitdatverplgr[(fitdatverplgr['MaxAfst']==5) & (fitdatverplgr['MotiefV']==1)].copy()
 gr5km['linpmax']=gr5km['FactorEstNAL']/ gr5km['FactorEstAL']
@@ -1018,10 +1034,9 @@ def chisqsampler (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,pltgrps):
     z=np.array(z)
     return z
 #chitries= chisqsampler (cbspc4data,pc4inwgrid,rudifungrid,useKAfstVland,xlatKAfstV)    
-chitries= chisqsampler (cbspc4data,pc4inwgcache,rudifungcache,useKAfstVland,xlatKAfstV,fitgrps)    
-
-
-print (chitries)
+if False:
+    chitries= chisqsampler (cbspc4data,pc4inwgcache,rudifungcache,useKAfstVland,xlatKAfstV,fitgrps)    
+    print (chitries)
 
 #    lw = np.linspace(1,1.4,3)
 #    lo = np.linspace(0.8,1.0,3)
@@ -1033,8 +1048,6 @@ print (chitries)
 # [7.59435412e+16 7.40995871e+16 7.55013017e+16]
 # [7.59435412e+16 7.40995871e+16 7.55013017e+16]]
 # -
-
-chitries
 
 seaborn.scatterplot(data=fitdatverplgr[fitdatverplgr['MaxAfst']==0],x="FactorEst",y="DiffEst",hue="GeoInd")
 
@@ -1106,6 +1119,10 @@ elif 0==1:
                                 cmap='jet',legend=True,alpha=.6)
     cx.add_basemap(pland, source= prov0)
 #plland.plot( column= 'DiffEst', Legend=True)
+
+#stop hier
+raise ("restart fit")
+
 
 # +
 #verwachte relaties
