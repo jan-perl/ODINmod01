@@ -162,12 +162,15 @@ specvaltab
 
 # -
 
+def intcast0nan (ser):
+    return np.where(np.isnan(ser),0,ser.astype(int))
 def _onlyverpl(df):
     return  df [(df['Verpl']==1 ) & (df['AankPC'] > 500) & (df['VertPC'] > 500)  ] .copy(deep=False)  
 allodinyr=_onlyverpl(ODiN2readpkl.allodinyr)
-#allodinyr['VertPC']=allodinyr['VertPC'].astype(int)
-#allodinyr['AankPC']=allodinyr['AankPC'].astype(int)
-#allodinyr['MotiefV']=allodinyr['MotiefV'].astype(int)
+#blijf float gebruiken: dan kun je op is isnan selectern na merge
+#allodinyr['VertPC']=intcast0nan ( allodinyr['VertPC'])
+#allodinyr['AankPC']=intcast0nan ( allodinyr['AankPC'])
+#allodinyr['MotiefV']=intcast0nan ( allodinyr['MotiefV'])
 len(allodinyr.index)
 
 
@@ -422,13 +425,30 @@ some_string="""OthPC,MotiefV,Comment
 2671,1,kassen werk/oppervl overschat
 2675,1,kassen werk/oppervl overschat
 2676,1,kassen werk/oppervl overschat
+2678,1,kassen werk/oppervl overschat
+2681,1,kassen werk/oppervl overschat
 2691,1,kassen werk/oppervl overschat
 5928,1,logistiek werk/oppervl overschat
+1118,8,binnenstad Adam
+1118,11,binnenstad Adam
 6525,6,radboud U
 2333,1,werk Leiden
 3011,1,werk rotterdam
 3011,7,winkelen rotterdam
 3511,1,werk utrecht
+1334,7,winkel
+1442,7,winkel
+1703,7,winkel
+1825,7,winkel
+2321,7,winkel
+2513,7,winkel
+3562,7,winkel
+3825,7,winkel
+5038,7,winkel
+8911,7,winkel
+9712,7,winkel
+7811,7,winkel
+9723,7,winkel
 3511,7,winkelen utrecht
 3311,7,Binnenstad Dordrcht
 3431,7,Nieuwegein City Plaza
@@ -461,7 +481,7 @@ def surplusPCmotief(allpc4,df,man):
 #    print(allemotief)
     allemotief['siggrens'] = 1e6+  .002 *  allemotief['MotiefTot'] + .2*allemotief['oppfrac']
     tehoog=abs(allemotief['FactorV'] - allemotief['oppfrac'])  >allemotief['siggrens'] 
-    man['flgman']=1
+    man['flgman']=1.1
     allemotief=allemotief.merge(man,how='left')
     rv =allemotief[ tehoog | (False== np.isnan(allemotief['flgman']))  ]
     return rv
@@ -475,17 +495,27 @@ highpcs.to_excel("../output/highmotiefPCs.xlsx")
 
 # -
 
-def mkhighpcflg(df,excepts):
-    excepts= excepts[['OthPC','MotiefV']].copy()
-    excepts['flg']=1
+def mkhighpcflgv1(df,excepts):
+    excepts= excepts[['OthPC','MotiefV']].copy(deep=False)
+    excepts['flg']=1.1
 #    print(excepts)
     dfs= df[['MotiefV','AankPC','VertPC']]
     df2= dfs.merge (excepts.rename (columns={'OthPC':'AankPC'}),how='left').rename(columns={'flg':'AankFlg'})
-    df2= df2.merge(excepts.rename (columns={'OthPC':'VertPC'}),how='left').rename(columns={'flg':'VertFlg'})
+    df2= df2.merge (excepts.rename (columns={'OthPC':'VertPC'}),how='left').rename(columns={'flg':'VertFlg'})
     rv= ( np.isnan(df2['AankFlg']) & np.isnan(df2['VertFlg']) ) == False
     return rv
 allodinyr['HighPCfls'] =mkhighpcflg(allodinyr,highpcs)
-allodinyr['HighPCfls']
+allodinyr[ (allodinyr['HighPCfls']) ==True ] [['AankPC','VertPC','MotiefV','FactorV']]
+
+
+def mkhighpcflg(df,excepts):    
+    nflg = np.array ( excepts['OthPC'] *100 +  excepts['MotiefV'] )
+    c1 = np.isin(df ['AankPC'] *100 +  df['MotiefV'] ,nflg) 
+    c2 = np.isin(df ['VertPC'] *100 +  df['MotiefV'] ,nflg) 
+    rv= c1| c2
+    return rv
+allodinyr['HighPCfls'] =mkhighpcflg(allodinyr,highpcs)
+allodinyr[ (allodinyr['HighPCfls']) ==True ] [['AankPC','VertPC','MotiefV','FactorV']]
 
 xlatKAfstV
 
@@ -562,6 +592,8 @@ odinverplgr[['KAfstCluCode','GeoInd']].groupby('KAfstCluCode').agg('count')
 allodinyr[['KAfstV','Verpl']].groupby('KAfstV').agg('count')
 
 odinverplgr[['FactorVGen','FactorVSpec']].sum()
+
+odinverplgr[odinverplgr['PC4']==9711].groupby('MotiefV')[['FactorVGen','FactorVSpec']].sum()
 
 
 # +

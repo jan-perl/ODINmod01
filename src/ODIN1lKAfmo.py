@@ -593,9 +593,9 @@ def choose_cutoffold(indat,pltgrps,hasfitted,prevrres,pu):
         outframe['osafe']  = (prevrres['FactorEstNAL'] < 0.2 * prevrres['FactorEstAL'] ) & (outframe['MaxAfst']!=0)
     elif True:        
         outframe['ALsafe'] = indat['FactorV'] > .9 * outframe['EstVPAL'] 
-        outframe['osafe'] = indat['FactorV'] < .1 * outframe['EstVPAL'] 
+        outframe['osafe'] =  indat['FactorV'] < .4 * outframe['EstVPAL'] 
         outframe['ALsafe'] = outframe['ALsafe'] | (outframe['MaxAfst']==0)
-        outframe['osafe'] = outframe['osafe'] & (outframe['MaxAfst']!=0)
+        outframe['osafe'] =  outframe['osafe'] & (outframe['MaxAfst']!=0) & (indat['FactorV'] > 0)
     else:
         outframe['ALsafe'] =True
         outframe['osafe'] = True
@@ -604,30 +604,35 @@ def choose_cutoffold(indat,pltgrps,hasfitted,prevrres,pu):
             for okey in ('OW','OO'):
                 colnam="M_"+ lkey +"_" + okey
 #                print(colnam,(lvals[np.isnan(lvals)]))
-                outframe['ALsafe'] = outframe['ALsafe'] & (indat[colnam] > 0.2  * indat[colnamAL])
-                outframe['osafe']  = outframe['osafe']  & (indat[colnam] < 0.01 * indat[colnamAL])
+                outframe['ALsafe'] = outframe['ALsafe'] & (indat[colnam] > 0.99  * indat[colnamAL])
+                outframe['osafe']  = outframe['osafe']  & (indat[colnam] < 0.2 * indat[colnamAL])
         outframe['ALsafe'] = outframe['ALsafe'] | (outframe['MaxAfst']==0)
         outframe['osafe'] = outframe['osafe'] & (outframe['MaxAfst']!=0)
     if 1==1:
+        outframe['ALsafe'] = outframe['ALsafe'].astype(int)
+        outframe['osafe'] = outframe['osafe'].astype(int)
+        if np.sum(outframe['osafe'] * outframe['ALsafe']) !=0:
+            raise ("Error: overlapping fits")
+
         outframe['FactorVP'] =indat['FactorV']
         outframe['FactorVFo'] = indat['FactorV']  /outframe['EstVPAL'] 
         outframe['FactorVFAL'] = indat['FactorV']  /outframe['EstVPAL'] 
 
-        outframe['FactorVF'] =indat['FactorV'] * ((outframe['ALsafe'] |outframe['osafe'] ).astype(int))
+        outframe['FactorVF'] =indat['FactorV'] * (outframe['ALsafe'] +outframe['osafe'] )
         for lkey in ('LW','LO'):
             colnamAL ="M_"+ lkey +"_AL"
             colnamALo="F_"+ lkey +"_AL"
-            outframe[colnamALo] = indat[colnamAL] * ((outframe['ALsafe']).astype(int))
+            outframe[colnamALo] = indat[colnamAL] * (outframe['ALsafe'])
             for okey in ('OW','OO','OM','OA'):
                 colnam ="M_"+ lkey +"_" + okey
                 colnamo="F_"+ lkey +"_" + okey
 #                print(colnam,(lvals[np.isnan(lvals)]))
-                outframe[colnamo] = indat[colnam] * ((outframe['osafe']).astype(int))
+                outframe[colnamo] = indat[colnam] * (outframe['osafe'])
 #    outframe['ALmult'] = ( (outframe['ALsafe']==False).astype(int))
     return outframe
 
 cut2=  choose_cutoffold(indatverplgr,fitgrps,False,0,expdefs)   
-cut2
+#cut2
 
 # +
 #todo
@@ -636,6 +641,13 @@ cut2
 #gewicht: w= (p * (1/p - 1/l))** (+ pow+1)   -> aparte kolom
 # -
 
+def pointspertype(cutdf):
+    cutcnt= cutdf.copy(deep=False)[['osafe','ALsafe','FactorVP','GrpExpl']]
+    cutcnt[['FactorVok']] =cutcnt[['FactorVP']] >0
+    cutcnt[['allrecs']] = cutcnt[['FactorVok']]*0+1
+    rv= cutcnt.groupby('GrpExpl').agg('sum')
+    return rv[rv['allrecs'] > 1000]
+pointspertype(cut2)
 
 
 # +
@@ -830,23 +842,24 @@ def predict_values(indf,topreddf,pltgrp,rf,pu,stobijdr):
     if (debug):
         print ((s2al, s2))
     #s2ch= np.min( (np.where((s2==0),s2al,s2 ), np.where((s2al==0),s2,s2al ) ) ,axis=0)
-    s2ch= np.where((s2==0),np.where(outdf['MaxAfst']==0, s2al,0), 
+    s2ch= np.where((s2<=0),np.where(outdf['MaxAfst']==0, s2al,0), 
                            np.where((s2al==0),s2,
                            np.power (np.power(s2,-curvpwr) + np.power(s2al,-curvpwr), -curvpwr )) )
     if (debug):
         print (s2ch)
     outdf['FactorEst'] = s2ch
-    outdf['DiffEst'] =outdf['FactorV']-s2ch
+    outdf['DiffEst'] = np.where(outdf['FactorV']>0, outdf['FactorV']-s2ch,np.nan)
     if stobijdr:
         outdf[colvacols2 ] = np.array(blk1al)*np.array(blk2al)
     return(outdf)
 
 def dofitdatverplgr(indf,topreddf,pltgrp,pu):
-    rf = fit_cat_parameters(indf,topreddf,pltgrp,pu,False)
-    return predict_values(indf,topreddf,pltgrp,rf,pu)
+    rf = fit_cat_parameters(indf,topreddf,pltgrp,pu)
+    return predict_values(indf,topreddf,pltgrp,rf,pu,False)
 
 fitdatverplgr = dofitdatverplgr(cut2,indatverplgr,fitgrps,expdefs)
-seaborn.scatterplot(data=fitdatverplgr,x="FactorEst",y="DiffEst",hue="GeoInd")
+fitdatverplgrx = fitdatverplgr[abs(fitdatverplgr["DiffEst"])> 2e6] 
+seaborn.scatterplot(data=fitdatverplgrx,x="FactorEst",y="DiffEst",hue="GeoInd")
 # -
 
 cut3=  choose_cutoff(indatverplgr,fitgrps,True,fitdatverplgr,expdefs)  
@@ -861,7 +874,8 @@ cut3=  choose_cutoff(indatverplgr,fitgrps,True,fitdatverplgr,expdefs)
 for r in range(0):
     cut3=  choose_cutoff(indatverplgr,fitgrps,True,fitdatverplgr,expdefs)  
     fitdatverplgr = dofitdatverplgr(cut3,indatverplgr,fitgrps,expdefs)
-seaborn.scatterplot(data=fitdatverplgr,x="FactorEst",y="DiffEst",hue="GeoInd")
+fitdatverplgrx = fitdatverplgr[abs(fitdatverplgr["DiffEst"])> 2e6] 
+seaborn.scatterplot(data=fitdatverplgrx,x="FactorEst",y="DiffEst",hue="GeoInd")
 
 fitdatverplgr["x_LM_AL"] = fitdatverplgr["M_LW_AL"] * fitdatverplgr["M_LO_AL"]
 seaborn.scatterplot(data=fitdatverplgr,x="x_LM_AL",y="DiffEst",hue="GeoInd")
@@ -1023,6 +1037,10 @@ print (chitries)
 chitries
 
 seaborn.scatterplot(data=fitdatverplgr[fitdatverplgr['MaxAfst']==0],x="FactorEst",y="DiffEst",hue="GeoInd")
+
+fitdatverplgr[fitdatverplgr['FactorEst']>1e7][['PC4', 'GrpExpl','GeoInd',
+          'FactorEst','FactorV','FactorVGen','FactorVSpec']].sort_values(
+    by=['PC4', 'GrpExpl','GeoInd'])
 
 pllanddiff= cbspc4data[['postcode4']].merge(fitdatverplgr[(fitdatverplgr['MaxAfst']==0) 
                     &  (fitdatverplgr ['MotiefV'] ==6 )][['PC4','DiffEst','FactorEst','FactorV']],
@@ -1334,7 +1352,10 @@ datpltverplp = mkpltverplp (naarhuis,dspecvaltab,'AankPC/rudifun/S_MXI22_GB','Mo
 
 # +
 #check 1 reisigerskm auto kilometers
-# -
+
+# +
+def mkdatadiff3(verpl,fg,infof,landcod):    
+    return ODINcatVNuse.mkdatadiff(verpl,fg,landcod)
 
 def mkdatadiff2(verpl,fg,infof,landcod):    
 #    print(('verpl',len(verpl),verpl.dtypes) )
@@ -1351,13 +1372,16 @@ def mkdatadiff2(verpl,fg,infof,landcod):
 #                         DINcatVNuse.infoflds,ODINcatVNuse.landcod)
 
 
+# -
+
 #ddc_indat =  ODINcatVNuse.mkdatadiff(fitdatverplgr,ODINcatVNuse.fitgrpse,ODINcatVNuse.landcod)
-#ddc_indat =  mkdatadiff2(fitdatverplgr,ODINcatVNuse.fitgrpse,ODINcatVNuse.landcod)
+ddc_indat =  mkdatadiff3(fitdatverplgr,
+                         ODINcatVNuse.fitgrpse,ODINcatVNuse.infoflds,ODINcatVNuse.landcod)
 totinf_indat = ODINcatVNuse.mkinfosums(ddc_indat,ODINcatVNuse.odindiffflginfo,
                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,ODINcatVNuse.landcod)
 totinf_indat
 
-ddc_fitdat =  mkdatadiff2(fitdatverplgr.rename (
+ddc_fitdat =  mkdatadiff3(fitdatverplgr.rename (
        columns={'FactorV':'FactorO', 'FactorEst':'FactorV' }),
             ODINcatVNuse.fitgrpse,  ODINcatVNuse.infoflds,ODINcatVNuse.landcod)
 
@@ -1366,5 +1390,36 @@ totinf_fitdat = ODINcatVNuse.mkinfosums(ddc_fitdat,ODINcatVNuse.odindiffflginfo,
 totinf_fitdat.groupby(["GeoInd"]).agg('sum')
 
 totinf_indat.groupby(["GeoInd"]).agg('sum')
+
+
+#let op dit kan niet, want hierover hebben we gesommeerd !
+def permotief(totin,totfit,kflgs):
+    renai = dict ( ( (flg,flg+"_i") for flg in kflgs) ) 
+    agrpi=totin.groupby(["MotiefV","GeoInd"])[kflgs].agg('sum') /1e6
+    agrpi['Gemafst_i'] = agrpi ['FactorKm'] /agrpi ['FactorV'] 
+
+    renaf = dict ( ( (flg,flg+"_f") for flg in kflgs) )
+    agrpf=totfit.groupby(["MotiefV","GeoInd"])[kflgs].agg('sum') /1e6
+    agrpf['Gemafst_f'] = agrpf ['FactorKm'] /agrpf ['FactorV'] 
+    agrp=pd.merge(agrpi.reset_index().rename(columns=renai),  
+                  agrpf.reset_index().rename(columns=renaf) )
+    return agrp
+motlst= permotief(totinf_indat,totinf_fitdat,ODINcatVNuse.kflgsflds)  
+motlst.to_excel("../output/orif_permot.xlsx")
+
+
+def woonbalans(totin,kflgs):
+    ause = totin[np.isin(totin['isnaarhuis'],[5,6])].copy(deep=False).rename (
+          columns={'GeoInd':'OriRicht'})
+    ause['GeoInd']=np.where(ause['isnaarhuis']==5, 
+                        np.where(ause['OriRicht']=='AankPC', 'actzijde' , 'huiszijde' ),
+                        np.where(ause['OriRicht']!='AankPC', 'actzijde' , 'huiszijde' )    
+                           )
+    agrp = ause .groupby(['MotiefV','GeoInd','isnaarhuis'])[kflgs].agg('sum')    /1e6   
+    agrp ['Gemafst'] = agrp ['FactorKm'] /agrp ['FactorV'] 
+    return agrp   
+woonbalans(totinf_indat,ODINcatVNuse.kflgsflds)                       
+
+woonbalans(totinf_fitdat,ODINcatVNuse.kflgsflds)      
 
 
