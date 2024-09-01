@@ -214,11 +214,20 @@ mkverplsum1metlab(odinverplklinfo[odinverplklinfo['GrpTyp']=='Jaar'],kinfoflds,l
 # +
 #nu kenmerken per opvolgend slice
 
-def _mkratios (indfs,indfgr):
+def _mkratioso (indfs,indfgr):
     indfr=indfs.merge(indfgr,how='left')
     indfr['FactorKm']=np.where( indfr['FactorSum'] ==0,0,indfr['FactorKm']/indfr['FactorSum'])
     indfr['FactorC']=np.where( indfr['FactorSum'] ==0,0,indfr['FactorC']/indfr['FactorSum'] )
     return indfr
+
+def _mkratios (indfs,indfgr):
+    indfr=indfs.merge(indfgr,how='left')
+    normvals = indfr['FactorSum'].copy()
+    normzero = normvals==0
+    indfr['FactorKm']=np.where(normzero,0,indfr['FactorKm']/normvals ) 
+    indfr['FactorC'] =np.where(normzero,0,indfr['FactorC']/normvals )
+    return indfr
+
 
 def _chkratios (indfr,grp):
 #check data alle sommen kloppen
@@ -234,7 +243,7 @@ def _chkratios (indfr,grp):
 
 
 def convert_diffgrpsidatold(indf,fg,kf,fclu,landcod,relative):
-    indfs=indf.sort_values(by='KAfstCluCode').reset_index()    
+    indfs=indf.sort_values(by=fg+kf+['KAfstCluCode'] ).reset_index()    
     indfs['FactorP'] = indfs.groupby(fg+kf)['FactorV'].shift(1,fill_value=0.0)
     indfs['KmP']     = indfs.groupby(fg+kf)['FactorKm'].shift(1,fill_value=0.0)
     indfs['FactorC']=indfs['FactorV']-indfs['FactorP']
@@ -246,9 +255,11 @@ def convert_diffgrpsidatold(indf,fg,kf,fclu,landcod,relative):
         totdf=indf[indf['KAfstCluCode']==landcod].rename(
             columns={'FactorV':'FactorSum','FactorKm':'KmSum' }).drop(
             columns=['KAfstCluCode','index','AvgAfst'])
-#        print(totdf.columns)
-#        indfgrtot=indfr.groupby(fg+kf)[['FactorSum','KmSum']].agg('sum').reset_index()
-#        print(indfgrtot.columns)
+        ifsflds=['FactorSum','KmSum']
+#        print((totdf.columns),len(totdf),totdf[ifsflds].sum())
+#        indfgrtot=indfr.groupby(fg+kf)[ifsflds].agg('sum').reset_index()
+#        print((indfgrtot.columns),len(indfgrtot),indfgrtot[ifsflds].sum())
+
         tottst = _mkratios (indfs,totdf)
         _chkratios (tottst,fg+kf)
 
@@ -267,57 +278,69 @@ odindiffgrpinfo0
 # +
  #nu kenmerken per opvolgend slice
 
-def _mkratios2 (indfs,indfgr,infflds):
+def _mkratios2 (indfs,indfgr,onflds,cflds):
     print((indfs.columns),len(indfs))
     print((indfgr.columns),len(indfgr))
-    indfr=indfs.merge(indfgr,how='left')
+    indfr=indfs.merge(indfgr,on=onflds,how='left')
     print((indfr.columns),len(indfr))
-    normvals = indfr['FactorVSum'].copy()
-    normzero = normvals==0
-    for fld in infflds:
-        indfr[fld] = np.where(  normzero,0, indfr[fld] /normvals)
+    #kopie maken omdat anders Factor_v overschreven zou worden
+    normvals = indfr['FactorVSum']
+    normzero = (normvals==0)
+    for fld in cflds:
+        indfr[fld+'u'] = np.where( normzero,0, indfr[fld] /normvals)
+        indfr['norm']=normvals
     return indfr
 
 def _chkratios2 (indfr,grp,infflds):
 #check data alle sommen kloppen
     indftst  =indfr.groupby(grp).agg('sum').reset_index().sort_values(by=grp)
-    indfail2 = indfr[(np.isnan(indfr['FactorV_c'])) | (np.isnan(indfr['FactorKm_c']))]
+    chkvsumrange= True
+    if chkvsumrange:
+        indftstmin  =indfr.groupby(grp).agg('min').reset_index().sort_values(by=grp)
+        indftstmax  =indfr.groupby(grp).agg('max').reset_index().sort_values(by=grp)
+        indftst['Vsumrange '] = indftstmax['FactorVSum'] - indftstmin['FactorVSum'] 
+    
+    indfail2 = indfr[(np.isnan(indfr['FactorV_cu'])) | (np.isnan(indfr['FactorKm_c']))]
     if len(indfail2)>0:
         print(grp,len(indfail2),len(indfr),indfail2)
         raise("programming error")
-    indfail1 = indftst[(abs(indftst['FactorV_c']-1)> 1e-6) & (indftst['FactorVSum'] !=0)]
+    indfail1 = indftst[(abs(indftst['FactorV_cu']-1)> 1e-6) & (indftst['FactorVSum'] !=0)]
     if len(indfail1)>0:
         print(grp,len(indfail1),len(indfr),indfail1)
         raise("programming error")
 
 
 def convert_diffgrpsidat2(indf,fg,kf,infflds,fclu,pf,landcod,relative):
+    print(infflds)
     indfs =indf.sort_values(by=fg+kf+['KAfstCluCode']).reset_index()    
     grp1=indfs.groupby(fg+kf)
     for fld in infflds:
-        indfs[fld+"_p"] = (grp1[fld].shift(1,fill_value=0.0) )
-        indfs[fld+pf] = indfs[fld]- indfs[fld+"_p"]
+#        indfs[fld+"_p"] = (grp1[fld].shift(1,fill_value=0.0) )
+#        indfs[fld+pf] = indfs[fld]- indfs[fld+"_p"]        
+        indfs[fld+pf] = indfs[fld]- (grp1[fld].shift(1,fill_value=0.0) )
     ifcflds = list((fld+pf for fld in infflds))    
     ifsflds = list({fld+"Sum" for fld in infflds})
     ifcrena = dict(zip(ifcflds,ifsflds))
-    print (ifcrena)
+#    print (ifcrena)
     if relative:
     #    print(indfgr)
     #controleer data dit de landerlijke waarden worden
         indsumin = indfs.rename(columns=ifcrena)        
-        totdf=indf[indf['KAfstCluCode']==landcod].rename(columns=dict(zip(infflds,ifcflds))).drop(
+        totdf=indf[indf['KAfstCluCode']==landcod].rename(columns=dict(zip(infflds,ifsflds))).drop(
             columns=['KAfstCluCode','index','AvgAfst'])
-        print((totdf.columns),len(totdf))
+        print((totdf.columns),len(totdf),totdf[ifsflds].sum())
         indfgrtot=indsumin.groupby(fg+kf)[ifsflds].agg('sum').reset_index()
-        print((indfgrtot.columns),len(indfgrtot))
-        tottst = _mkratios2 (indfs,totdf,ifcflds)
-#        _chkratios2 (tottst,fg+kf,infflds)
+        print((indfgrtot.columns),len(indfgrtot),indfgrtot[ifsflds].sum())
+        tottst = _mkratios2 (indfs,totdf,fg+kf,ifcflds)
+        _chkratios2 (tottst,fg+kf,infflds)
 
+        print(fg,fclu)
     #verdeel slices
         indfgr=indsumin.groupby(fg+fclu+['KAfstCluCode'])[ifsflds].agg('sum').reset_index()
+        indfs['onefs'] =1
         print((indfgr.columns),len(indfgr))
-        indfrat = _mkratios2 (indfs,indfgr,ifcflds)    
-#        _chkratios2 (indfrat,fg+fclu+['KAfstCluCode'],infflds)
+        indfrat = _mkratios2 (indfs,indfgr,fg+kf,ifcflds)    
+        _chkratios2 (indfrat,fg+fclu+['KAfstCluCode'],infflds)
         rv= indfrat [fg+kf+ ['KAfstCluCode'] + ifcflds ]
     else:
         rv= indfs [fg+kf+ ['KAfstCluCode'] + ifcflds ]
@@ -326,6 +349,16 @@ def convert_diffgrpsidat2(indf,fg,kf,infflds,fclu,pf,landcod,relative):
 odindiffgrpinfo2 = convert_diffgrpsidat2(odinverplklinfo,fitgrpse,kinfoflds,infoflds,
                                        ['GrpTyp'],"_c",landcod,True)
 odindiffgrpinfo2
+
+
+# +
+def _dbg (df):
+    s1 = df[df['GrpExpl'] =='1.0 4 : Van en naar het werk ronde elders']
+    s2= s1[s1['GrpTyp']=='Jaar']
+    return s2
+
+s2r = _dbg(odinverplklinfo)    
+s2r.groupby('KAfstCluCode').sum()
 # -
 
 odindiffgrpinfodif = odindiffgrpinfo2
