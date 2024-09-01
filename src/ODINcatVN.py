@@ -158,9 +158,16 @@ largranval =ODiN2readpkl.largranval
 
 specvaltab = ODiN2readpkl.mkspecvaltab(dbk_2022)
 specvaltab
+
+
 # -
 
-allodinyr=ODiN2readpkl.allodinyr
+def _onlyverpl(df):
+    return  df [(df['Verpl']==1 ) & (df['AankPC'] > 500) & (df['VertPC'] > 500)  ] .copy(deep=False)  
+allodinyr=_onlyverpl(ODiN2readpkl.allodinyr)
+#allodinyr['VertPC']=allodinyr['VertPC'].astype(int)
+#allodinyr['AankPC']=allodinyr['AankPC'].astype(int)
+#allodinyr['MotiefV']=allodinyr['MotiefV'].astype(int)
 len(allodinyr.index)
 
 
@@ -209,13 +216,15 @@ def pickAnrs(myspecvals,xvar,newmaxbndidx):
     selKAfstV.loc[ orimax , "MaxAfst"]  =0    
     return (  [  selKAfstV[['KAfstCluCode',"MaxAfst"]] , xlatKAfstV ])
 
-useKAfstV,xlatKAfstV  = pickAnrs (specvaltab,'KAfstV',[1,2,3,4,5,6,7,8,-1] )
-#print(xlatKAfstV)   
-print(useKAfstV)   
+useKAfstVo,xlatKAfstVo  = pickAnrs (specvaltab,'KAfstV',[1,2,3,4,5,6,7,8,-1] )
+print(xlatKAfstVo)   
+print(useKAfstVo)   
 # -
 
-kvallsel = list(i+1 for i in  range(np.max(useKAfstV['KAfstCluCode']-1))) +[-1]
+kvallsel = list(i+1 for i in  range(np.max(useKAfstVo['KAfstCluCode']-1))) +[-1]
 print(kvallsel)
+#noot: in het wegschijven is het geen probleem om alle afstanden te doen
+useKAfstV,xlatKAfstV= pickAnrs (specvaltab,'KAfstV',kvallsel)
 useKAfstVall,xlatKAfstVall  = pickAnrs (specvaltab,'KAfstV',kvallsel)
 useKAfstVall.iloc[-1,1] = 200
 useKAfstVall['MinAfst'] = useKAfstVall['MaxAfst'] .shift(1,fill_value=0.0)
@@ -473,6 +482,8 @@ def mkhighpcflg(df,excepts):
 allodinyr['HighPCfls'] =mkhighpcflg(allodinyr,highpcs)
 allodinyr['HighPCfls']
 
+xlatKAfstV
+
 
 # +
 #other file merge geo
@@ -481,9 +492,9 @@ allodinyr['HighPCfls']
 #dan een dataframe dat
 #2) per lengteschaal, 1 PC (van of naar en anderegroepen (maar bijv ook Motief ODin data verzamelt)
 
-def mkdfverplxypc4d1 (df,myspecvals,xvarPC,pltgrps,grp1map,selstr,myKAfstV,myxlatKAfstV):
-    debug=False
-    dfvrecs = df [(df['Verpl']==1 ) & (df[xvarPC] > 500)  ]   
+def mkdfverplxypc4d1 (df,myspecvals,xvarPC,pltgrps,grp1map,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4):
+    debug=True
+    dfvrecs = df [(df['Verpl']==1 ) & (df[xvarPC] > 500)  ].copy(deep=False)   
 #    oprecs = df [df['OP']==1]
     gcols=pltgrps+ ['KAfstV',xvarPC]
     #sommeer per groep per oorspronkelijke KAfstV, maar niet voor internationaal
@@ -491,12 +502,12 @@ def mkdfverplxypc4d1 (df,myspecvals,xvarPC,pltgrps,grp1map,selstr,myKAfstV,myxla
     if debug:
         print( ( "oorspr lengte groepen", len(pstats)) )
     #nu kleiner dataframe, dupliceer records in groep
-    pstatsc = pstats[pstats ['KAfstV'] >0].merge(myxlatKAfstV,how='left').drop( columns='KAfstV')
+    pstatsc = pstats[pstats ['KAfstV'] >0].merge(myxlatKAfstV,how='left',on='KAfstV').drop( columns='KAfstV')
     if debug:    
-        print( ( "oorspr lengte groepen met duplicaten", len(pstats)) )
+        print( ( "oorspr lengte groepen met duplicaten", len(pstatsc)) )
     pstatsc = pstatsc.groupby(pltgrps +[ 'KAfstCluCode', xvarPC]).sum().reset_index()
     if debug:
-        print( ( "lengte clusters", len(pstats)) )
+        print( ( "lengte clusters", len(pstatsc)) )
     dfgrps = pstatsc.groupby(pltgrps )[  [ 'KAfstCluCode']].count().reset_index().drop( columns='KAfstCluCode')
     if debug:
         print( ( "types opdeling", len(dfgrps)) )
@@ -524,11 +535,11 @@ def mkdfverplxypc4d1 (df,myspecvals,xvarPC,pltgrps,grp1map,selstr,myKAfstV,myxla
 
 #code werk nog niet 
 
-def mkdfverplxypc4 (df,myspecvals,pltgrps,selstr,myKAfstV,myxlatKAfstV):
+def mkdfverplxypc4 (df,myspecvals,pltgrps,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4):
     df['FactorVGen']  = np.where(df['HighPCfls'],0, df['FactorV'] )
     df['FactorVSpec'] = np.where(df['HighPCfls'], df['FactorV'],0 )
 
-    fr2= (mkdfverplxypc4d1 (df,myspecvals,grp,pltgrps,isnhexpl,selstr,myKAfstV,myxlatKAfstV)
+    fr2= (mkdfverplxypc4d1 (df,myspecvals,grp,pltgrps,isnhexpl,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4)
             for grp in ['AankPC','VertPC'] )
     rv=pd.concat(fr2).reset_index()
 #        rv1= mkdfverplxypc4d1 (df,myspecvals,'AankPC',pltgrps,isnhexpl,selstr,myKAfstV,myxlatKAfstV)
@@ -538,9 +549,13 @@ def mkdfverplxypc4 (df,myspecvals,pltgrps,selstr,myKAfstV,myxlatKAfstV):
 
 fitgrps=['MotiefV','isnaarhuis']
 odinverplgr = mkdfverplxypc4 (allodinyr ,specvaltab,fitgrps,'Motief en isnaarhuis',
-                                useKAfstV,xlatKAfstV)
+                                useKAfstV,xlatKAfstV,geoschpc4r2)
 odinverplgr
 # -
+odinverplgr[['KAfstCluCode','GeoInd']].groupby('KAfstCluCode').agg('count')
+
+allodinyr[['KAfstV','Verpl']].groupby('KAfstV').agg('count')
+
 odinverplgr[['FactorVGen','FactorVSpec']].sum()
 
 
@@ -553,7 +568,7 @@ odinverplgr[['FactorVGen','FactorVSpec']].sum()
 
 def mkdfverplklas1 (df,myspecvals,xvarPC,pltgrps,grp1map,myinfoflds,myKAfstV,myxlatKAfstV):
     debug=False
-    dfvrecs = df [(df['Verpl']==1 ) & (df['AankPC'] > 500) & (df['VertPC'] > 500)  ]   
+    dfvrecs = df [(df['Verpl']==1 ) & (df['AankPC'] > 500) & (df['VertPC'] > 500)  ].copy(deep=False)   
 #    oprecs = df [df['OP']==1]
     gcols=pltgrps+ ['KAfstV',xvarPC]
     #sommeer per groep per oorspronkelijke KAfstV, maar niet voor internationaal
@@ -609,152 +624,92 @@ def mkdfverplklas1 (df,myspecvals,xvarPC,pltgrps,grp1map,myinfoflds,myKAfstV,myx
 
 #code werk nog niet 
 
-def mkdfverplklas (df,myspecvals,pltgrps,myinfogrps,myinfoflds,myKAfstV,myxlatKAfstV):
-    fr2= (mkdfverplklas1(df,myspecvals,grp,pltgrps,isnhexpl,myinfoflds,myKAfstV,myxlatKAfstV)
+def mkdfverplklas (df,myspecvals,pltgrps,myinfogrps,lisnhexpl,myinfoflds,myKAfstV,myxlatKAfstV):
+    fr2= (mkdfverplklas1(df,myspecvals,grp,pltgrps,lisnhexpl,myinfoflds,myKAfstV,myxlatKAfstV)
             for grp in myinfogrps)
     rv=pd.concat(fr2).reset_index()
     return rv
 
 
-infogrps=['KHvm','AankUur','VertUur','Jaar']
+infogrps=['KHvm','AankUur','VertUur','Jaar','Verpl']
 allodinyr['FactorKm']= allodinyr['FactorV'] * allodinyr['AfstS'] *10
 infoflds=['FactorV','FactorKm']
-odinverplklinfo = mkdfverplklas (allodinyr ,specvaltab,fitgrps,infogrps,infoflds,
+odinverplklinfo = mkdfverplklas (allodinyr ,specvaltab,fitgrps,infogrps,isnhexpl,infoflds,
                                 useKAfstV,xlatKAfstV)
 fitgrpse=fitgrps+['GrpExpl']
 kinfoflds=["GrpTyp", "GrpVal","GrpV_label"]
 odinverplklinfo
 
 
+# +
+#other file merge geo
+#other file addparsrecs
+
+#dan een dataframe dat
+#2) per lengteschaal, 1 PC (van of naar en anderegroepen (maar bijv ook Motief ODin data verzamelt)
+
+def _addfields(pstats,useKAfstVall):
+    pstatsa= pstats.merge(useKAfstVall[['KAfstV','AvgAfst']],how='left')
+    pstatsa['FactorKm']= pstatsa['FactorV'] * pstatsa['AvgAfst']
+    pstatsa['FactorAutoKm']= np.where(pstatsa['KHvm'] ==1 ,pstatsa['FactorKm']  ,0)
+    pstatsa['FactorActiveKm']= np.where(np.isin(pstatsa['KHvm'], [5,6] ),pstatsa['FactorKm']  ,0)
+    return pstatsa
+
+def mkdfverplklasflgs(df,myspecvals,pltgrps,grp1map,myinfoflds,myKAfstV,myxlatKAfstV):
+    debug=False
+    dfvrecs0 = df [(df['Verpl']==1 ) & (df['AankPC'] > 500) & (df['VertPC'] > 500)  ].copy(deep=False)   
+#    oprecs = df [df['OP']==1]
+    gcols=pltgrps+ ['KAfstV']
+    dfvrecs = _addfields(dfvrecs0,useKAfstVall)
+    #sommeer per groep per oorspronkelijke KAfstV, maar niet voor internationaal
+    pstats = dfvrecs[gcols+myinfoflds].groupby(gcols).sum().reset_index()
+    if debug:
+        print( ( "oorspr lengte groepen", len(pstats)) )
+    #nu kleiner dataframe, dupliceer records in groep
+    pstatsc = pstats[pstats ['KAfstV'] >0].merge(myxlatKAfstV,how='left').drop( columns='KAfstV')
+    if debug:    
+        print( ( "oorspr lengte groepen met duplicaten", len(pstats)) )
+    pstatsc = pstatsc.groupby(pltgrps +[ 'KAfstCluCode']).sum().reset_index()
+    if debug:
+        print( ( "lengte clusters", len(pstats)) )
+    dfgrps = pstatsc.groupby(pltgrps )[  [ 'KAfstCluCode']].count().reset_index().drop( columns='KAfstCluCode')
+    if debug:
+        print( ( "types opdeling", len(dfgrps)) )
+    if debug:
+        print( ( "alle land combinaties", len(vollandrecs) , len(mygeoschpc4)* len(dfgrps)) )
+    pstatc= dfgrps
+    if 1==1:
+        explhere = myspecvals [myspecvals['Variabele_naam'] == pltgrps[0]].copy()
+        explhere['Code'] = pd.to_numeric(explhere['Code'],errors='coerce')
+#        print(explhere)
+        pstatsc=pstatsc.merge(explhere,left_on=pltgrps[0], right_on='Code', how='left')    
+        pstatsc['GrpExpl'] = pstatsc[pltgrps[0]].astype(str) +  " "+ pstatsc[pltgrps[1]].astype(str) + \
+              " : " + pstatsc['Code_label'] + " "+ pstatsc[pltgrps[1]].map(grp1map)
+        pstatsc= pstatsc.drop(columns=['Code','Code_label','Variabele_naam'])
+    else:
+        pstatsc['GrpExpl']=''
+    if debug:
+        print( ( "return rdf", len(pstatsc)) )
+#    print(pstatsc)
+    return(pstatsc)
+
+#code werk nog niet 
+
+
+allodinyr['FactorKm']= allodinyr['FactorV'] * allodinyr['AfstS'] *10
+kflgsflds=['FactorV',"FactorKm","FactorAutoKm","FactorActiveKm"]
+odinverplflgs = mkdfverplklasflgs (allodinyr ,specvaltab,fitgrps,isnhexpl,kflgsflds, useKAfstV,xlatKAfstV)
+odinverplflgs
 # -
 
-def mkverplsum1(indf):
-    landcod=np.max(useKAfstV['KAfstCluCode'])
-    totdf=indf[indf['KAfstCluCode']==landcod]    
-    rv=totdf.groupby(['KAfstCluCode',"GrpTyp"])[infoflds].agg('sum')
-    return rv
-mkverplsum1(odinverplklinfo)
-
-
-# +
-def mkverplsum1metlab(indf,kf):
-    landcod=np.max(useKAfstV['KAfstCluCode'])
-    totdf=indf[indf['KAfstCluCode']==landcod]    
-    rv=totdf.groupby(['KAfstCluCode']+kf)[infoflds].agg('sum')
-    return rv
-t2=(mkverplsum1metlab(odinverplklinfo,kinfoflds)/1e9/5).reset_index()
-
-def convert_duurzaam_slice(t3):
-    t2= t3[t3['GrpTyp']=='KHvm'].copy(deep=False)
-    TTW_kgco2pkm=.149    
-    t2['CO2GT']=t2['FactorKm'] * np.where(t2['GrpVal']==1,TTW_kgco2pkm,0)
-    t2['KmActive']=t2['FactorKm'] * np.where(np.isin(t2['GrpVal'],[5,6]),1,0)
-    return t2
-#aantallen in miljarden per jaar, laatste kolom in kms
-#t2
-t2=convert_duurzaam_slice(t2)
-t2['GemAfst']=t2['FactorKm']/ t2['FactorV']
-t2
-
-# +
-#https://www.cbs.nl/nl-nl/visualisaties/verkeer-en-vervoer/verkeer/verkeersprestaties-personenautos
-#In 2022 legden alle Nederlandse personenauto’s samen 114,3 miljard kilometer af.
-# -
-
-mkverplsum1metlab(odinverplklinfo[odinverplklinfo['GrpTyp']=='Jaar'],kinfoflds)/1e9
-
-
-# +
-#nu kenmerken per opvolgend slice
-
-def _mkratios (indfs,indfgr):
-    indfr=indfs.merge(indfgr,how='left')
-    indfr['FactorKm']=np.where( indfr['FactorSum'] ==0,0,indfr['KmC']/indfr['FactorSum'])
-    indfr['FactorC']=np.where( indfr['FactorSum'] ==0,0,indfr['FactorC']/indfr['FactorSum'] )
-    return indfr
-
-def _chkratios (indfr,grp):
-#check data alle sommen kloppen
-    indftst  =indfr.groupby(grp).agg('sum').reset_index()
-    indfail2 = indfr[(np.isnan(indfr['FactorC'])) | (np.isnan(indfr['FactorKm']))]
-    if len(indfail2)>0:
-        print(len(indfail2),len(indfr),indfail2)
-        raise("programming error")
-    indfail1 = indftst[(abs(indftst['FactorC']-1)> 1e-6) & (indftst['FactorSum'] !=0)]
-    if len(indfail1)>0:
-        print(indfail1)
-        raise("programming error")
-
-
-def convert_diffgrpsidat(indf,fg,kf,fclu):
-    indfs=indf.sort_values(by='KAfstCluCode').reset_index()    
-    indfs['FactorP'] = indfs.groupby(fg+kf)['FactorV'].shift(1,fill_value=0.0)
-    indfs['KmP']     = indfs.groupby(fg+kf)['FactorKm'].shift(1,fill_value=0.0)
-    indfs['FactorC']=indfs['FactorV']-indfs['FactorP']
-    indfs['KmC']=indfs['FactorKm']-indfs['KmP']
-    indfr = indfs.rename(columns={'FactorC':'FactorSum','KmC': 'KmSum' })
-#    print(indfgr)
-#controleer data dit de landerlijke waarden worden
-    landcod=np.max(useKAfstV['KAfstCluCode'])
-    totdf=indf[indf['KAfstCluCode']==landcod].rename(columns={'FactorV':'FactorC','FactorKm':'KmC' })
-    indfgrtot=indfr.groupby(fg+fclu)[['FactorSum','KmSum']].agg('sum').reset_index()
-    tottst = _mkratios (totdf,indfgrtot)
-    _chkratios (tottst,fg+fclu)
-
-#verdeel slices
-    indfgr=indfr.groupby(fg+fclu+['KAfstCluCode'])[['FactorSum','KmSum']].agg('sum').reset_index()
-    indfr = _mkratios (indfs,indfgr)
-    _chkratios (indfr,fg+fclu+['KAfstCluCode'])
-    rv= indfr [fg+kf+ ['KAfstCluCode','FactorC','FactorKm'] ]
-    return rv 
-odindiffgrpinfo = convert_diffgrpsidat(odinverplklinfo,fitgrpse,kinfoflds,['GrpTyp'])
-odindiffgrpinfo 
-
-
-# +
-def mkduurzconvert(lf,fg):
-    ds= convert_duurzaam_slice(lf)
-    ds=ds.drop(columns=["GrpTyp", "GrpVal","GrpV_label"])
-    dssu=ds.groupby(['KAfstCluCode']+fg).agg('sum').reset_index()    
-    return dssu
-    
-duurzrefnrs = mkduurzconvert(odindiffgrpinfo,fitgrpse)
-# -
-
-seaborn.lineplot(data=duurzrefnrs,x="FactorKm",y="KmActive",hue="GrpExpl")
-
-seaborn.lineplot(data=duurzrefnrs,x="FactorKm",y="CO2GT",hue="GrpExpl")
-
-
-# +
-#pak nu database als odinverplgr, differentieer per slice, en plak 
-#daar gegevens aan uit per groep genomeerde database als
-def mksumperklas(verpl,kenm,fg):
-    print(verpl.dtypes)
-    v2=verpl.copy(deep=False).drop(columns='Variabele_naam')
-    v2['FactorV']= v2['FactorVGen']+ v2['FactorVSpec']
-    #in deze totalen zijn afstanden zinloos
-    v2['FactorKm']=v2['FactorV']
-    vg= convert_diffgrpsidat(v2,fg,['PC4','GeoInd'],['GeoInd'])   
-    print(vg.dtypes)
-    kenmu=kenm.rename(columns={'FactorC':'FCone','FactorKm':'RitAfst'})
-    print(kenmu.dtypes)
-    ds=vg.merge(kenmu,how='left')
-    print(ds.dtypes)
-    ds['FactorKm'] = ds['FactorC'] * ds['RitAfst']
-    ds=ds.drop(columns=[ "GrpVal","GrpV_label"])
-    dssu=ds.groupby(fg+ ["GrpTyp",'GeoInd'] ).agg('sum').reset_index()    
-    return dssu
-    
-cattots2 = mksumperklas(odinverplgr,odindiffgrpinfo,fitgrpse)
-cattots2
-# -
+odinverplflgs[odinverplflgs['KAfstCluCode']==15].sum()
 
 useKAfstV.to_pickle("../intermediate/ODINcatVN01uKA.pkl")
 xlatKAfstV.to_pickle("../intermediate/ODINcatVN01xKA.pkl")
 
 odinverplgr.to_pickle("../intermediate/ODINcatVN01db.pkl")
 odinverplklinfo.to_pickle("../intermediate/ODINcatVN02db.pkl")
+odinverplflgs.to_pickle("../intermediate/ODINcatVN03db.pkl")
 
 # mooi, nu analyses welke raar zijn
 

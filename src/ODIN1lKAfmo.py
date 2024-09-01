@@ -160,8 +160,14 @@ rudifungcache = getcachedgrids(rudifungrid)
 #wel presenteren we het steeds als cumulatieve sommen tot een bepaalde bin
 # -
 
-useKAfstV=pd.read_pickle("../intermediate/ODINcatVN01uKA.pkl")
-xlatKAfstV=pd.read_pickle("../intermediate/ODINcatVN01xKA.pkl")
+useKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01uKA.pkl")
+xlatKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01xKA.pkl")
+useKAfstV  = useKAfstVa [useKAfstVa ["MaxAfst"] <20].copy()
+maxcuse= np.max(useKAfstV[useKAfstV ["MaxAfst"] !=0] ['KAfstCluCode'])
+xlatKAfstV  = xlatKAfstVa [(xlatKAfstVa['KAfstCluCode']<=maxcuse ) |
+                           (xlatKAfstVa['KAfstCluCode']==np.max(useKAfstV[ 'KAfstCluCode']) )].copy()
+#print(xlatKAfstV)   
+print(useKAfstV)   
 
 useKAfstVQ  = useKAfstV [useKAfstV ["MaxAfst"] <4]
 #print(xlatKAfstV)   
@@ -201,6 +207,58 @@ bd=fietswijk3pc4 [abs(fietswijk3pc4['aantal_inwoners_d2'] ) > 1 ]
 
 expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0}
 
+
+# +
+#eerst een dataframe dat
+#2) per lengteschaal, en PC variabelen eerst geografisch sommeert dan waarde ophaalt per punt
+#   bijv BAM BAT of  (BAM*BAT)/(BAM+BAT)
+#en dit dan per PC 4 sommeert
+#dit zijn min of meer statische utigangstabellen waarop de modellen dan door kunnen gaan
+#Hierna kan daar dan op gemodelleerd worden (data is niet geo meer maar per PC4)
+#let op dit beschrijft het NAAR deel van de reis: het van deel 
+#dit moet nog vermenigvuligd worden met het vergelijkbare (heel locale) tuple ->
+#dus steeds 9 kolommen LW LO LM x OW OO OM 
+#radius =0: some over hele land voor O
+def filtgridprecalc (rudigrid,myKAfstV,pu):
+    debug=False
+    
+    R=dict()
+#    R_LW= rudifungrid.read(3)
+#    R_LT= rudifungrid.read(5)
+    R_LW= rudigrid[3]
+    R_LT= rudigrid[5]
+    R_LO =  R_LT- R_LW   
+    R_LW = np.power(R_LW,pu['LW'])
+    R_LO = np.where(R_LO <0,-np.power(-R_LO,pu['LO']), np.power(R_LO,pu['LO']) )
+    R['LW']= R_LW
+    R['LO'] =  R_LO
+#    R['LM'] =  (R_LO* R_LW) / (R_LO + R_LW+1e-10)
+
+    for lkey in R.keys():
+
+        
+        for okey in ('OW','OO','OM'):
+            colnam="M_"+ lkey +"_" + okey
+#            print(colnam)
+            outdf[colnam] = 0*lvals            
+    R_LW_land= np.sum(R_LW)
+    R_LO_land= np.sum(R_LO)
+    
+    for index, row in myKAfstV[myKAfstV['MaxAfst']!=0].iterrows():        
+        filt=rasteruts1.roundfilt(100,1000*row["MaxAfst"])
+        filtarea = np.power(np.sum(filt)*1e-6,pu['OA'])
+
+        F=dict()
+        tstart= time.perf_counter()
+        F_OW = rasteruts1.convfiets2d(R_LW, filt ,bdim=8) /R_LW_land
+        F_OT = rasteruts1.convfiets2d(R_LT, filt ,bdim=8) /R_LO_land
+        tend= time.perf_counter()
+    if debug:
+        print(("blklen" ,len(outdfst), "outlen" ,len(outdf)) )
+    return(outdf)
+
+#geoschpc4allQ=mkgeoschparafr(cbspc4data,pc4inwgrid,rudifungrid,useKAfstVQ,1.2,1.0)
+#precgrids1=filtgridprecalc(rudifungcache,useKAfstVQ,expdefs)
 
 # +
 #eerst een dataframe dat
@@ -506,11 +564,21 @@ indatverplgr
 
 #oude versie: ieder record fit naar ofwel ALsafe of naar osafe, of nergens heen
 
-def choose_cutoffold(indat,pltgrps,hasfitted,prevrres):
+def choose_cutoffold(indat,pltgrps,hasfitted,prevrres,pu):
     outframe=indat[['PC4','GrpExpl','MaxAfst','KAfstCluCode','GeoInd' ] +pltgrps].copy(deep=False)
+    recisAL=indat['MaxAfst']==0
+    wval1= indat[recisAL] [['FactorV','PC4','GeoInd'] +pltgrps].copy(deep=False)
+    wval1= wval1.rename(columns={'FactorV':'EstVPAL'})
+    outframe=outframe.merge(wval1,how='left')
+
     if hasfitted:
         outframe['ALsafe'] = (prevrres['FactorEstNAL'] > 5.0 * prevrres['FactorEstAL'] ) | (outframe['MaxAfst']==0) 
         outframe['osafe']  = (prevrres['FactorEstNAL'] < 0.2 * prevrres['FactorEstAL'] ) & (outframe['MaxAfst']!=0)
+    elif True:        
+        outframe['ALsafe'] = indat['FactorV'] > .9 * outframe['EstVPAL'] 
+        outframe['osafe'] = indat['FactorV'] < .1 * outframe['EstVPAL'] 
+        outframe['ALsafe'] = outframe['ALsafe'] | (outframe['MaxAfst']==0)
+        outframe['osafe'] = outframe['osafe'] & (outframe['MaxAfst']!=0)
     else:
         outframe['ALsafe'] =True
         outframe['osafe'] = True
@@ -524,6 +592,10 @@ def choose_cutoffold(indat,pltgrps,hasfitted,prevrres):
         outframe['ALsafe'] = outframe['ALsafe'] | (outframe['MaxAfst']==0)
         outframe['osafe'] = outframe['osafe'] & (outframe['MaxAfst']!=0)
     if 1==1:
+        outframe['FactorVP'] =indat['FactorV']
+        outframe['FactorVFo'] = indat['FactorV']  /outframe['EstVPAL'] 
+        outframe['FactorVFAL'] = indat['FactorV']  /outframe['EstVPAL'] 
+
         outframe['FactorVF'] =indat['FactorV'] * ((outframe['ALsafe'] |outframe['osafe'] ).astype(int))
         for lkey in ('LW','LO'):
             colnamAL ="M_"+ lkey +"_AL"
@@ -537,15 +609,17 @@ def choose_cutoffold(indat,pltgrps,hasfitted,prevrres):
 #    outframe['ALmult'] = ( (outframe['ALsafe']==False).astype(int))
     return outframe
 
-cut2=  choose_cutoffold(indatverplgr,fitgrps,False,0)   
+cut2=  choose_cutoffold(indatverplgr,fitgrps,False,0,expdefs)   
 cut2
-
 
 # +
 #todo
 #fit tov fractie (l komt uit data FactorVL)
 #waarde:  p=1/(1/l + 1/f) -> f= 1/ (1/p - 1/l) -> divergeert dus alleen als w>.1, anders 0
 #gewicht: w= (p * (1/p - 1/l))** (+ pow+1)   -> aparte kolom
+# -
+
+
 
 # +
 #originele code had copy. Kost veel geheugen en tijd
@@ -563,7 +637,7 @@ def choose_cutoffnw(indat,pltgrps,hasfitted,prevrres,pu):
         outframe['EstVPo']   =np.power(prevrres['FactorEstNAL'],curvpwr)
         outframe['EstVP']    =np.power(prevrres['FactorEst'],curvpwr)
     else: 
-        wval1= indat[recisAL] [['FactorV','PC4','GeoInd'] +pltgrps].copy()
+        wval1= indat[recisAL] [['FactorV','PC4','GeoInd'] +pltgrps].copy(deep=False)
         wval1= wval1.rename(columns={'FactorV':'EstVPAL'})
         wval1['EstVPAL'] =np.power(wval1['EstVPAL'],curvpwr)
         outframe=outframe.merge(wval1,how='left')
@@ -620,10 +694,10 @@ def choose_cutoffnw(indat,pltgrps,hasfitted,prevrres,pu):
     return outframe
 
 def choose_cutoff(indat,pltgrps,hasfitted,prevrres,curvpwr):
-    if True:
+    if False:
         return choose_cutoffnw(indat,pltgrps,hasfitted,prevrres,curvpwr)
     else:
-        return choose_cutoffold(indat,pltgrps,hasfitted,prevrres)
+        return choose_cutoffold(indat,pltgrps,hasfitted,prevrres,curvpwr)
 
 
 cut2=  choose_cutoff(indatverplgr,fitgrps,False,0,expdefs)   
@@ -746,7 +820,7 @@ seaborn.scatterplot(data=fitdatverplgr,x="FactorEst",y="DiffEst",hue="GeoInd")
 # -
 
 cut3=  choose_cutoff(indatverplgr,fitgrps,True,fitdatverplgr,expdefs)  
-cut3=  choose_cutoffold(indatverplgr,fitgrps,True,fitdatverplgr)  
+#cut3=  choose_cutoff(indatverplgr,fitgrps,True,fitdatverplgr,expdefs)  
 #cut3
 
 # +
