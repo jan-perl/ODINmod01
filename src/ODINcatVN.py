@@ -702,7 +702,8 @@ odinverplflgs = mkdfverplklasflgs (allodinyr ,specvaltab,fitgrps,isnhexpl,kflgsf
 odinverplflgs
 # -
 
-odinverplflgs[odinverplflgs['KAfstCluCode']==15].sum()
+odinflgtots=odinverplflgs[odinverplflgs['KAfstCluCode']==15].sum()
+odinflgtots
 
 useKAfstV.to_pickle("../intermediate/ODINcatVN01uKA.pkl")
 xlatKAfstV.to_pickle("../intermediate/ODINcatVN01xKA.pkl")

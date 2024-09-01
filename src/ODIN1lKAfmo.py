@@ -360,7 +360,22 @@ useKAfstVland = useKAfstV [useKAfstV['MaxAfst']==0]
 geoschpc4land=mkgeoschparafr(cbspc4data,pc4inwgcache,rudifungcache,useKAfstVland,expdefs)
 geoschpc4land
 
-odinverplgr=pd.read_pickle("../intermediate/ODINcatVN01db.pkl")
+#het inlezen van odinverplgr loopt in deze versie via ODINcatVNuse
+import ODINcatVNuse
+
+print(useKAfstV) 
+
+odinverplklinfo = ODINcatVNuse.odinverplklinfo_o[np.isin(ODINcatVNuseodinverplklinfo_o['KAfstCluCode'],maskKAfstV)].copy (deep=False)
+odinverplgr =ODINcatVNuse.odinverplgr_o[np.isin(odinverplgr_o['KAfstCluCode'],maskKAfstV)].copy (deep=False)
+odinverplflgs =odinverplflgs_o[np.isin(odinverplflgs_o['KAfstCluCode'],maskKAfstV)].copy (deep=False)
+
+
+# +
+#de ingelezen odinverplgr_o heeft nog heel veel KAfstCluCode s
+#hierin eerst snijden
+# -
+
+#was odinverplgr=pd.read_pickle("../intermediate/ODINcatVN01db.pkl")
 def deffactorv(rv):
     rv['FactorV'] = np.where ((rv['FactorVGen'] ==0 ) & ( rv['FactorVSpec']>0) ,
                np.nan,rv['FactorVGen'] + 0* rv['FactorVSpec'] )
