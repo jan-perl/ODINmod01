@@ -425,6 +425,11 @@ some_string="""OthPC,MotiefV,Comment
 2691,1,kassen werk/oppervl overschat
 5928,1,logistiek werk/oppervl overschat
 6525,6,radboud U
+2333,1,werk Leiden
+3011,1,werk rotterdam
+3011,7,winkelen rotterdam
+3511,1,werk utrecht
+3511,7,winkelen utrecht
 3311,7,Binnenstad Dordrcht
 3431,7,Nieuwegein City Plaza
 3995,7,Houten Rond en Castellum

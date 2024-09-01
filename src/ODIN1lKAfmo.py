@@ -364,10 +364,12 @@ geoschpc4land
 import ODINcatVNuse
 
 print(useKAfstV) 
+maskKAfstV= list(useKAfstV['KAfstCluCode'])
+maskKAfstV
 
-odinverplklinfo = ODINcatVNuse.odinverplklinfo_o[np.isin(ODINcatVNuseodinverplklinfo_o['KAfstCluCode'],maskKAfstV)].copy (deep=False)
-odinverplgr =ODINcatVNuse.odinverplgr_o[np.isin(odinverplgr_o['KAfstCluCode'],maskKAfstV)].copy (deep=False)
-odinverplflgs =odinverplflgs_o[np.isin(odinverplflgs_o['KAfstCluCode'],maskKAfstV)].copy (deep=False)
+odinverplklinfo = ODINcatVNuse.odinverplklinfo_o[np.isin(ODINcatVNuse.odinverplklinfo_o['KAfstCluCode'],maskKAfstV)].copy (deep=False)
+odinverplgr =ODINcatVNuse.odinverplgr_o[np.isin(ODINcatVNuse.odinverplgr_o['KAfstCluCode'],maskKAfstV)].copy (deep=False)
+odinverplflgs =ODINcatVNuse.odinverplflgs_o[np.isin(ODINcatVNuse.odinverplflgs_o['KAfstCluCode'],maskKAfstV)].copy (deep=False)
 
 
 # +
@@ -781,9 +783,7 @@ def _fitsub(indf,fitgrp,_regressgrp,  colvacols2, colpacols2):
     return rf
     
     
-def dofitdatverplgr(indf,topreddf,pltgrp,pu):
-    curvpwr = pu['CP']
-#    indf = indf[(indf['MaxAfst']!=95.0) & (indf[pltgrp]<3) ]
+def fit_cat_parameters(indf,topreddf,pltgrp,pu):
     debug=False
     colvacols = indf.columns
     colpacols = np.array( list ( (re.sub(r'F_','P_',s) for s in list(colvacols) ) ) )
@@ -795,6 +795,16 @@ def dofitdatverplgr(indf,topreddf,pltgrp,pu):
     else:
         fitgrp=pltgrp + ['GeoInd' ]
     rf= _fitsub(indf,fitgrp,_regressgrp,  colvacols2, colpacols2).reset_index()
+    return rf
+
+def predict_values(indf,topreddf,pltgrp,rf,pu,stobijdr):
+    curvpwr = pu['CP']
+#    indf = indf[(indf['MaxAfst']!=95.0) & (indf[pltgrp]<3) ]
+    debug=False
+    colvacols = indf.columns
+    colpacols = np.array( list ( (re.sub(r'F_','P_',s) for s in list(colvacols) ) ) )
+    colvacols2 = colvacols[colvacols != colpacols]
+    colpacols2 = colpacols[colvacols != colpacols]
     
     outdf = topreddf.merge(rf,how='left')
     #let op: voorspel uit M kolommen
@@ -827,8 +837,13 @@ def dofitdatverplgr(indf,topreddf,pltgrp,pu):
         print (s2ch)
     outdf['FactorEst'] = s2ch
     outdf['DiffEst'] =outdf['FactorV']-s2ch
+    if stobijdr:
+        outdf[colvacols2 ] = np.array(blk1al)*np.array(blk2al)
     return(outdf)
 
+def dofitdatverplgr(indf,topreddf,pltgrp,pu):
+    rf = fit_cat_parameters(indf,topreddf,pltgrp,pu,False)
+    return predict_values(indf,topreddf,pltgrp,rf,pu)
 
 fitdatverplgr = dofitdatverplgr(cut2,indatverplgr,fitgrps,expdefs)
 seaborn.scatterplot(data=fitdatverplgr,x="FactorEst",y="DiffEst",hue="GeoInd")
@@ -1033,7 +1048,7 @@ largestdiffsPC (cbspc4data,fitdatverplgr)
 #chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(3511,3512,3584 )))]
 #chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(6511,6525 )))]
 #chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(2513 ,2333)))]
-chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(7511) ))]
+chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(2333,2334,2331) ))]
 #chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(5611,5612 )))]
 #chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(2678,2691 )))]
 #chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(1012,1017,1043,1101,1118 )))]
@@ -1313,6 +1328,43 @@ def mkpltverplp (df,myspecvals,collvar,normgrp,selstr):
 #datpltverplp = mkpltverplp (allodinyr,specvaltab,'Doel','Jaar','Alle ritten')
 #datpltverplp = mkpltverplp (allodinyr,specvaltab,'VertUur','Jaar','Alle ritten')
 datpltverplp = mkpltverplp (naarhuis,dspecvaltab,'AankPC/rudifun/S_MXI22_GB','MotiefV','Alle ritten')
+# +
+#top . nu eerst kijken naar kengetallen van basis fit
+
+
+# +
+#check 1 reisigerskm auto kilometers
 # -
+
+def mkdatadiff2(verpl,fg,infof,landcod):    
+#    print(('verpl',len(verpl),verpl.dtypes) )
+    v2=verpl.copy(deep=False).drop(columns='Variabele_naam')
+#    v2['FactorV']= v2['FactorVGen']+ v2['FactorVSpec']
+    #in deze totalen zijn afstanden zinloos
+    v2['FactorKm']=v2['FactorV']
+    #deze dus niet normaliseren
+    vg= ODINcatVNuse.convert_diffgrpsidat(v2,fg,['PC4','GeoInd'],
+                                          infof,['GeoInd'],"_v",landcod,False) 
+#    print(('vg',len(vg),vg.dtypes))
+    return vg
+#ddc_indat =  mkdatadiff2(fitdatverplgr,ODINcatVNuse.fitgrpse,
+#                         DINcatVNuse.infoflds,ODINcatVNuse.landcod)
+
+
+#ddc_indat =  ODINcatVNuse.mkdatadiff(fitdatverplgr,ODINcatVNuse.fitgrpse,ODINcatVNuse.landcod)
+#ddc_indat =  mkdatadiff2(fitdatverplgr,ODINcatVNuse.fitgrpse,ODINcatVNuse.landcod)
+totinf_indat = ODINcatVNuse.mkinfosums(ddc_indat,ODINcatVNuse.odindiffflginfo,
+                       ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,ODINcatVNuse.landcod)
+totinf_indat
+
+ddc_fitdat =  mkdatadiff2(fitdatverplgr.rename (
+       columns={'FactorV':'FactorO', 'FactorEst':'FactorV' }),
+            ODINcatVNuse.fitgrpse,  ODINcatVNuse.infoflds,ODINcatVNuse.landcod)
+
+totinf_fitdat = ODINcatVNuse.mkinfosums(ddc_fitdat,ODINcatVNuse.odindiffflginfo,
+                       ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,ODINcatVNuse.landcod)
+totinf_fitdat.groupby(["GeoInd"]).agg('sum')
+
+totinf_indat.groupby(["GeoInd"]).agg('sum')
 
 

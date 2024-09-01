@@ -397,14 +397,14 @@ odindiffflginfo
 
 
 def mkdatadiff(verpl,fg,landcod):    
-    print(('verpl',len(verpl),verpl.dtypes) )
+#    print(('verpl',len(verpl),verpl.dtypes) )
     v2=verpl.copy(deep=False).drop(columns='Variabele_naam')
-    v2['FactorV']= v2['FactorVGen']+ v2['FactorVSpec']
+#    v2['FactorV']= v2['FactorVGen']+ v2['FactorVSpec']
     #in deze totalen zijn afstanden zinloos
     v2['FactorKm']=v2['FactorV']
     #deze dus niet normaliseren
     vg= convert_diffgrpsidat(v2,fg,['PC4','GeoInd'],infoflds,['GeoInd'],"_v",landcod,False) 
-    print(('vg',len(vg),vg.dtypes))
+#    print(('vg',len(vg),vg.dtypes))
     return vg
 datadiffcache =    mkdatadiff(odinverplgr,fitgrpse,landcod)
 #datadiffcache
@@ -435,14 +435,19 @@ def _normflgvals (vg,kenmu,fg,cflds):
 #pak nu database als odinverplgr, differentieer per slice, en plak 
 #daar gegevens aan uit per groep genormeerde database als
 def mkinfosums(vg,kenmu,fg,kenmcols,landcod):    
-    
-    print(('vg',len(vg),vg.dtypes))    
-    print(('kenmu',len(kenmu),kenmu.dtypes))
+#    print(('vg',len(vg),vg.dtypes))    
+#    print(('kenmu',len(kenmu),kenmu.dtypes))
     dssu=  _normflgvals (vg,kenmu,fg,kenmcols ) 
     return dssu
     
 infotots2 = mkinfosums(datadiffcache ,odindiffflginfo,fitgrpse,kflgsflds,landcod)
-infotots2
+#infotots2
+# -
+
+if True:
+    o2=infotots2.groupby(["GeoInd"]).agg('sum')
+    print(o2/74170863993)    
+o2
 
 
 # +
