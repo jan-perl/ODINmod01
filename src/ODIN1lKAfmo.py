@@ -100,6 +100,8 @@ cbspc4data =pd.read_pickle("../intermediate/CBS/pc4data_"+stryear+".pkl")
 cbspc4data= cbspc4data.sort_values(by=['postcode4']).reset_index()
 
 cbspc4data['oppervlak'] = cbspc4data.area
+cbspc4data['aantal_inwoners'] = np.where(cbspc4data['aantal_inwoners'] <0,0,
+                                         cbspc4data['aantal_inwoners'] )
 
 cbspc4data.dtypes
 
@@ -349,7 +351,34 @@ geoschpc4allQ[geoschpc4allQ['PC4']==3991]
 # -
 
 geoschpc4all=mkgeoschparafr(cbspc4data,pc4inwgcache,rudifungcache,useKAfstV,expdefs)
-geoschpc4 = geoschpc4all
+
+
+# +
+def _qcutmxi(df,mxivarin,mxiout,nbins):
+    mxiout,bins =  pd.qcut(df[mxivarin], nbins, retbins=True, labels=False)
+    df['mxiout'] = mxiout
+    print (bins)  
+#    rv= pd.Series(mxiout*1.1, index=range(len(df)))
+    return  df[['mxiout']]
+
+def addbins (df):
+    outdf=df.set_index(keys=['KAfstCluCode','PC4'],drop=False)
+#    print(outdf)
+    outdf['scaleMXI']= np.where(outdf['MaxAfst'] ==0, outdf['M_LW_AL']/
+               (outdf['M_LW_AL'] + outdf['M_LO_AL'] ) , ( (outdf['M_LW_OW'] + outdf['M_LO_OW'] )/
+       (outdf['M_LW_OW'] + outdf['M_LW_OO'] + outdf['M_LO_OW'] + outdf['M_LO_OO'] ) ) )
+#    outdf['mxigrp'] =4
+    binfr=1
+    allret= outdf.drop(columns=['PC4','KAfstCluCode']).groupby('KAfstCluCode').apply(_qcutmxi, 'scaleMXI','mxigrp',5)
+    print(allret.dtypes)
+    outdf['mxigrp'] =allret
+    outdf=outdf.reset_index(drop=True)
+    return ([outdf,binfr])
+    
+geoschpc4, geobingr = addbins(geoschpc4all)
+# -
+
+geoschpc4
 
 #kijk even naar sommen
 geoschpc4.groupby(['KAfstCluCode','MaxAfst']).agg('sum')
@@ -359,6 +388,8 @@ geoschpc4
 useKAfstVland = useKAfstV [useKAfstV['MaxAfst']==0]
 geoschpc4land=mkgeoschparafr(cbspc4data,pc4inwgcache,rudifungcache,useKAfstVland,expdefs)
 geoschpc4land
+
+
 
 from importlib import reload  # Python 3.4+
 if False:
@@ -392,11 +423,11 @@ deffactorv(odinverplgr)
 #maak 2 kolommen met totalen aankomst en vertrek (alle categorrieen)
 #worden als kolommen aan addf geoschpc4land toegevoegd per PC
 #is eigenlijk alleen van belang voor diagnostische plots
-#en totalen hannen ook uit aggregaten gehaald kunnen wornde
+#en totalen hannen ook uit aggregaten gehaald kunnen worden
 #TODO cleanup
 
 def mkvannaarcol(rv,verpldf,xvarPC):
-    dfvrecs = verpldf [verpldf ['GeoInd'] == xvarPC]
+    dfvrecs = verpldf [(verpldf ['GeoInd'] == xvarPC) ]
     pstats = dfvrecs.groupby('PC4')[['FactorV']].sum().reset_index()
     outvar='TotaalV'+xvarPC
 #    pstats=pstats.rename(columns={xvarPC:'PC4'})
@@ -412,6 +443,7 @@ mkvannaarcol(geoschpc4land,odinverplgr,'VertPC')
 #geoschpc4 is een mooi dataframe met generieke woon en werk parameters
 #Er is nog wel een mogelijk verzadigings effect daar waar de waarden voor
 #grotere afstanden die van de landelijke waarden benaderen
+#geoschpc4land
 # -
 #nog netjes importeren
 largranval = -9999999999
@@ -504,6 +536,67 @@ geenwoonexpA= loglogregrplot(geogeenwoon,'M_LO_AL','TotaalVAankPC')
 
 
 # +
+#nu eerst geo data voor fit naar geo groepen verzamelen:
+# let op: er zijn daarna 2 schalen, die ieder nuttig zijn:
+# PC4 (om lokale zaken te bekijken) en geogroep voor statistiek om et fitten
+# let op PC4 naar mxigrp vertaling is verschillend per 'KAfstCluCode'
+#dit gaat niet zo werken: Per Motief moeten er andere PC4-s uit gefilterd worden
+#dus: summ pas NA merge met geo
+
+def summmxigrp(dfin,dfland):
+    dfgrp= dfin.copy(deep=False)
+    dfmetvn= dfin.merge(dfland [['PC4','TotaalVAankPC','TotaalVVertPC']],how='left')
+    dfgrp['nPCsgeo']=1
+    dfgrp['mxigrp2']=np.where(np.isnan(dfmetvn['TotaalVAankPC'] + dfmetvn['TotaalVVertPC'] ),-1, dfgrp['mxigrp'])
+    newgrp= ['KAfstCluCode','mxigrp2']
+    rv= dfgrp.groupby(newgrp).agg('sum')
+    rv['MaxAfst'] = rv['MaxAfst'] /rv['nPCsgeo']
+    rv['scaleMXI'] = rv['scaleMXI'] /rv['nPCsgeo']
+    rv=rv.reset_index().rename(columns={'mxigrp2':'mxigrp'} )
+    return rv
+#.drop(columns='PC4')
+geoschmxigrp= summmxigrp(geoschpc4,geoschpc4land)
+geoschmxigrp
+# -
+
+#eerst kleine categorieen verwijderen uit odinverplgr
+#niet zo doen: zo ontstaan dubbele records per PC3. Dus: summaries
+grpexpcontrs= ['isnaarhuis','GeoInd','MotiefV','GrpExpl']
+def replacesmallGrpExpl(dfin,landcod):    
+    defcode=13
+    numgrprecs=dfin[dfin['KAfstCluCode']==landcod].groupby(grpexpcontrs)[['GrpExpl']].agg('count').rename(
+       columns={'GrpExpl':'NumExplRecs'}).reset_index()
+    smallnum = numgrprecs [numgrprecs ['NumExplRecs'] <400].sort_values(by='NumExplRecs')
+    expl13 =   numgrprecs [numgrprecs ['MotiefV'] ==defcode].rename(columns={'GrpExpl':'DefExpl'})
+    print(  smallnum  )
+    dfout=dfin.copy(deep=False)
+    dfrepl = dfin.merge(smallnum,how='left').reset_index()
+    dfrepl['toch'] = np.isnan(dfrepl['NumExplRecs']) ==False 
+    dfout['MotiefV'] = np.where(dfrepl['toch'],defcode,dfout['MotiefV'] )
+    newexpl = dfout.merge( expl13 , how='left').reset_index()
+    print(newexpl)
+    dfout['GrpExpl'] = np.where(dfrepl['toch'],newexpl['DefExpl'],dfout['GrpExpl']  )
+    print(dfout.reset_index()[dfrepl['toch']])
+    print(dfout.dtypes)
+    return(dfout)
+#odinverplgr2 = replacesmallGrpExpl (odinverplgr,ODINcatVNuse.landcod)
+#odinverplgrtext = replacesmallGrpExpl (odinverplgr2,ODINcatVNuse.landcod)
+
+
+# +
+#nu ook mxigrp toevoegen aan odinverplgr
+def odinmergemxi(odindf,mxigrps):
+#    print(mxigrps.dtypes)
+    mxitab= mxigrps[['PC4','KAfstCluCode','mxigrp']]
+    rv= odindf.merge(mxitab,how='left')
+#    print(( len (odindf), len(rv)) )
+    return rv
+
+odinverplgr2 = odinmergemxi (odinverplgr ,geoschpc4)
+odinverplgr2 
+
+
+# +
 #print(allodinyr2)
 #allodinyr = allodinyr2
 
@@ -580,7 +673,6 @@ indatverplgr = mkdfverplxypc4 (odinverplgr ,fitgrps,'Motief en isnaarhuis',
                                 useKAfstV,xlatKAfstV,geoschpc4,2.0)
 indatverplgr
 # +
-#originele code had copy. Kost veel geheugen en tijd
 #daarom verder met kolommen met een F_ (filtered)
 
 #oude versie: ieder record fit naar ofwel ALsafe of naar osafe, of nergens heen
@@ -624,6 +716,9 @@ def choose_cutoffold(indat,pltgrps,hasfitted,prevrres,pu):
     if 1==1:
         outframe['ALsafe'] = outframe['ALsafe'].astype(int)
         outframe['osafe'] = outframe['osafe'].astype(int)
+        overlap = outframe['osafe'] * outframe['ALsafe']
+        outframe['ALsafe'] = outframe['ALsafe'] - overlap
+        outframe['osafe'] = outframe['osafe'] - overlap
         if np.sum(outframe['osafe'] * outframe['ALsafe']) !=0:
             raise ("Error: overlapping fits")
 
