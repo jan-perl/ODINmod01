@@ -415,8 +415,11 @@ odinverplflgs =ODINcatVNuse.odinverplflgs_o[np.isin(ODINcatVNuse.odinverplflgs_o
 #was odinverplgr=pd.read_pickle("../intermediate/ODINcatVN01db.pkl")
 def deffactorv(rv):
     rv['FactorV'] = np.where ((rv['FactorVGen'] ==0 ) & ( rv['FactorVSpec']>0) ,
-               np.nan,rv['FactorVGen'] + 0* rv['FactorVSpec'] )
-deffactorv(odinverplgr)
+               0,rv['FactorVGen'] + 0* rv['FactorVSpec'] )
+    skipsdf = rv [(rv['FactorVGen'] ==0 ) & ( rv['FactorVSpec']>0) ] [['PC4','MotiefV']].copy()
+    return skipsdf
+skipPCMdf = deffactorv(odinverplgr)
+skipPCMdf
 
 
 # +
@@ -540,27 +543,69 @@ geenwoonexpA= loglogregrplot(geogeenwoon,'M_LO_AL','TotaalVAankPC')
 # let op: er zijn daarna 2 schalen, die ieder nuttig zijn:
 # PC4 (om lokale zaken te bekijken) en geogroep voor statistiek om et fitten
 # let op PC4 naar mxigrp vertaling is verschillend per 'KAfstCluCode'
-#dit gaat niet zo werken: Per Motief moeten er andere PC4-s uit gefilterd worden
-#dus: summ pas NA merge met geo
 
-def summmxigrp(dfin,dfland):
+def summmxigrp(dfin):
     dfgrp= dfin.copy(deep=False)
-    dfmetvn= dfin.merge(dfland [['PC4','TotaalVAankPC','TotaalVVertPC']],how='left')
     dfgrp['nPCsgeo']=1
-    dfgrp['mxigrp2']=np.where(np.isnan(dfmetvn['TotaalVAankPC'] + dfmetvn['TotaalVVertPC'] ),-1, dfgrp['mxigrp'])
-    newgrp= ['KAfstCluCode','mxigrp2']
+    newgrp= ['KAfstCluCode','mxigrp']
     rv= dfgrp.groupby(newgrp).agg('sum')
-    rv['MaxAfst'] = rv['MaxAfst'] /rv['nPCsgeo']
-    rv['scaleMXI'] = rv['scaleMXI'] /rv['nPCsgeo']
-    rv=rv.reset_index().rename(columns={'mxigrp2':'mxigrp'} )
+#    rv['MaxAfst'] = rv['MaxAfst'] /rv['nPCsgeo']
+#    rv['scaleMXI'] = rv['scaleMXI'] /rv['nPCsgeo']
+    rv=rv.reset_index().drop(columns=['MaxAfst','PC4'] )
     return rv
 #.drop(columns='PC4')
-geoschmxigrp= summmxigrp(geoschpc4,geoschpc4land)
-geoschmxigrp
+geoschmxigrp= summmxigrp(geoschpc4)
+len(geoschmxigrp)
+
+
+# +
+def _partsummmxigrp(thismot,geoschpc4):
+    pcset = list(thismot['PC4'])
+#    print(pcset)
+    pc4sel = geoschpc4[np.isin(geoschpc4['PC4'],pcset)]
+#    print (pc4sel)
+    dfo = summmxigrp(pc4sel)
+    return dfo
+
+def summmxicorrgrp(dfin,skips):
+    rv = skips.groupby('MotiefV').apply(_partsummmxigrp,dfin).reset_index().drop(columns='level_1')
+#    print (rv)
+    return (rv)
+geoschmxicorr= summmxicorrgrp(geoschpc4,skipPCMdf)
+#een correctitie
+len(geoschmxicorr)
+
+
+# +
+def _addsummmxigrp(thismot,dfin1,corrdfin):    
+    imatch = ['KAfstCluCode','mxigrp']
+    motcorr = corrdfin[corrdfin['MotiefV']==thismot] #.set_index(imatch)
+    motcorridx = dfin1[imatch] #.set_index(imatch)
+    mmatch = ['MotiefV'] + imatch
+    corrdf = motcorridx.merge(motcorr,how='left') .set_index(mmatch)
+#    corrdf = pd.DataFrame(np.where(np.isnan(corrdf ),0,corrdf))
+    corrdf = np.where(np.isnan(corrdf ),0,corrdf)
+    dfinidxed = dfin1.copy(deep=False)
+    dfinidxed['MotiefV'] =  thismot
+    dfinidxed= dfinidxed.set_index(mmatch)
+    addf= (dfinidxed - corrdf).reset_index()
+    return addf
+
+def allmotmxicorrgrp(dfin1,corrdfin,maxmotief):   
+    rv = ( _addsummmxigrp(thismot+1,dfin1,corrdfin ) for thismot in range(np.int(maxmotief)) )
+    rv=pd.concat(rv)
+#    print([ np.sum(np.isnan(rv )),len(rv) ])
+
+    #    print (rv)
+    return (rv)
+geoschmixpMotief= allmotmxicorrgrp(summmxigrp(geoschpc4),
+                    summmxicorrgrp(geoschpc4,skipPCMdf),np.max(odinverplgr['MotiefV']))
+#deze te gebruiken in plaata van geoschpc4 voor mixclusts
+len(geoschmixpMotief)
 # -
 
 #eerst kleine categorieen verwijderen uit odinverplgr
-#niet zo doen: zo ontstaan dubbele records per PC3. Dus: summaries
+#niet zo doen: zo ontstaan dubbele records per PC3. Dus: verplaatsen naar ODINcatVN
 grpexpcontrs= ['isnaarhuis','GeoInd','MotiefV','GrpExpl']
 def replacesmallGrpExpl(dfin,landcod):    
     defcode=13
@@ -585,16 +630,18 @@ def replacesmallGrpExpl(dfin,landcod):
 
 # +
 #nu ook mxigrp toevoegen aan odinverplgr
-def odinmergemxi(odindf,mxigrps):
+def odinmergemxi(odindf,mxigrps,cluflds):
 #    print(mxigrps.dtypes)
-    mxitab= mxigrps[['PC4','KAfstCluCode','mxigrp']]
-    rv= odindf.merge(mxitab,how='left')
+    addclu=['KAfstCluCode','mxigrp']
+    mxitab= mxigrps[['PC4']+addclu]
+    itab= odindf.merge(mxitab,how='left')
+    stab= itab.groupby(addclu+cluflds).agg('sum')  .reset_index().drop(columns=['PC4','index'])  
 #    print(( len (odindf), len(rv)) )
-    return rv
+    return stab
 
-odinverplgr2 = odinmergemxi (odinverplgr ,geoschpc4)
-odinverplgr2 
-
+odinverplmxigr = odinmergemxi (odinverplgr ,geoschpc4,grpexpcontrs)
+len(odinverplmxigr )
+#deze te gebruiken in plaata vanodinverplgr voor mixclusts
 
 # +
 #print(allodinyr2)
@@ -669,18 +716,24 @@ def mkdfverplxypc4 (dfg2,pltgrps,selstr,myKAfstV,myxlatKAfstV,geoschpc4in,pu):
     return rv
 
 fitgrps=['MotiefV','isnaarhuis']
-indatverplgr = mkdfverplxypc4 (odinverplgr ,fitgrps,'Motief en isnaarhuis',
+indatverplmxigr = mkdfverplxypc4 (odinverplmxigr ,fitgrps,'Motief en isnaarhuis',
                                 useKAfstV,xlatKAfstV,geoschpc4,2.0)
-indatverplgr
+len(indatverplmxigr)
+# -
+indatverplmxigr = mkdfverplxypc4 (odinverplmxigr ,fitgrps,'Motief en isnaarhuis',
+                                useKAfstV,xlatKAfstV,geoschmixpMotief,2.0).merge(useKAfstV,how='left')
+len(indatverplmxigr)
+
+
 # +
 #daarom verder met kolommen met een F_ (filtered)
 
 #oude versie: ieder record fit naar ofwel ALsafe of naar osafe, of nergens heen
 
-def choose_cutoffold(indat,pltgrps,hasfitted,prevrres,pu):
-    outframe=indat[['PC4','GrpExpl','MaxAfst','KAfstCluCode','GeoInd' ] +pltgrps].copy(deep=False)
+def choose_cutoffold(indat,pltgrps,hasfitted,prevrres,grpind,pu):
+    outframe=indat[[grpind,'GrpExpl','MaxAfst','KAfstCluCode','GeoInd' ] +pltgrps].copy(deep=False)
     recisAL=indat['MaxAfst']==0
-    wval1= indat[recisAL] [['FactorV','PC4','GeoInd'] +pltgrps].copy(deep=False)
+    wval1= indat[recisAL] [['FactorV',grpind,'GeoInd'] +pltgrps].copy(deep=False)
     wval1= wval1.rename(columns={'FactorV':'EstVPAL'})
     outframe=outframe.merge(wval1,how='left')    
     outframe['FactorVFAL'] = indat['FactorV']  /outframe['EstVPAL'] 
@@ -737,7 +790,8 @@ def choose_cutoffold(indat,pltgrps,hasfitted,prevrres,pu):
 #    outframe['ALmult'] = ( (outframe['ALsafe']==False).astype(int))
     return outframe
 
-cut2=  choose_cutoffold(indatverplgr,fitgrps,False,0,expdefs)   
+#cut2=  choose_cutoffold(indatverplgr,fitgrps,False,0,'PC4',expdefs)   
+cut2=  choose_cutoffold(indatverplmxigr,fitgrps,False,0,'mxigrp',expdefs)   
 #cut2
 
 # +
@@ -754,7 +808,8 @@ def pointspertype(cutdf):
     cutcnt['osafrat'] = cutcnt['FactorVFAL'] * cutcnt['osafe']
     rv= cutcnt.groupby('GrpExpl').agg('sum')
     rv['osafrat'] = rv['osafrat'] / rv['osafe']
-    return rv[rv['allrecs'] > 1000]
+    mlim=0
+    return rv[rv['allrecs'] > mlim]
 pointspertype(cut2)
 
 
@@ -762,7 +817,7 @@ pointspertype(cut2)
 #originele code had copy. Kost veel geheugen en tijd
 #daarom verder met kolommen met een F_ (filtered)
 
-def choose_cutoffnw(indat,pltgrps,hasfitted,prevrres,pu):
+def choose_cutoffnw(indat,pltgrps,hasfitted,prevrres,grpind,pu):
     curvpwr = pu['CP']
     outframe=indat[['PC4','GrpExpl','MaxAfst','KAfstCluCode','GeoInd' ] +pltgrps].copy(deep=False)
     minwgt=.5
@@ -830,18 +885,19 @@ def choose_cutoffnw(indat,pltgrps,hasfitted,prevrres,pu):
                  np.max(outframe['ALsafe']),np.max(outframe['osafe'])) )
     return outframe
 
-def choose_cutoff(indat,pltgrps,hasfitted,prevrres,curvpwr):
+def choose_cutoff(indat,pltgrps,hasfitted,prevrres,grpind,curvpwr):
     if False:
-        return choose_cutoffnw(indat,pltgrps,hasfitted,prevrres,curvpwr)
+        return choose_cutoffnw(indat,pltgrps,hasfitted,prevrres,grpind,curvpwr)
     else:
-        return choose_cutoffold(indat,pltgrps,hasfitted,prevrres,curvpwr)
+        return choose_cutoffold(indat,pltgrps,hasfitted,prevrres,grpind,curvpwr)
 
 
-cut2=  choose_cutoff(indatverplgr,fitgrps,False,0,expdefs)   
+#cut2=  choose_cutoff(indatverplgr,fitgrps,False,0,'PC4',expdefs)   
+cut2=  choose_cutoff(indatverplmxigr,fitgrps,False,0,'mxigrp',expdefs)   
 #cut2
 # -
 
-def fitinddiag(fitdf,motiefc,naarhuisc,geoindex,pu):
+def fitinddiag(fitdf,motiefc,naarhuisc,geoindex,grpind,pu):
     curvpwr = pu['CP']
     seldf = fitdf [ (fitdf ['MotiefV'] ==motiefc) &
                   (fitdf ['isnaarhuis'] ==naarhuisc) &
@@ -866,12 +922,12 @@ def fitinddiag(fitdf,motiefc,naarhuisc,geoindex,pu):
     plmelt =  pd.melt(pldf, 'FactorVPrel', var_name='cols',  value_name='vals')
     
     if False:
-        print(seldf.sort_values(by=['PC4','KAfstCluCode'])[['FactorVFo','FactorVP']] )
+        print(seldf.sort_values(by=[grpind,'KAfstCluCode'])[['FactorVFo','FactorVP']] )
     fig, ax = plt.subplots()    
     seaborn.scatterplot(data=plmelt,x="FactorVPrel",y="vals", hue='cols', ax=ax)
     ax.set_xscale('log')
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-fitinddiag(cut2,10,5,'VertPC',expdefs)    
+#fitinddiag(cut2,10,5,'VertPC','mxigrp',expdefs)    
 
 
 # +
@@ -965,12 +1021,13 @@ def dofitdatverplgr(indf,topreddf,pltgrp,pu):
     rf = fit_cat_parameters(indf,topreddf,pltgrp,pu)
     return predict_values(indf,topreddf,pltgrp,rf,pu,False)
 
-fitdatverplgr = dofitdatverplgr(cut2,indatverplgr,fitgrps,expdefs)
+#fitdatverplgr = dofitdatverplgr(cut2,indatverplgr,fitgrps,expdefs)
+fitdatverplgr = dofitdatverplgr(cut2,indatverplmxigr,fitgrps,expdefs)
 fitdatverplgrx = fitdatverplgr[abs(fitdatverplgr["DiffEst"])> 2e6] 
 seaborn.scatterplot(data=fitdatverplgrx,x="FactorEst",y="DiffEst",hue="GeoInd")
 # -
 
-cut3=  choose_cutoff(indatverplgr,fitgrps,True,fitdatverplgr,expdefs)  
+cut3=  choose_cutoff(indatverplmxigr,fitgrps,True,fitdatverplgr,'mxigrp',expdefs)  
 #cut3=  choose_cutoff(indatverplgr,fitgrps,True,fitdatverplgr,expdefs)  
 #cut3
 
@@ -980,8 +1037,8 @@ cut3=  choose_cutoff(indatverplgr,fitgrps,True,fitdatverplgr,expdefs)
 
 #voor de time being, overschrijf de vorige selectie gegevens
 for r in range(2):
-    cut3=  choose_cutoff(indatverplgr,fitgrps,True,fitdatverplgr,expdefs)  
-    fitdatverplgr = dofitdatverplgr(cut3,indatverplgr,fitgrps,expdefs)
+    cut3=  choose_cutoff(indatverplmxigr,fitgrps,True,fitdatverplgr,'mxigrp',expdefs)  
+    fitdatverplgr = dofitdatverplgr(cut3,indatverplmxigr,fitgrps,expdefs)
 fitdatverplgrx = fitdatverplgr[abs(fitdatverplgr["DiffEst"])> 2e6] 
 seaborn.scatterplot(data=fitdatverplgrx,x="FactorEst",y="DiffEst",hue="GeoInd")
 
@@ -1080,27 +1137,32 @@ calcchidgrp(fitdatverplgr)
 
 
 # +
-def trypowerland (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,pltgrps,puin,v1i,v1v,v2i,v2v):
+def trypowerland (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,myskipPCMdf,pltgrps,puin,v1i,v1v,v2i,v2v):
     pu= puin.copy()
     pu[v1i]=v1v
     pu[v2i]=v2v
     print(pu)
-    mygeoschpc4= mkgeoschparafr(pc4data,pc4grid,rudigrid,myKAfstV,pu)
+    mygeoschpc4all= mkgeoschparafr(pc4data,pc4grid,rudigrid,myKAfstV,pu)
+    mygeoschpc4i, geobingr = addbins(mygeoschpc4all)
+    mygeoschmixpMotief= allmotmxicorrgrp(summmxigrp(mygeoschpc4i),
+                    summmxicorrgrp(mygeoschpc4i,myskipPCMdf),np.max(odinverplgr['MotiefV']))
+    myodinverplmxigr = odinmergemxi (odinverplgr ,mygeoschpc4i,grpexpcontrs)
     myxlatKAfstV=myKAfstV[['KAfstCluCode']].merge(inxlatKAfstV,how='left')
 #    print (myxlatKAfstV)
-    mydatverplgr = mkdfverplxypc4 (odinverplgr ,fitgrps,'Motief en isnaarhuis',
-                                myKAfstV,xlatKAfstV,mygeoschpc4,2.0)
+    mydatverplgr = mkdfverplxypc4 (myodinverplmxigr ,fitgrps,'Motief en isnaarhuis',
+                                myKAfstV,xlatKAfstV,mygeoschmixpMotief,2.0).merge(myKAfstV,how='left')
     
-    cut2i=  choose_cutoff(mydatverplgr,pltgrps,False,0,pu)  
+    cut2i=  choose_cutoff(mydatverplgr,pltgrps,False,0,'mxigrp',pu)  
     myfitverplgr = dofitdatverplgr(cut2i,mydatverplgr,pltgrps,pu)
     for r in range(2):
-        cut3i=  choose_cutoff(mydatverplgr,pltgrps,True,myfitverplgr,pu) 
+        cut3i=  choose_cutoff(mydatverplgr,pltgrps,True,myfitverplgr,'mxigrp',pu) 
         myfitverplgr = dofitdatverplgr(cut3i,mydatverplgr,pltgrps,pu)
     rdf=calcchidgrp(myfitverplgr)
     return(np.sum(rdf['chisq'].reset_index().iloc[:,1]))
     
 #rv=trypowerland(cbspc4data,pc4inwgrid,rudifungrid,useKAfstVland,xlatKAfstV,1.3,1.0,2.0)
-rv=trypowerland(cbspc4data,pc4inwgcache,rudifungcache,useKAfstVland,xlatKAfstV,fitgrps,
+rv=trypowerland(cbspc4data,pc4inwgcache,rudifungcache,useKAfstVland,xlatKAfstV,
+                skipPCMdf,fitgrps,
                 expdefs,'LW',1.1,'yy',2)
 rv
 # -
