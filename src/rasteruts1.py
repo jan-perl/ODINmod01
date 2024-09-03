@@ -483,8 +483,14 @@ def cartesian_product_multi(*dfs):
 #    rv.columns= list(mygeoschpc4.columns) + list(dfgrps.columns)
     return rv
 
-# -
 
+
+# -
+def getcachedgrids(src):
+    clst={}
+    for i in src.indexes:
+        clst[i] = src.read(i) 
+    return clst
 
 
 

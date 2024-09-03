@@ -76,6 +76,7 @@ from sklearn.linear_model import LinearRegression
 
 import re
 import time
+import glob
 
 import geopandas
 import contextily as cx
@@ -136,9 +137,10 @@ pc4tifname=calcgdir+'/cbs2020pc4-NL.tif'
 pc4excols= ['aantal_inwoners','aantal_mannen', 'aantal_vrouwen']
 pc4inwgrid= rasterio.open(pc4tifname)
 
-#rudifunset
-Rf_net_buurt=pd.read_pickle("../intermediate/rudifun_Netto_Buurt_o.pkl") 
-Rf_net_buurt.reset_index(inplace=True,drop=True)
+#rudifunset, heb originele data niet nodig, alleen grid
+#Rf_net_buurt=pd.read_pickle("../intermediate/rudifun_Netto_Buurt_o.pkl") 
+#Rf_net_buurt.reset_index(inplace=True,drop=True)
+#gemaakt in ROfietsbalans2
 rudifuntifname=calcgdir+'/oriTN2-NL.tif'
 rudifungrid= rasterio.open(rudifuntifname)
 
@@ -1638,57 +1640,38 @@ rdf00
 
 
 # +
-def runexperiment(expname,incache0,fitp,myuseKAfst):
+def runexperiment(expname,incache0,mult,fitp,myuseKAfst):
     incache=dict()
     incache[3]=np.where(np.isnan( incache0[3]),0, incache0[3])
     incache[5]=np.where(np.isnan( incache0[5]),0, incache0[5])
     incacheoth = incache[5] - incache[3]
     incacheoth = np.where(incacheoth <0,0,incacheoth)
-    print([np.max(incache[3]),np.max(incache[5]-incache[3]),np.min(incache[5]-incache[3]) ])
+#    print([np.max(incache[3]),np.max(incache[5]-incache[3]),np.min(incache[5]-incache[3]) ])
+    fname = "../intermediate/addgrds/"+expname+'.tif';
+    ogrid= rasterio.open(fname)
+    addcache = getcachedgrids(ogrid)
     mycache=dict()
-    if expname == 'same2pct':
-        mycache[3] = incache[3]*1.02
-        mycache[5] = incache[3]*1.02 + incacheoth*1.02
-    elif expname == 'base':
-        mycache[3] = incache[3]*1.0
-        mycache[5] = incache[3]*1.0 + incacheoth*1.0
-    elif expname == 'swap2pct':
-        grw= ( incacheoth*0.02 *np.sum(incache[3])/np.sum(incacheoth) )
-        mycache[3] = incache[3]+ grw
-        mycache[5] = incache[3]+ incacheoth+ ( grw + 
-                            incache[3]*0.02 *np.sum(incacheoth)/np.sum(incache[3])   )
-        print([np.max(mycache[3]),np.max(mycache[5]-mycache[3]),np.min(mycache[5]-mycache[3]) ])
-    elif expname == 'atmix2500':
-        filt=rasteruts1.roundfilt(100,2500)
+    mycache[3] = incache[3] + mult*addcache[3]
+    mycache[5] = incache[5] + mult * (addcache[3] + addcache[5])
 
-        F_OW = rasteruts1.convfiets2d(incache[3], filt ,bdim=8)
-        F_OT = rasteruts1.convfiets2d(incacheoth, filt ,bdim=8)
-        gr3 = incache[3] * F_OW*F_OT
-        gr5 = incacheoth * F_OW*F_OT
-        grw=( gr5*0.02 *np.sum(incache[3])/np.sum(gr5) )
-        mycache[3] = incache[3]+ grw
-        mycache[5] = incacheoth+  incache[3] + (grw+
-                                                gr3*0.02 *np.sum(incacheoth)/np.sum(gr3)   )
 #gebuik de parameters       
     rdf=predictnewdistr(cbspc4data,pc4inwgcache,mycache,myuseKAfst,xlatKAfstV,
                 skipPCMdf,fitgrps, expdefs,fitp)
     return rdf
 
-rdf03=runexperiment('atmix2500',rudifungcache,fitpara,useKAfstVQ) 
-rdf02=runexperiment('swap2pct',rudifungcache,fitpara,useKAfstVQ) 
-rdf01=runexperiment('same2pct',rudifungcache,fitpara,useKAfstVQ)
+rdf03=runexperiment('e0903a___fmx1_0010_02500',rudifungcache,1,fitpara,useKAfstVQ) 
+rdf02=runexperiment('e0903a___same_0010_02500',rudifungcache,1,fitpara,useKAfstVQ) 
+rdf01=runexperiment('e0903a___swap_0010_02500',rudifungcache,1,fitpara,useKAfstVQ)
+rdf00=runexperiment('e0903a___base_0010_02500',rudifungcache,1,fitpara,useKAfstVQ)
 
 # -
 
-rdf03f=runexperiment('atmix2500',rudifungcache,fitpara,useKAfstV) 
-rdf02f=runexperiment('swap2pct',rudifungcache,fitpara,useKAfstV) 
-rdf01f=runexperiment('same2pct',rudifungcache,fitpara,useKAfstV)
-rdf00f=runexperiment('base',rudifungcache,fitpara,useKAfstV)
-
-rdf01
+flst = glob.glob ("../intermediate/addgrds/e0903*.tif")
+elst = list(re.sub(".tif$",'',re.sub('^.*/','',f) ) for f in flst) 
+elst
 
 
-def grosumm(dfm,lbl,myuseKAfstV):
+def grosumm(dfm,lbl,myuseKAfstV,normfr):
     ddc_fitdat =  mkdatadiff2(dfm.rename (
        columns={'FactorV':'FactorO', 'FactorEst':'FactorV' }),
             ODINcatVNuse.fitgrpse,  ODINcatVNuse.infoflds,'mxigrp',ODINcatVNuse.landcod)
@@ -1700,17 +1683,26 @@ def grosumm(dfm,lbl,myuseKAfstV):
                 ODINcatVNuse.fitgrpse,[],ODINcatVNuse.kflgsflds, [],"_c",ODINcatVNuse.landcod,False)
     totinf_fitdat = ODINcatVNuse.mkinfosums(ddc_fitdat,myodindiffflginfo,
                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,ODINcatVNuse.landcod)
-    rv =totinf_fitdat.groupby(["GeoInd"]).agg('sum')
-#    rv['label']=lbl
+    rv =totinf_fitdat.groupby(["GeoInd"]).agg('sum').reset_index
+    if (len (normfr) >0):
+        rv = rv/ normfr
+        rv['label']=lbl
     return rv
-gs00=grosumm(rdf00,"orig",useKAfstVQ)
+gs00=grosumm(rdf00,"orig",useKAfstVQ,[])
 gs00
 
-grosumm(rdf01,"same2",useKAfstVQ)/gs00
 
-grosumm(rdf02,"swap2",useKAfstVQ)/gs00
+def grosres (explst,incache0,mult,fitp,myuseKAfst,setname):
+    rdf00N=predictnewdistr (cbspc4data,pc4inwgcache,rudifungcache,useKAfstVQ,myuseKAfst,
+                skipPCMdf,fitgrps,expdefs,fitpara)
+    gs00N = grosumm(rdf00N,"orig",useKAfstVQ,[])
+    st = ( grosumm(runexperiment(exp,incache0,mult,fitp,myuseKAfst),"exp",useKAfstVQ ,gs00N)  for exp in explst )
+    st = pd.concat (st)
+    st.reset_index().to_excel("../output/fitrelres"+setname+".xlsx")
+    return st
+stQ = grosres (elst,rudifungcache,1,fitpara,useKAfstVQ,'Set01Q-0903a')
 
-grosumm(rdf03,'atmix2500',useKAfstVQ)/gs00
+stQ
 
 st= [ grosumm(rdf03f,'atmix2500',useKAfstV),
 grosumm(rdf02f,'swap2pct',useKAfstV),
@@ -1718,6 +1710,8 @@ grosumm(rdf01f,'same2pct',useKAfstV),
 grosumm(rdf00f,'base',useKAfstV ) ]
 ofd=pd.concat(st)
 ofd              
+
+grosumm(rdf03,'atmix2500',useKAfstVQ)/gs00
 
 ofd.reset_index().to_excel("../output/firstsc0903b.xlsx")
 
