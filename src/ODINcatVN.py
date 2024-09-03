@@ -504,8 +504,9 @@ def mkhighpcflgv1(df,excepts):
     df2= df2.merge (excepts.rename (columns={'OthPC':'VertPC'}),how='left').rename(columns={'flg':'VertFlg'})
     rv= ( np.isnan(df2['AankFlg']) & np.isnan(df2['VertFlg']) ) == False
     return rv
-allodinyr['HighPCfls'] =mkhighpcflg(allodinyr,highpcs)
-allodinyr[ (allodinyr['HighPCfls']) ==True ] [['AankPC','VertPC','MotiefV','FactorV']]
+if False:
+    allodinyr['HighPCfls'] =mkhighpcflgv1(allodinyr,highpcs)
+    allodinyr[ (allodinyr['HighPCfls']) ==True ] [['AankPC','VertPC','MotiefV','FactorV']]
 
 
 def mkhighpcflg(df,excepts):    
@@ -576,7 +577,7 @@ def mkdfverplxypc4 (df,myspecvals,pltgrps,selstr,myKAfstV,myxlatKAfstV,mygeoschp
 
     fr2= (mkdfverplxypc4d1 (df,myspecvals,grp,pltgrps,isnhexpl,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4)
             for grp in ['AankPC','VertPC'] )
-    rv=pd.concat(fr2).reset_index()
+    rv=pd.concat(fr2).reset_index().drop(columns='Variabele_naam')
 #        rv1= mkdfverplxypc4d1 (df,myspecvals,'AankPC',pltgrps,isnhexpl,selstr,myKAfstV,myxlatKAfstV)
 #        rv2= mkdfverplxypc4d1 (df,myspecvals,'VertPC',pltgrps,isnhexpl,selstr,myKAfstV,myxlatKAfstV)
 #        rv= rv1.append(rv2) .reset_index(drop=True)   

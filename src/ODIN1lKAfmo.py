@@ -716,9 +716,9 @@ def mkdfverplxypc4 (dfg2,pltgrps,selstr,myKAfstV,myxlatKAfstV,geoschpc4in,pu):
     return rv
 
 fitgrps=['MotiefV','isnaarhuis']
-indatverplmxigr = mkdfverplxypc4 (odinverplmxigr ,fitgrps,'Motief en isnaarhuis',
+indatverplpc4gr = mkdfverplxypc4 (odinverplgr ,fitgrps,'Motief en isnaarhuis',
                                 useKAfstV,xlatKAfstV,geoschpc4,2.0)
-len(indatverplmxigr)
+len(indatverplpc4gr)
 # -
 indatverplmxigr = mkdfverplxypc4 (odinverplmxigr ,fitgrps,'Motief en isnaarhuis',
                                 useKAfstV,xlatKAfstV,geoschmixpMotief,2.0).merge(useKAfstV,how='left')
@@ -1017,12 +1017,14 @@ def predict_values(indf,topreddf,pltgrp,rf,pu,stobijdr):
         outdf[colvacols2 ] = np.array(blk1al)*np.array(blk2al)
     return(outdf)
 
-def dofitdatverplgr(indf,topreddf,pltgrp,pu):
+def _dofitdatverplgr(indf,topreddf,pltgrp,pu):
     rf = fit_cat_parameters(indf,topreddf,pltgrp,pu)
     return predict_values(indf,topreddf,pltgrp,rf,pu,False)
 
+fitpara= fit_cat_parameters(cut2,indatverplmxigr,fitgrps,expdefs)
+fitdatverplgr = predict_values(cut2,indatverplmxigr,fitgrps,fitpara,expdefs,False)
 #fitdatverplgr = dofitdatverplgr(cut2,indatverplgr,fitgrps,expdefs)
-fitdatverplgr = dofitdatverplgr(cut2,indatverplmxigr,fitgrps,expdefs)
+#fitdatverplgr = dofitdatverplgr(cut2,indatverplmxigr,fitgrps,expdefs)
 fitdatverplgrx = fitdatverplgr[abs(fitdatverplgr["DiffEst"])> 2e6] 
 seaborn.scatterplot(data=fitdatverplgrx,x="FactorEst",y="DiffEst",hue="GeoInd")
 # -
@@ -1037,8 +1039,9 @@ cut3=  choose_cutoff(indatverplmxigr,fitgrps,True,fitdatverplgr,'mxigrp',expdefs
 
 #voor de time being, overschrijf de vorige selectie gegevens
 for r in range(2):
-    cut3=  choose_cutoff(indatverplmxigr,fitgrps,True,fitdatverplgr,'mxigrp',expdefs)  
-    fitdatverplgr = dofitdatverplgr(cut3,indatverplmxigr,fitgrps,expdefs)
+    cut3=  choose_cutoff(indatverplmxigr,fitgrps,True,fitdatverplgr,'mxigrp',expdefs) 
+    fitpara= fit_cat_parameters(cut3,indatverplmxigr,fitgrps,expdefs)
+    fitdatverplgr = predict_values(cut3,indatverplmxigr,fitgrps,fitpara,expdefs,False)
 fitdatverplgrx = fitdatverplgr[abs(fitdatverplgr["DiffEst"])> 2e6] 
 seaborn.scatterplot(data=fitdatverplgrx,x="FactorEst",y="DiffEst",hue="GeoInd")
 
@@ -1153,15 +1156,19 @@ def trypowerland (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,myskipPCMdf,plt
                                 myKAfstV,xlatKAfstV,mygeoschmixpMotief,2.0).merge(myKAfstV,how='left')
     
     cut2i=  choose_cutoff(mydatverplgr,pltgrps,False,0,'mxigrp',pu)  
-    myfitverplgr = dofitdatverplgr(cut2i,mydatverplgr,pltgrps,pu)
+    myfitpara= fit_cat_parameters(cut2i,mydatverplgr,pltgrps,pu)
+    myfitverplgr = predict_values(cut2i,mydatverplgr,pltgrps,myfitpara,pu,False)
+
+#    myfitverplgr = dofitdatverplgr(cut2i,mydatverplgr,pltgrps,pu)
     for r in range(2):
         cut3i=  choose_cutoff(mydatverplgr,pltgrps,True,myfitverplgr,'mxigrp',pu) 
         myfitverplgr = dofitdatverplgr(cut3i,mydatverplgr,pltgrps,pu)
     rdf=calcchidgrp(myfitverplgr)
-    return(np.sum(rdf['chisq'].reset_index().iloc[:,1]))
+    chisq= np.sum(rdf['chisq'].reset_index().iloc[:,1])
+    return([chisq,myfitpara,rdf])
     
 #rv=trypowerland(cbspc4data,pc4inwgrid,rudifungrid,useKAfstVland,xlatKAfstV,1.3,1.0,2.0)
-rv=trypowerland(cbspc4data,pc4inwgcache,rudifungcache,useKAfstVland,xlatKAfstV,
+rv,pdf,rdf=trypowerland(cbspc4data,pc4inwgcache,rudifungcache,useKAfstVQ,xlatKAfstV,
                 skipPCMdf,fitgrps,
                 expdefs,'LW',1.1,'yy',2)
 rv
@@ -1192,7 +1199,7 @@ def chisqsampler (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,pltgrps):
     return z
 #chitries= chisqsampler (cbspc4data,pc4inwgrid,rudifungrid,useKAfstVland,xlatKAfstV)    
 if False:
-    chitries= chisqsampler (cbspc4data,pc4inwgcache,rudifungcache,useKAfstVland,xlatKAfstV,fitgrps)    
+    chitries= chisqsampler (cbspc4data,pc4inwgcache,rudifungcache,useKAfstV,xlatKAfstV,fitgrps)    
     print (chitries)
 
 #    lw = np.linspace(1,1.4,3)
@@ -1208,11 +1215,13 @@ if False:
 
 seaborn.scatterplot(data=fitdatverplgr[fitdatverplgr['MaxAfst']==0],x="FactorEst",y="DiffEst",hue="GeoInd")
 
-fitdatverplgr[fitdatverplgr['FactorEst']>1e7][['PC4', 'GrpExpl','GeoInd',
-          'FactorEst','FactorV','FactorVGen','FactorVSpec']].sort_values(
+fitdatverplpc4gr = predict_values(cut3,indatverplpc4gr,fitgrps,fitpara,expdefs,False)
+
+fitdatverplpc4gr[fitdatverplpc4gr['FactorEst']>1e7][['PC4', 'GrpExpl','GeoInd',
+          'FactorEst', 'DiffEst','FactorV','FactorVSpec']].sort_values(
     by=['PC4', 'GrpExpl','GeoInd'])
 
-pllanddiff= cbspc4data[['postcode4']].merge(fitdatverplgr[(fitdatverplgr['MaxAfst']==0) 
+pllanddiff= cbspc4data[['postcode4']].merge(fitdatverplpc4gr[(fitdatverplpc4gr['MaxAfst']==0) 
                     &  (fitdatverplgr ['MotiefV'] ==6 )][['PC4','DiffEst','FactorEst','FactorV']],
             how='left',left_on=('postcode4'), right_on = ('PC4'))
 print ( (len(cbspc4data), len(pllanddiff) ) )
@@ -1227,7 +1236,7 @@ def largestdiffsPC (pc4dta,indf):
           ['postcode4','GrpExpl'])[['isnaarhuis','DiffEst']].agg(
            {'isnaarhuis':'count','DiffEst':'mean'} )
     return rv
-largestdiffsPC (cbspc4data,fitdatverplgr)
+largestdiffsPC (cbspc4data,fitdatverplpc4gr)
 
 # +
 #inspectie
@@ -1277,8 +1286,6 @@ elif 0==1:
     cx.add_basemap(pland, source= prov0)
 #plland.plot( column= 'DiffEst', Legend=True)
 
-#stop hier
-raise ("restart fit")
 
 
 # +
@@ -1531,14 +1538,14 @@ datpltverplp = mkpltverplp (naarhuis,dspecvaltab,'AankPC/rudifun/S_MXI22_GB','Mo
 def mkdatadiff3(verpl,fg,infof,landcod):    
     return ODINcatVNuse.mkdatadiff(verpl,fg,landcod)
 
-def mkdatadiff2(verpl,fg,infof,landcod):    
+def mkdatadiff2(verpl,fg,infof,grpind,landcod):    
 #    print(('verpl',len(verpl),verpl.dtypes) )
-    v2=verpl.copy(deep=False).drop(columns='Variabele_naam')
+    v2=verpl.copy(deep=False)
 #    v2['FactorV']= v2['FactorVGen']+ v2['FactorVSpec']
     #in deze totalen zijn afstanden zinloos
     v2['FactorKm']=v2['FactorV']
     #deze dus niet normaliseren
-    vg= ODINcatVNuse.convert_diffgrpsidat(v2,fg,['PC4','GeoInd'],
+    vg= ODINcatVNuse.convert_diffgrpsidat(v2,fg,[grpind,'GeoInd'],
                                           infof,['GeoInd'],"_v",landcod,False) 
 #    print(('vg',len(vg),vg.dtypes))
     return vg
@@ -1549,15 +1556,15 @@ def mkdatadiff2(verpl,fg,infof,landcod):
 # -
 
 #ddc_indat =  ODINcatVNuse.mkdatadiff(fitdatverplgr,ODINcatVNuse.fitgrpse,ODINcatVNuse.landcod)
-ddc_indat =  mkdatadiff3(fitdatverplgr,
-                         ODINcatVNuse.fitgrpse,ODINcatVNuse.infoflds,ODINcatVNuse.landcod)
+ddc_indat =  mkdatadiff2(fitdatverplgr,
+                         ODINcatVNuse.fitgrpse,ODINcatVNuse.infoflds,'mxigrp',ODINcatVNuse.landcod)
 totinf_indat = ODINcatVNuse.mkinfosums(ddc_indat,ODINcatVNuse.odindiffflginfo,
                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,ODINcatVNuse.landcod)
 totinf_indat
 
-ddc_fitdat =  mkdatadiff3(fitdatverplgr.rename (
+ddc_fitdat =  mkdatadiff2(fitdatverplgr.rename (
        columns={'FactorV':'FactorO', 'FactorEst':'FactorV' }),
-            ODINcatVNuse.fitgrpse,  ODINcatVNuse.infoflds,ODINcatVNuse.landcod)
+            ODINcatVNuse.fitgrpse,  ODINcatVNuse.infoflds,'mxigrp',ODINcatVNuse.landcod)
 
 totinf_fitdat = ODINcatVNuse.mkinfosums(ddc_fitdat,ODINcatVNuse.odindiffflginfo,
                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,ODINcatVNuse.landcod)
@@ -1583,7 +1590,8 @@ motlst.to_excel("../output/orif_permot.xlsx")
 
 
 def woonbalans(totin,kflgs):
-    ause = totin[np.isin(totin['isnaarhuis'],[5,6])].copy(deep=False).rename (
+    ause = totin[np.isin(totin['isnaarhuis'],[5,6]) &
+                 np.isin(totin['MotiefV'],[1]) ].copy(deep=False).rename (
           columns={'GeoInd':'OriRicht'})
     ause['GeoInd']=np.where(ause['isnaarhuis']==5, 
                         np.where(ause['OriRicht']=='AankPC', 'actzijde' , 'huiszijde' ),
@@ -1595,5 +1603,101 @@ def woonbalans(totin,kflgs):
 woonbalans(totinf_indat,ODINcatVNuse.kflgsflds)                       
 
 woonbalans(totinf_fitdat,ODINcatVNuse.kflgsflds)      
+
+
+# +
+def predictnewdistr(pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,myskipPCMdf,pltgrps,puin,
+                    myfitpara):
+    pu= puin.copy()
+    mygeoschpc4all= mkgeoschparafr(pc4data,pc4grid,rudigrid,myKAfstV,pu)
+    mygeoschpc4i, geobingr = addbins(mygeoschpc4all)
+    mygeoschmixpMotief= allmotmxicorrgrp(summmxigrp(mygeoschpc4i),
+                    summmxicorrgrp(mygeoschpc4i,myskipPCMdf),np.max(odinverplgr['MotiefV']))
+    myodinverplmxigr = odinmergemxi (odinverplgr ,mygeoschpc4i,grpexpcontrs)
+    myxlatKAfstV=myKAfstV[['KAfstCluCode']].merge(inxlatKAfstV,how='left')
+#    print (myxlatKAfstV)
+    mydatverplgr = mkdfverplxypc4 (myodinverplmxigr ,fitgrps,'Motief en isnaarhuis',
+                                myKAfstV,xlatKAfstV,mygeoschmixpMotief,2.0).merge(myKAfstV,how='left')
+    
+    cut2i=  choose_cutoff(mydatverplgr,pltgrps,False,0,'mxigrp',pu)  
+#deze dus niet    myfitpara= fit_cat_parameters(cut2i,mydatverplgr,pltgrps,pu)
+    myfitverplgr = predict_values(cut2i,mydatverplgr,pltgrps,myfitpara,pu,False)
+
+    rdf=calcchidgrp(myfitverplgr)
+    chisq= np.sum(rdf['chisq'].reset_index().iloc[:,1])
+    return(myfitverplgr)
+
+rdf00=predictnewdistr (cbspc4data,pc4inwgcache,rudifungcache,useKAfstVQ,xlatKAfstV,
+                skipPCMdf,fitgrps,expdefs,fitpara)
+rfd00
+
+
+# +
+def runexperiment(expname,incache0,fitp,myuseKAfst):
+    incache=dict()
+    incache[3]=np.where(np.isnan( incache0[3]),0, incache0[3])
+    incache[5]=np.where(np.isnan( incache0[5]),0, incache0[5])
+    incacheoth = incache[5] - incache[3]
+    incacheoth = np.where(incacheoth <0,0,incacheoth)
+    print([np.max(incache[3]),np.max(incache[5]-incache[3]),np.min(incache[5]-incache[3]) ])
+    mycache=dict()
+    if expname == 'same2pct':
+        mycache[3] = incache[3]*1.02
+        mycache[5] = incache[3]*1.02 + incacheoth*1.02
+    elif expname == 'base':
+        mycache[3] = incache[3]*1.0
+        mycache[5] = incache[3]*1.0 + incacheoth*1.0
+    elif expname == 'swap2pct':
+        grw= ( incacheoth*0.02 *np.sum(incache[3])/np.sum(incacheoth) )
+        mycache[3] = incache[3]+ grw
+        mycache[5] = incache[3]+ incacheoth+ ( grw + 
+                            incache[3]*0.02 *np.sum(incacheoth)/np.sum(incache[3])   )
+        print([np.max(mycache[3]),np.max(mycache[5]-mycache[3]),np.min(mycache[5]-mycache[3]) ])
+    elif expname == 'atmix2500':
+        filt=rasteruts1.roundfilt(100,2500)
+
+        F_OW = rasteruts1.convfiets2d(incache[3], filt ,bdim=8)
+        F_OT = rasteruts1.convfiets2d(incacheoth, filt ,bdim=8)
+        gr3 = incache[3] * F_OW*F_OT
+        gr5 = incacheoth * F_OW*F_OT
+        grw=( gr5*0.02 *np.sum(incache[3])/np.sum(gr5) )
+        mycache[3] = incache[3]+ grw
+        mycache[5] = incacheoth+  incache[3] + (grw+
+                                                gr3*0.02 *np.sum(incacheoth)/np.sum(gr3)   )
+#gebuik de parameters       
+    rdf=predictnewdistr(cbspc4data,pc4inwgcache,mycache,myuseKAfst,xlatKAfstV,
+                skipPCMdf,fitgrps, expdefs,fitp)
+    return rdf
+
+rdf03=runexperiment('atmix2500',rudifungcache,fitpara,useKAfstVQ) 
+rdf02=runexperiment('swap2pct',rudifungcache,fitpara,useKAfstVQ) 
+rdf01=runexperiment('same2pct',rudifungcache,fitpara,useKAfstVQ)
+
+# -
+
+rdf03=runexperiment('atmix2500',rudifungcache,fitpara,useKAfstVQ) 
+rdf02=runexperiment('swap2pct',rudifungcache,fitpara,useKAfstVQ) 
+rdf01=runexperiment('same2pct',rudifungcache,fitpara,useKAfstVQ)
+rdf01=runexperiment('same2pct',rudifungcache,fitpara,useKAfstVQ)
+
+rdf01
+
+
+def grosumm(dfm,lbl):
+    ddc_fitdat =  mkdatadiff2(dfm.rename (
+       columns={'FactorV':'FactorO', 'FactorEst':'FactorV' }),
+            ODINcatVNuse.fitgrpse,  ODINcatVNuse.infoflds,'mxigrp',ODINcatVNuse.landcod)
+    totinf_fitdat = ODINcatVNuse.mkinfosums(ddc_fitdat,ODINcatVNuse.odindiffflginfo,
+                       ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,ODINcatVNuse.landcod)
+    rv =totinf_fitdat.groupby(["GeoInd"]).agg('sum')
+    return rv
+gs00=grosumm(rdf00,"orig")
+gs00
+
+grosumm(rdf01,"same2")/gs00
+
+grosumm(rdf02,"swap2")/gs00
+
+grosumm(rdf03,'atmix2500')/gs00
 
 

@@ -398,7 +398,7 @@ odindiffflginfo
 
 def mkdatadiff(verpl,fg,landcod):    
 #    print(('verpl',len(verpl),verpl.dtypes) )
-    v2=verpl.copy(deep=False).drop(columns='Variabele_naam')
+    v2=verpl.copy(deep=False)
 #    v2['FactorV']= v2['FactorVGen']+ v2['FactorVSpec']
     #in deze totalen zijn afstanden zinloos
     v2['FactorKm']=v2['FactorV']
@@ -412,7 +412,7 @@ datadiffcache =    mkdatadiff(odinverplgr,fitgrpse,landcod)
 # +
 def _normflgvals (vg,kenmu,fg,cflds):    
     ds=vg.merge(kenmu,how='left',on=fg+['KAfstCluCode'])
-    print(('ds',len(ds),ds.dtypes))
+#    print(('ds',len(ds),ds.dtypes))
     #normaliseren doen we hier, omdat er steeds precies 1 match is
     for fld in cflds:
         ds[fld] = ds['FactorV_v'] * ds[fld+'_c']/ ds['FactorV_c']   
