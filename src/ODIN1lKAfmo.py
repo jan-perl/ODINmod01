@@ -1162,7 +1162,9 @@ def trypowerland (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,myskipPCMdf,plt
 #    myfitverplgr = dofitdatverplgr(cut2i,mydatverplgr,pltgrps,pu)
     for r in range(2):
         cut3i=  choose_cutoff(mydatverplgr,pltgrps,True,myfitverplgr,'mxigrp',pu) 
-        myfitverplgr = dofitdatverplgr(cut3i,mydatverplgr,pltgrps,pu)
+        myfitpara= fit_cat_parameters(cut2i,mydatverplgr,pltgrps,pu)
+        myfitverplgr = predict_values(cut2i,mydatverplgr,pltgrps,myfitpara,pu,False)
+#        myfitverplgr = dofitdatverplgr(cut3i,mydatverplgr,pltgrps,pu)
     rdf=calcchidgrp(myfitverplgr)
     chisq= np.sum(rdf['chisq'].reset_index().iloc[:,1])
     return([chisq,myfitpara,rdf])
@@ -1555,10 +1557,13 @@ def mkdatadiff2(verpl,fg,infof,grpind,landcod):
 
 # -
 
+odindiffflginfo= ODINcatVNuse.convert_diffgrpsidat(odinverplflgs,
+                ODINcatVNuse.fitgrpse,[],ODINcatVNuse.kflgsflds, [],"_c",ODINcatVNuse.landcod,False)
+
 #ddc_indat =  ODINcatVNuse.mkdatadiff(fitdatverplgr,ODINcatVNuse.fitgrpse,ODINcatVNuse.landcod)
 ddc_indat =  mkdatadiff2(fitdatverplgr,
                          ODINcatVNuse.fitgrpse,ODINcatVNuse.infoflds,'mxigrp',ODINcatVNuse.landcod)
-totinf_indat = ODINcatVNuse.mkinfosums(ddc_indat,ODINcatVNuse.odindiffflginfo,
+totinf_indat = ODINcatVNuse.mkinfosums(ddc_indat,odindiffflginfo,
                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,ODINcatVNuse.landcod)
 totinf_indat
 
@@ -1566,7 +1571,7 @@ ddc_fitdat =  mkdatadiff2(fitdatverplgr.rename (
        columns={'FactorV':'FactorO', 'FactorEst':'FactorV' }),
             ODINcatVNuse.fitgrpse,  ODINcatVNuse.infoflds,'mxigrp',ODINcatVNuse.landcod)
 
-totinf_fitdat = ODINcatVNuse.mkinfosums(ddc_fitdat,ODINcatVNuse.odindiffflginfo,
+totinf_fitdat = ODINcatVNuse.mkinfosums(ddc_fitdat,odindiffflginfo,
                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,ODINcatVNuse.landcod)
 totinf_fitdat.groupby(["GeoInd"]).agg('sum')
 
@@ -1629,7 +1634,7 @@ def predictnewdistr(pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,myskipPCMdf,p
 
 rdf00=predictnewdistr (cbspc4data,pc4inwgcache,rudifungcache,useKAfstVQ,xlatKAfstV,
                 skipPCMdf,fitgrps,expdefs,fitpara)
-rfd00
+rdf00
 
 
 # +
@@ -1683,28 +1688,34 @@ rdf00f=runexperiment('base',rudifungcache,fitpara,useKAfstV)
 rdf01
 
 
-def grosumm(dfm,lbl):
+def grosumm(dfm,lbl,myuseKAfstV):
     ddc_fitdat =  mkdatadiff2(dfm.rename (
        columns={'FactorV':'FactorO', 'FactorEst':'FactorV' }),
             ODINcatVNuse.fitgrpse,  ODINcatVNuse.infoflds,'mxigrp',ODINcatVNuse.landcod)
-    totinf_fitdat = ODINcatVNuse.mkinfosums(ddc_fitdat,ODINcatVNuse.odindiffflginfo,
+    mymaskKAfstV= list(myuseKAfstV['KAfstCluCode'])
+    mymaskKAfstV
+    myodinverplflgs =ODINcatVNuse.odinverplflgs_o[np.isin(
+         ODINcatVNuse.odinverplflgs_o['KAfstCluCode'],mymaskKAfstV)].copy (deep=False)
+    myodindiffflginfo= ODINcatVNuse.convert_diffgrpsidat(myodinverplflgs,
+                ODINcatVNuse.fitgrpse,[],ODINcatVNuse.kflgsflds, [],"_c",ODINcatVNuse.landcod,False)
+    totinf_fitdat = ODINcatVNuse.mkinfosums(ddc_fitdat,myodindiffflginfo,
                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,ODINcatVNuse.landcod)
     rv =totinf_fitdat.groupby(["GeoInd"]).agg('sum')
     rv['label']=lbl
     return rv
-gs00=grosumm(rdf00,"orig")
+gs00=grosumm(rdf00,"orig",useKAfstVQ)
 gs00
 
-grosumm(rdf01,"same2")/gs00
+grosumm(rdf01,"same2",useKAfstVQ)/gs00
 
-grosumm(rdf02,"swap2")/gs00
+grosumm(rdf02,"swap2",useKAfstVQ)/gs00
 
-grosumm(rdf03,'atmix2500')/gs00
+grosumm(rdf03,'atmix2500',useKAfstVQ)/gs00
 
-st= [ grosumm(rdf03f,'atmix2500'),
-grosumm(rdf02f,'swap2pct'),
-grosumm(rdf01f,'same2pct'),
-grosumm(rdf00f,'base' ) ]
+st= [ grosumm(rdf03f,'atmix2500',useKAfstV),
+grosumm(rdf02f,'swap2pct',useKAfstV),
+grosumm(rdf01f,'same2pct',useKAfstV),
+grosumm(rdf00f,'base' ) ,useKAfstV]
 ofd=pd.concat(st)
 ofd              
 
