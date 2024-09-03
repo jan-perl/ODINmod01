@@ -1683,36 +1683,29 @@ def grosumm(dfm,lbl,myuseKAfstV,normfr):
                 ODINcatVNuse.fitgrpse,[],ODINcatVNuse.kflgsflds, [],"_c",ODINcatVNuse.landcod,False)
     totinf_fitdat = ODINcatVNuse.mkinfosums(ddc_fitdat,myodindiffflginfo,
                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,ODINcatVNuse.landcod)
-    rv =totinf_fitdat.groupby(["GeoInd"]).agg('sum').reset_index
+    rv =totinf_fitdat.groupby(["GeoInd"]).agg('sum')
     if (len (normfr) >0):
         rv = rv/ normfr
         rv['label']=lbl
     return rv
 gs00=grosumm(rdf00,"orig",useKAfstVQ,[])
-gs00
+gs00T = grosumm(rdf00,"origchk",useKAfstVQ,gs00)
+gs00T
 
 
 def grosres (explst,incache0,mult,fitp,myuseKAfst,setname):
     rdf00N=predictnewdistr (cbspc4data,pc4inwgcache,rudifungcache,useKAfstVQ,myuseKAfst,
                 skipPCMdf,fitgrps,expdefs,fitpara)
     gs00N = grosumm(rdf00N,"orig",useKAfstVQ,[])
-    st = ( grosumm(runexperiment(exp,incache0,mult,fitp,myuseKAfst),"exp",useKAfstVQ ,gs00N)  for exp in explst )
+    st = ( grosumm(runexperiment(exp,incache0,mult,fitp,myuseKAfst),exp,useKAfstVQ ,gs00N)  for exp in explst )
     st = pd.concat (st)
     st.reset_index().to_excel("../output/fitrelres"+setname+".xlsx")
     return st
-stQ = grosres (elst,rudifungcache,1,fitpara,useKAfstVQ,'Set01Q-0903a')
+stQ = grosres (elst[1:3],rudifungcache,1,fitpara,useKAfstVQ,'Set01Q-0903a')
+stQ
 
 stQ
 
-st= [ grosumm(rdf03f,'atmix2500',useKAfstV),
-grosumm(rdf02f,'swap2pct',useKAfstV),
-grosumm(rdf01f,'same2pct',useKAfstV),
-grosumm(rdf00f,'base',useKAfstV ) ]
-ofd=pd.concat(st)
-ofd              
-
-grosumm(rdf03,'atmix2500',useKAfstVQ)/gs00
-
-ofd.reset_index().to_excel("../output/firstsc0903b.xlsx")
+stN = grosres (elst,rudifungcache,1,fitpara,useKAfstV,'Set01N-0903a')            
 
 
