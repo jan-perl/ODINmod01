@@ -1675,10 +1675,10 @@ rdf01=runexperiment('same2pct',rudifungcache,fitpara,useKAfstVQ)
 
 # -
 
-rdf03=runexperiment('atmix2500',rudifungcache,fitpara,useKAfstVQ) 
-rdf02=runexperiment('swap2pct',rudifungcache,fitpara,useKAfstVQ) 
-rdf01=runexperiment('same2pct',rudifungcache,fitpara,useKAfstVQ)
-rdf01=runexperiment('same2pct',rudifungcache,fitpara,useKAfstVQ)
+rdf03f=runexperiment('atmix2500',rudifungcache,fitpara,useKAfstV) 
+rdf02f=runexperiment('swap2pct',rudifungcache,fitpara,useKAfstV) 
+rdf01f=runexperiment('same2pct',rudifungcache,fitpara,useKAfstV)
+rdf00f=runexperiment('base',rudifungcache,fitpara,useKAfstV)
 
 rdf01
 
@@ -1690,6 +1690,7 @@ def grosumm(dfm,lbl):
     totinf_fitdat = ODINcatVNuse.mkinfosums(ddc_fitdat,ODINcatVNuse.odindiffflginfo,
                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,ODINcatVNuse.landcod)
     rv =totinf_fitdat.groupby(["GeoInd"]).agg('sum')
+    rv['label']=lbl
     return rv
 gs00=grosumm(rdf00,"orig")
 gs00
@@ -1699,5 +1700,14 @@ grosumm(rdf01,"same2")/gs00
 grosumm(rdf02,"swap2")/gs00
 
 grosumm(rdf03,'atmix2500')/gs00
+
+st= [ grosumm(rdf03f,'atmix2500'),
+grosumm(rdf02f,'swap2pct'),
+grosumm(rdf01f,'same2pct'),
+grosumm(rdf00f,'base' ) ]
+ofd=pd.concat(st)
+ofd              
+
+ofd.reset_index().to_excel("../output/firstsc0903n.xlsx")
 
 
