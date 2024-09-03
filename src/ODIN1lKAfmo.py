@@ -1701,7 +1701,7 @@ def grosumm(dfm,lbl,myuseKAfstV):
     totinf_fitdat = ODINcatVNuse.mkinfosums(ddc_fitdat,myodindiffflginfo,
                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,ODINcatVNuse.landcod)
     rv =totinf_fitdat.groupby(["GeoInd"]).agg('sum')
-    rv['label']=lbl
+#    rv['label']=lbl
     return rv
 gs00=grosumm(rdf00,"orig",useKAfstVQ)
 gs00
@@ -1715,10 +1715,10 @@ grosumm(rdf03,'atmix2500',useKAfstVQ)/gs00
 st= [ grosumm(rdf03f,'atmix2500',useKAfstV),
 grosumm(rdf02f,'swap2pct',useKAfstV),
 grosumm(rdf01f,'same2pct',useKAfstV),
-grosumm(rdf00f,'base' ) ,useKAfstV]
+grosumm(rdf00f,'base',useKAfstV ) ]
 ofd=pd.concat(st)
 ofd              
 
-ofd.reset_index().to_excel("../output/firstsc0903n.xlsx")
+ofd.reset_index().to_excel("../output/firstsc0903b.xlsx")
 
 
