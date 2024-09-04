@@ -95,6 +95,12 @@ import numba
 #from numba.utils import IS_PY3
 from numba.decorators import jit
 
+import ODiN2readpkl
+
+gemeentendata ,  wijkgrensdata ,    buurtendata = ODiN2readpkl.getgwb(2020)
+
+grgem = gemeentendata[(gemeentendata['H2O']=='NEE') & (gemeentendata['AANT_INW']>1e5) ]
+
 stryear='2020'
 cbspc4data =pd.read_pickle("../intermediate/CBS/pc4data_"+stryear+".pkl")
 cbspc4data= cbspc4data.sort_values(by=['postcode4']).reset_index()
@@ -181,11 +187,15 @@ def calccats(ingr,flgs):
 #    print([ limrel, limidcs ,limuse] )
     pcatted= pd.cut( invs,limuse,labels=False)
     if flgs=='noextr':
-        pcatted = np.where(np.isin( pcatted ,[0,1,nbin-1]) ,0,pcatted-1)
+        pcatted = np.where(np.isin( pcatted ,[0,1,2*nbin-1]) ,0,pcatted-1)
     elif flgs=='midone':
-        pcatted = np.where(np.isin( pcatted ,[0,1,nbin-1]) ,0,1)        
+        pcatted = np.where(np.isin( pcatted ,[0,1,2*nbin-1]) ,0,1)  
+    elif flgs=='pres':
+        pcatted = np.where(pcatted>=2 ,0,1)          
     elif flgs=='dfcat':
         pcatted =  pcatted 
+    elif flgs=='vals':
+        pcatted =  invs     
     else:
         print ('Error')
     pcatr= np.reshape(pcatted,ingr.shape)
@@ -203,7 +213,9 @@ calccats(rudifungcache[3],'noextr')
 def _renorm1(pat,tot):
     return np.sum(tot)* pat / (np.sum(pat))
 
-expposs= ['base' ,'same', 'swap', 'icat' ,'scat' ,'fmx1','smx1']
+expposs1= ['base' ,'same', 'swap','verd' ,'icat' ,'scat' ]
+expposs2= ['fmx1','smx1','frb1','srb1','xfm1','xfb1','atm1','stm1']
+
 
 def writeexperiment(expname,incache0,promille,mtrrang,prefix):
     outsetnm= '{}_{:_>6}_{:0>4}_{:0>5}'.format(prefix,expname,promille,mtrrang) 
@@ -221,12 +233,16 @@ def writeexperiment(expname,incache0,promille,mtrrang,prefix):
     mycache=dict()
     cats3= calccats(incache[3],'noextr')
     catso= calccats(incacheoth,'noextr')
+    fmp=0.25
     
     if expname == 'same':
         mycache[3] = incache[3]*mfact
         mycache[5] = incacheoth*mfact
+    elif expname == 'verd':    
+        mycache[3] = _renorm1 (incache[3]* incache[3] ,incache[3]) *mfact
+        mycache[5] = _renorm1 (incacheoth*incacheoth ,incacheoth) *mfact
     elif expname == 'swap':
-        grw= ( incacheoth*mfact *np.sum(incache[3])/np.sum(incacheoth) )
+#        grw= ( incacheoth*mfact *np.sum(incache[3])/np.sum(incacheoth) )
         mycache[3] =  _renorm1 (incacheoth ,incache[3]) *mfact
         mycache[5] =  _renorm1 (incache[3],incacheoth ) *mfact
 #        print([np.max(mycache[3]),np.max(mycache[5]-mycache[3]),np.min(mycache[5]-mycache[3]) ])
@@ -239,20 +255,64 @@ def writeexperiment(expname,incache0,promille,mtrrang,prefix):
     elif expname == 'scat':    
         mycache[3] = _renorm1 (catso ,incache[3]) *mfact
         mycache[5] = _renorm1 (cats3 ,incacheoth) *mfact
+    elif expname == 'srb1':
+        filt=rasteruts1.roundfilt(100,mtrrang)
+        F_OW = rasteruts1.convfiets2d(incache[3], filt ,bdim=8)
+        F_OT = rasteruts1.convfiets2d(incacheoth, filt ,bdim=8)
+        FMSK =  calccats( np.power(F_OW*F_OT,fmp),'noextr')
+        cb= (cats3-catso)
+        mycache[3] = _renorm1 (np.where(cb<0,-cb,0 ) *FMSK ,incache[3]) *mfact
+        mycache[5] = _renorm1 (np.where(cb>0,cb,0 )*FMSK ,incacheoth) *mfact  
+    elif expname == 'frb1':
+        filt=rasteruts1.roundfilt(100,mtrrang)
+        F_OW = rasteruts1.convfiets2d(incache[3], filt ,bdim=8)
+        F_OT = rasteruts1.convfiets2d(incacheoth, filt ,bdim=8)
+        FMSK =  calccats( np.power(F_OW*F_OT,fmp),'noextr')
+        cb= (catso-cats3)
+        mycache[3] = _renorm1 (np.where(cb<0,-cb,0 ) *FMSK ,incache[3]) *mfact
+        mycache[5] = _renorm1 (np.where(cb>0,cb,0 )*FMSK ,incacheoth) *mfact  
+    elif expname == 'xfm1':
+        filt=rasteruts1.roundfilt(100,mtrrang)
+        F_OW = rasteruts1.convfiets2d(incache[3], filt ,bdim=8)
+        OW_MSK =  calccats( F_OW,'pres')
+        #transformeer gebouw-> woning waar niet-woningen minder zijn dan woningen 
+        #en bouw rest waar woningen in minderheid zijn
+        mycache[3] = _renorm1 (catso * (cats3>catso)  ,incache[3]) *mfact
+        mycache[5] = _renorm1 (catso * OW_MSK * (cats3<catso) ,incacheoth) *2* mfact  -  _renorm1 (mycache[3],incacheoth)
+    elif expname == 'xfb1':
+        filt=rasteruts1.roundfilt(100,mtrrang)
+        F_OW = rasteruts1.convfiets2d(incache[3], filt ,bdim=8)
+        OW_MSK =  calccats( F_OW,'pres')
+        #transformeer  woning -> gebouw waar niet-woningen minder zijn dan woningen 
+        #en bouw wonigen waar woningen nu in minderheid zijn
+        mycache[5] = _renorm1 ( (cats3) * (catso<4) * (catso<cats3) ,incacheoth) *mfact        
+        mycache[3] = _renorm1 ( catso *  OW_MSK *(catso>cats3),incache[3]) *2 *mfact - _renorm1 (mycache[5],incache[3])*mfact
     elif expname == 'smx1':
         filt=rasteruts1.roundfilt(100,mtrrang)
         F_OW = rasteruts1.convfiets2d(incache[3], filt ,bdim=8)
         F_OT = rasteruts1.convfiets2d(incacheoth, filt ,bdim=8)
-        FMSK =  calccats( F_OW*F_OT,'noextr')
+        FMSK =  calccats( np.power(F_OW*F_OT,fmp),'noextr')
         mycache[3] = _renorm1 (catso *FMSK ,incache[3]) *mfact
-        mycache[5] = _renorm1 (cats3 *FMSK ,incache[3]) *mfact  
+        mycache[5] = _renorm1 (cats3 *FMSK ,incacheoth) *mfact  
     elif expname == 'fmx1':
         filt=rasteruts1.roundfilt(100,mtrrang)
         F_OW = rasteruts1.convfiets2d(incache[3], filt ,bdim=8)
         F_OT = rasteruts1.convfiets2d(incacheoth, filt ,bdim=8)
-        FMSK =  calccats( F_OW*F_OT,'noextr')
-        mycache[3] = _renorm1 (catso *FMSK ,incache[3]) *mfact
-        mycache[5] = _renorm1 (cats3 *FMSK ,incache[3]) *mfact  
+        FMSK =  calccats( np.power(F_OW*F_OT,fmp),'noextr')
+        mycache[3] = _renorm1 (cats3 *FMSK ,incache[3]) *mfact
+        mycache[5] = _renorm1 (catso *FMSK ,incacheoth) *mfact  
+    elif expname == 'atm1':
+        filt=rasteruts1.roundfilt(100,mtrrang)
+        F_OW = rasteruts1.convfiets2d(incache[3], filt ,bdim=8)
+        F_OT = rasteruts1.convfiets2d(incacheoth, filt ,bdim=8)
+        mycache[3] = _renorm1 (cats3 *F_OW*F_OT ,incache[3]) *mfact
+        mycache[5] = _renorm1 (catso *F_OW*F_OT ,incacheoth) *mfact      
+    elif expname == 'stm1':
+        filt=rasteruts1.roundfilt(100,mtrrang)
+        F_OW = rasteruts1.convfiets2d(incache[3], filt ,bdim=8)
+        F_OT = rasteruts1.convfiets2d(incacheoth, filt ,bdim=8)
+        mycache[3] = _renorm1 (catso *F_OW*F_OT ,incache[3]) *mfact
+        mycache[5] = _renorm1 (cats3 *F_OW*F_OT ,incacheoth) *mfact           
     else:
         print("Error: type not defined : " +expname)
         raise()
@@ -263,31 +323,83 @@ def writeexperiment(expname,incache0,promille,mtrrang,prefix):
     ogrid= rasterio.open(fname)
     return ([ogrid, fname, mycache ])
 
-oset03, fname, mycache=writeexperiment('fmx1',rudifungcache,10,2500,'e0903a') 
-oset02, fname, mycache=writeexperiment('swap',rudifungcache,10,2500,'e0903a') 
-oset01, fname, mycache=writeexperiment('same',rudifungcache,10,2500,'e0903a') 
-
+oset03, fname03, mycache03=writeexperiment('fmx1',rudifungcache,10,2500,'tst') 
 # -
-
+oset03, fname03, mycache03=writeexperiment('atm1',rudifungcache,10,2500,'txt') 
 
 
 def showaddhtn(dataset3):
     fig, ax = plt.subplots()
 #   dataset3=dataset2.to_crs(epsg=plot_crs)
-#    base=cbspc4data.boundary.plot(color='green',ax=ax,alpha=.3);
-    rasterio.plot.show((dataset3,3),cmap='Reds',ax=ax,alpha=0.5)
+    base=grgem.boundary.plot(color='green',ax=ax,alpha=.2);
+    rasterio.plot.show((dataset3,3),cmap='Reds',ax=ax,alpha=0.1)
     rasterio.plot.show((dataset3,5),cmap='Blues',ax=ax,alpha=0.5)
     setaxutr(ax)
 #    cx.add_basemap(pland, source= prov0)
-showaddhtn(oset01)    
+showaddhtn(oset03)    
 
-oset04, fname, mycache=writeexperiment('icat',rudifungcache,10,2500,'e0903a') 
-showaddhtn(oset04)  
+oset04l, fnamel, mycachel=writeexperiment('atm1',rudifungcache,10,2500,'e0904b') 
 
-for exp in expposs :
-    oset04, fname, mycache=writeexperiment(exp,rudifungcache,10,2500,'e0903a') 
-    print (showaddhtn(oset04)   )
 
-showaddhtn(oset03)  
+def showlogs(dataset3):
+    fig, ax = plt.subplots()
+#   dataset3=dataset2.to_crs(epsg=plot_crs)
+    base=grgem.boundary.plot(color='green',ax=ax,alpha=.2);
+    rasterio.plot.show((dataset3,3),cmap='Reds',ax=ax,alpha=0.1)
+    rasterio.plot.show((dataset3,5),cmap='Blues',ax=ax,alpha=0.5)
+    setaxutr(ax)
+#    cx.add_basemap(pland, source= prov0)
+showlogs(oset03) 
+
+showaddhtn(oset03)
+
+
+# +
+def logpltland(ecache,fld,txt):
+    minv=1
+    mos=np.log(minv)/ np.log(10)
+    image1= np.log(np.where(ecache[3]<minv,1,ecache[3]/minv)) /np.log(10)
+    image2= np.log(np.where(ecache[5]<minv,1,ecache[5]/minv)) /np.log(10)
+    nv = - ecache[3] - ecache[5]
+    image3= np.log(np.where(nv<minv,1,nv/minv)) /np.log(10)
+    lststr =  'Values for {}, min1 log10 W {}, max log10 W {}, min O {} , max log10 O {}  , max log10 negs {}'. format (txt, np
+                    .min(image1)-mos,np.max(image1)-mos , np.min(image2)-mos,np.max(image2)-mos,np.max(image3)-mos)
+    print (lststr)
+    fig, (ax1, ax2,ax3) = plt.subplots(nrows=1, ncols=3, figsize=(50, 20))
+    nlextent=[0,280000,300000, 625000]
+    #image = np.isnan(image)
+    ax1.imshow(image1,cmap='jet',alpha=.6,extent=nlextent)
+    ax2.imshow(image2,cmap='jet',alpha=.6,extent=nlextent)
+    ax3.imshow(image1,cmap='Reds',alpha=.6,extent=nlextent)
+    ax3.imshow(image2,cmap='Blues',alpha=.6,extent=nlextent)
+    ax3.imshow(image3,cmap='Greens',alpha=.6,extent=nlextent)
+    grgem.boundary.plot(color='green',ax=ax3,alpha=.2)
+#   ax1.colorbar()
+#    ax2.colorbar()
+#    axes[0].plot(x1, y1)
+#    axes[1].plot(x2, y2)
+    ax2.set_title(lststr)
+    fig.tight_layout()
+    figname = "../intermediate/addgrds/fig_"+txt+'.png';
+    fig.savefig(figname) 
+    return fig
+    
+logpltland(mycache03,3,'tstexample')
+# -
+
+expcach=dict()
+gset=dict()
+for exp in expposs1+expposs2 :
+    gset[exp], fname, expcach[exp]=writeexperiment(exp,rudifungcache,10,2500,'e0904a') 
+    logpltland(expcach[exp],3,exp) 
+#    print (showaddhtn(oset04)   )
+
+#expposs2
+for exp in {}  :
+    print(exp)
+    print (showaddhtn(gset[exp] )) 
+
+for exp in expposs2 :
+    print( logpltland(expcach[exp],3,exp) )
 
 
