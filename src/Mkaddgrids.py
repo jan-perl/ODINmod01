@@ -215,7 +215,8 @@ def _renorm1(pat,tot):
 
 expposs1= ['base' ,'same', 'swap','verd' ,'icat' ,'scat' ]
 expposs2= ['fmx1','smx1','frb1','srb1','xfm1','xfb1','atm1','stm1']
-
+exprrun= expposs1+expposs2
+exprrun = ['verd']
 
 def writeexperiment(expname,incache0,promille,mtrrang,prefix):
     outsetnm= '{}_{:_>6}_{:0>4}_{:0>5}'.format(prefix,expname,promille,mtrrang) 
@@ -239,8 +240,9 @@ def writeexperiment(expname,incache0,promille,mtrrang,prefix):
         mycache[3] = incache[3]*mfact
         mycache[5] = incacheoth*mfact
     elif expname == 'verd':    
+        #werk meer ophogen ivm macht voor wonen en selectie dat die hier gebruikt worden
         mycache[3] = _renorm1 (incache[3]* incache[3] ,incache[3]) *mfact
-        mycache[5] = _renorm1 (incacheoth*incacheoth ,incacheoth) *mfact
+        mycache[5] = _renorm1 (incacheoth*incacheoth ,incacheoth) *mfact *1.2
     elif expname == 'swap':
 #        grw= ( incacheoth*mfact *np.sum(incache[3])/np.sum(incacheoth) )
         mycache[3] =  _renorm1 (incacheoth ,incache[3]) *mfact
@@ -276,17 +278,17 @@ def writeexperiment(expname,incache0,promille,mtrrang,prefix):
         F_OW = rasteruts1.convfiets2d(incache[3], filt ,bdim=8)
         OW_MSK =  calccats( F_OW,'pres')
         #transformeer gebouw-> woning waar niet-woningen minder zijn dan woningen 
-        #en bouw rest waar woningen in minderheid zijn
+        #en bouw rest waar nu ook gebouwen zijn
         mycache[3] = _renorm1 (catso * (cats3>catso)  ,incache[3]) *mfact
-        mycache[5] = _renorm1 (catso * OW_MSK * (cats3<catso) ,incacheoth) *2* mfact  -  _renorm1 (mycache[3],incacheoth)
+        mycache[5] = _renorm1 (catso ,incacheoth) *2* mfact  -  _renorm1 (mycache[3],incacheoth) *mfact
     elif expname == 'xfb1':
         filt=rasteruts1.roundfilt(100,mtrrang)
         F_OW = rasteruts1.convfiets2d(incache[3], filt ,bdim=8)
-        OW_MSK =  calccats( F_OW,'pres')
+        OW_MSK =  calccats( F_OW,'noextr')
         #transformeer  woning -> gebouw waar niet-woningen minder zijn dan woningen 
         #en bouw wonigen waar woningen nu in minderheid zijn
         mycache[5] = _renorm1 ( (cats3) * (catso<4) * (catso<cats3) ,incacheoth) *mfact        
-        mycache[3] = _renorm1 ( catso *  OW_MSK *(catso>cats3),incache[3]) *2 *mfact - _renorm1 (mycache[5],incache[3])*mfact
+        mycache[3] = _renorm1 ( catso *  OW_MSK ,incache[3]) *2 *mfact - _renorm1 (mycache[5],incache[3])*mfact
     elif expname == 'smx1':
         filt=rasteruts1.roundfilt(100,mtrrang)
         F_OW = rasteruts1.convfiets2d(incache[3], filt ,bdim=8)
@@ -389,7 +391,7 @@ logpltland(mycache03,3,'tstexample')
 
 expcach=dict()
 gset=dict()
-for exp in expposs1+expposs2 :
+for exp in exprrun :
     gset[exp], fname, expcach[exp]=writeexperiment(exp,rudifungcache,10,2500,'e0904a') 
     logpltland(expcach[exp],3,exp) 
 #    print (showaddhtn(oset04)   )
@@ -399,7 +401,8 @@ for exp in {}  :
     print(exp)
     print (showaddhtn(gset[exp] )) 
 
-for exp in expposs2 :
+expposs2 
+for exp in [] :
     print( logpltland(expcach[exp],3,exp) )
 
 

@@ -1154,16 +1154,20 @@ paratab
 fitdatverplgr.groupby (['MotiefV','isnaarhuis','GeoInd','MaxAfst']).agg('mean')
 
 
+# +
 def getmaxafstadmax( dd, landcod):
     rf = dd[dd['KAfstCluCode'] == landcod ] 
     binst= useKAfstV.iloc[-2,1]
-#    print(binst)
+    print(binst)
     binstm=1
     rf['MaxShow'] = binstm * rf['FactorKm_c'] / rf['FactorV_c'] - (binstm-1)*binst
-    rf = rf[ODINcatVNuse.fitgrpse +['MaxShow']]
+    rf['MaxShStat'] =  rf['FactorV_c'] 
+    rf = rf[ODINcatVNuse.fitgrpse +['MaxShow','MaxShStat']]
     return rf
 #maxvals = 
 getmaxafstadmax(ODINcatVNuse. odindiffflginfo, ODINcatVNuse.landcod)
+
+# hier komen waarden uit ONDER binstm. Dat is niet goed.
 
 # +
 #mogelijk: maxafst joinen uit diifdata
@@ -1843,17 +1847,16 @@ def grosres (explst,incache0,mult,fitp,oridat,myuseKAfst,setname):
     st=st.append(dto)
     st.reset_index().to_excel("../output/fitrelres"+setname+".xlsx")
     return st
-stQ = grosres (elst[0:3],rudifungcache,1,fitpara, fitdatverplgr,useKAfstVQ,'Set01Q-'+globset)
+stQ = grosres (elst[0:3],rudifungcache,1,fitpara, fitdatverplgr,useKAfstVQ,'Dbg01Q-'+globset)
 stQ
 
 stQ
 
-# +
-#stN = grosres (elst,rudifungcache,1,fitpara,fitdatverplgr,useKAfstV,'Set01N-'+globset )        
+     
 
 # +
 #check eens alles
-#stQa = grosres (elst,rudifungcache,1,fitpara, fitdatverplgr,useKAfstVQ,'Set01Q-'+globset)
+#stQa = grosres (elst,rudifungcache,1,fitpara, fitdatverplgr,useKAfstVQ,'DBgf01Q-'+globset)
 #stQa
 # -
 
