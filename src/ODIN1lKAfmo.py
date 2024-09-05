@@ -427,6 +427,11 @@ def deffactorv(rv):
 skipPCMdf = deffactorv(odinverplgr)
 skipPCMdf
 
+# vind spec fractie
+s1= ODINcatVNuse.odinverplgr [ODINcatVNuse.odinverplgr['KAfstCluCode']==15].sum()
+sf = s1['FactorVSpec'] / (s1['FactorVSpec']  + s1['FactorVGen'] )
+sf*100
+
 
 # +
 #maak 2 kolommen met totalen aankomst en vertrek (alle categorrieen)
@@ -1200,7 +1205,7 @@ def pltmotdistgrp (mydati,horax,vertax,vnsep):
 
     rvs = rv2[np.isin(rv2['GrpExpl'],bigmotl)]
 #    rv2['MotiefV']=rv2['MotiefV'].astype(int).astype(str)
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(12, 6))
     
 #    print ( rvs[ (rvs['MotiefV']==1) & (rvs['MaxAfst']== stelafst) ] ) 
     
@@ -1220,6 +1225,8 @@ def pltmotdistgrp (mydati,horax,vertax,vnsep):
 #    ax.set_yscale('log')
     # Put a legend to the right of the current axis
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    figname = "../output/gplo_fmdg_"+"horax"+"_"+vertax+"_"+'G1.svg';
+    fig.savefig(figname, bbox_inches="tight") 
     return (rv2)
 ov=pltmotdistgrp(fitdatverplgr,'MaxAfst','FactorEst',False)
 # -
