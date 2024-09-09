@@ -83,53 +83,58 @@ def mkmotsum1(diffin,myspecvals,myKAfstV):
     motafstgrp = (motafstgrp.merge(explhere1,left_on='MotiefV', right_on='Code', how='left').rename(
                columns={'Code_label':'MotiefV_label'}) )
     motafstgrp['MotiefS'] = (motafstgrp['MotiefV'].astype(int) .astype(str) ) + " "+ motafstgrp['MotiefV_label']
-#    motafstgrp['FractAct'] = motafstgrp['FactorActiveV_c']/ motafstgrp['FactorV_c'] 
-    motafstgrp['GemAfst'] = motafstgrp['MaxAfst'] 
+    motafstgrp['FractAct'] = motafstgrp['FactorActiveV']/ motafstgrp['FactorV'] 
+    motafstgrp['GemAfst'] = np.where(motafstgrp['MaxAfst'] ==0,100 , motafstgrp['MaxAfst'] )
     motafstgrp['FractMot'] = motafstgrp['FactorV']/ motafstgrp['MotiefSum'] 
     
     return motafstgrp
 motafstgrpc_glb = mkmotsum1(odinverplflgs,specvaltab,useKAfstV)
 #motafstgrp_glb
 
-def motplt(df0,donorm):
+def motplt(df0,tit):
     df = df0[df0['MotiefSum']>5e9]
     fig, ax = plt.subplots(figsize=(6, 4))
     sns.lineplot(data=df,x='GemAfst',y="FactorV",hue="MotiefS",ax=ax)
     ax.set_xscale('log')
     ax.set_xlabel('Afstand (km)')
     ax.set_ylabel('Aantal ritten')
+    ax.set_title(tit)
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     return fig
-motplt(motafstgrpc_glb,True)
+motplt(motafstgrpc_glb,'Totalen over jaren, cumulatief over afstand')
 
 
-def motpltrel(df0,donorm):
+def motpltrel(df0,tit):
     df = df0[df0['MotiefSum']>5e9]
     fig, ax = plt.subplots(figsize=(6, 4))
     sns.lineplot(data=df,x='GemAfst',y="FractMot",hue="MotiefS",ax=ax)
     ax.set_xscale('log')
     ax.set_xlabel('Afstand (km)')
     ax.set_ylabel('Fractie van reizen voor motief')
+    ax.set_title(tit)
     ax.axhline(0)
     ax.axhline(0.5)
     ax.axhline(1)
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     return fig
-motpltrel(motafstgrpc_glb,True)
+motpltrel(motafstgrpc_glb,'Deel reizen per motief, cumulatief over afstand')
 
 
-def motactfplt(df0,donorm):
+def motactfplt(df0,tit):
     df = df0[df0['MotiefSum']>5e9]
     fig, ax = plt.subplots(figsize=(6, 4))
     sns.lineplot(data=df,x='GemAfst',y="FractAct",hue="MotiefS",ax=ax)
     ax.set_xscale('log')
     ax.set_xlabel('Afstand (km)')
     ax.set_ylabel('Fractie active modes')
+    ax.set_title(tit)
     ax.axhline(0)
     ax.axhline(0.5)
     ax.axhline(1)
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     return fig
-motactfplt(motafstgrp_glb,False)
+motactfplt(motafstgrpc_glb,'Deel actief, alle reizen binnen afstand')
+
+motactfplt(motafstgrp_glb,'Deel actief, EXTRA reizen op die afstand')
 
 
