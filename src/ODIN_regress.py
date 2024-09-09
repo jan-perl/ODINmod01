@@ -43,11 +43,6 @@ if (len(notcalled_expl [ notcalled_expl  ['reason'] .isna() ]) >0 ):
     print("Untested files found. Add calling to it to EMS_regress.R ")
 
 #tabel should not have NA entries
-# -
-
-#old main file, should not be used anymore
-import charging_main
-import chargingProbability
 
 # +
 #to import ODIN data, run
@@ -72,7 +67,5 @@ import viewCBS
 
 #convert RUDIFUN to usable PC4 data
 import cnvRUDIFUN
-
-import prepareData
 
 import preproc_spss

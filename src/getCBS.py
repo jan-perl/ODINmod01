@@ -25,12 +25,13 @@ if(1==1):
     except:
         print(" replacing existing ");
 
-fetchweb=False
+fetchweb=True
 
 #Kerncijfers per postcode
 #https://www.cbs.nl/nl-nl/dossier/nederland-regionaal/geografische-data/gegevens-per-postcode
-pc4lnks = ["https://download.cbs.nl/postcode/2023-CBS_pc4_2022_v1.zip",
-           "https://download.cbs.nl/postcode/2023-cbs_pc4_2021_v2.zip",
+pc4lnks = ["https://download.cbs.nl/postcode/2024-cbs_pc4_2023_v1.zip",
+           "https://download.cbs.nl/postcode/2024-cbs_pc4_2022_v2.zip",
+           "https://download.cbs.nl/postcode/2024-cbs_pc4_2021_vol.zip",
            "https://download.cbs.nl/postcode/2023-cbs_pc4_2020_vol.zip",
            "https://download.cbs.nl/postcode/2023-cbs_pc4_2019_vol.zip",
            "https://download.cbs.nl/postcode/CBS-PC4-2018-v3.zip",
@@ -60,7 +61,7 @@ def getcbspc4(link,uzdir):
     try:
         os.remove ("../data/CBS/"+of)
     except:
-        print(" first time download ");        
+        print(" first time download "+uzdir);        
     str1= "wget -q -O ../data/CBS/"+of+" "+link
     os.system(str1)
     if uzdir=='':
@@ -69,7 +70,7 @@ def getcbspc4(link,uzdir):
         try:
             os.mkdir ("../data/CBS/"+uzdir)
         except:
-            print(" replacing existing ");
+            print(" replacing existing "+uzdir);
         str2= "bash -c 'cd ../data/CBS/"+uzdir+" ; unzip -u ../"+of + "'"
     os.system(str2)
 if fetchweb :
