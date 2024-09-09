@@ -521,6 +521,22 @@ allodinyr[ (allodinyr['HighPCfls']) ==True ] [['AankPC','VertPC','MotiefV','Fact
 xlatKAfstV
 
 
+#add column 'GrpExpl' to pstatsc
+def addgrpexpl(indf,myspecvals,col0,col1,grp1map):
+    if 1==1:
+        explhere = myspecvals [myspecvals['Variabele_naam'] == col0].copy()
+        explhere['Code'] = pd.to_numeric(explhere['Code'],errors='coerce')
+#        print(explhere)
+        outdf=indf.merge(explhere,left_on=col0, right_on='Code', how='left')    
+        outdf['GrpExpl'] = outdf[col0].astype(str) +  " "+ outdf[col1].astype(str) + \
+              " : " + outdf['Code_label'] + " "+ outdf[col1].map(grp1map)
+        outdf= outdf.drop(columns=['Code','Code_label','Variabele_naam']) 
+    else:
+        outdf=indf.copy(deep=False)
+        outdf['GrpExpl']=''               
+    return outdf
+
+
 # +
 #other file merge geo
 #other file addparsrecs
@@ -554,16 +570,8 @@ def mkdfverplxypc4d1 (df,myspecvals,xvarPC,pltgrps,grp1map,selstr,myKAfstV,myxla
         print( ( "alle land combinaties", len(vollandrecs) , len(mygeoschpc4)* len(dfgrps)) )
     pstatsc=pstatsc.rename(columns={xvarPC:'PC4'}).merge(vollandrecs,how='right')
     pstatsc['GeoInd'] = xvarPC
-    if 1==1:
-        explhere = myspecvals [myspecvals['Variabele_naam'] == pltgrps[0]].copy()
-        explhere['Code'] = pd.to_numeric(explhere['Code'],errors='coerce')
-#        print(explhere)
-        pstatsc=pstatsc.merge(explhere,left_on=pltgrps[0], right_on='Code', how='left')    
-        pstatsc['GrpExpl'] = pstatsc[pltgrps[0]].astype(str) +  " "+ pstatsc[pltgrps[1]].astype(str) + \
-              " : " + pstatsc['Code_label'] + " "+ pstatsc[pltgrps[1]].map(grp1map)
-        pstatsc= pstatsc.drop(columns=['Code','Code_label'])
-    else:
-        pstatsc['GrpExpl']=''
+    pstatsc = addgrpexpl(pstatsc,myspecvals, pltgrps[0], pltgrps[1],grp1map)
+
     if debug:
         print( ( "return rdf", len(pstatsc)) )
     
@@ -577,7 +585,7 @@ def mkdfverplxypc4 (df,myspecvals,pltgrps,selstr,myKAfstV,myxlatKAfstV,mygeoschp
 
     fr2= (mkdfverplxypc4d1 (df,myspecvals,grp,pltgrps,isnhexpl,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4)
             for grp in ['AankPC','VertPC'] )
-    rv=pd.concat(fr2).reset_index().drop(columns='Variabele_naam')
+    rv=pd.concat(fr2).reset_index()
 #        rv1= mkdfverplxypc4d1 (df,myspecvals,'AankPC',pltgrps,isnhexpl,selstr,myKAfstV,myxlatKAfstV)
 #        rv2= mkdfverplxypc4d1 (df,myspecvals,'VertPC',pltgrps,isnhexpl,selstr,myKAfstV,myxlatKAfstV)
 #        rv= rv1.append(rv2) .reset_index(drop=True)   
@@ -645,16 +653,8 @@ def mkdfverplklas1 (df,myspecvals,xvarPC,pltgrps,grp1map,myinfoflds,myKAfstV,myx
 #        print('def lab '+xvarPC)
         pstatsc['GrpV_label']='as number'
 
-    if 1==1:
-        explhere = myspecvals [myspecvals['Variabele_naam'] == pltgrps[0]].copy()
-        explhere['Code'] = pd.to_numeric(explhere['Code'],errors='coerce')
-#        print(explhere)
-        pstatsc=pstatsc.merge(explhere,left_on=pltgrps[0], right_on='Code', how='left')    
-        pstatsc['GrpExpl'] = pstatsc[pltgrps[0]].astype(str) +  " "+ pstatsc[pltgrps[1]].astype(str) + \
-              " : " + pstatsc['Code_label'] + " "+ pstatsc[pltgrps[1]].map(grp1map)
-        pstatsc= pstatsc.drop(columns=['Code','Code_label','Variabele_naam'])
-    else:
-        pstatsc['GrpExpl']=''
+    pstatsc = addgrpexpl(pstatsc,myspecvals, pltgrps[0], pltgrps[1],grp1map)
+
     if debug:
         print( ( "return rdf", len(pstatsc)) )
 #    print(pstatsc)
@@ -718,16 +718,9 @@ def mkdfverplklasflgs(df,myspecvals,pltgrps,grp1map,myinfoflds,myKAfstV,myxlatKA
     if debug:
         print( ( "alle land combinaties", len(vollandrecs) , len(mygeoschpc4)* len(dfgrps)) )
     pstatc= dfgrps
-    if 1==1:
-        explhere = myspecvals [myspecvals['Variabele_naam'] == pltgrps[0]].copy()
-        explhere['Code'] = pd.to_numeric(explhere['Code'],errors='coerce')
-#        print(explhere)
-        pstatsc=pstatsc.merge(explhere,left_on=pltgrps[0], right_on='Code', how='left')    
-        pstatsc['GrpExpl'] = pstatsc[pltgrps[0]].astype(str) +  " "+ pstatsc[pltgrps[1]].astype(str) + \
-              " : " + pstatsc['Code_label'] + " "+ pstatsc[pltgrps[1]].map(grp1map)
-        pstatsc= pstatsc.drop(columns=['Code','Code_label','Variabele_naam'])
-    else:
-        pstatsc['GrpExpl']=''
+
+    pstatsc = addgrpexpl(pstatsc,myspecvals, pltgrps[0], pltgrps[1],grp1map)
+
     if debug:
         print( ( "return rdf", len(pstatsc)) )
 #    print(pstatsc)

@@ -1727,11 +1727,11 @@ def woonbalans1(totin,kflgs):
 #    agrp ['gcol'] = "Mot_"+ np.array(agrp ['MotiefV'] .astype('string'))+"_nh_"+ np.array(agrp ['isnaarhuis'] .astype('string'))
     agrp ['p1'] = "Mot_"
     agrp ['p2'] = "_nh_"
-    mc= np.char.array(agrp['MotiefV'].values)
-    nc= np.char.array(agrp['isnaarhuis'].values)
-    p1= np.char.array(agrp['p1'].values)
-    p2= np.char.array(agrp['p2'].values)
-    agrp ['gcol'] = np.genfromtxt(p1 + mc +p2 + nc  ,dtype='U'  )
+    mc= agrp['MotiefV'].astype(int).astype(str)
+    nc= agrp['isnaarhuis'].astype(str)
+    p1= agrp['p1'].astype(str)
+    p2= agrp['p2'].astype(str)
+    agrp ['gcol'] =p1 + mc +p2 + nc 
     agrp2 = agrp.pivot(index="GeoInd", columns="gcol", values="FactorV")
     return agrp2
 woonbalans1(totinf_indat,ODINcatVNuse.kflgsflds)                       
