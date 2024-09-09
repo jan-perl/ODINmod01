@@ -690,7 +690,9 @@ def _addfields(pstats,useKAfstVall):
     pstatsa= pstats.merge(useKAfstVall[['KAfstV','AvgAfst']],how='left')
     pstatsa['FactorKm']= pstatsa['FactorV'] * pstatsa['AvgAfst']
     pstatsa['FactorAutoKm']= np.where(pstatsa['KHvm'] ==1 ,pstatsa['FactorKm']  ,0)
-    pstatsa['FactorActiveKm']= np.where(np.isin(pstatsa['KHvm'], [5,6] ),pstatsa['FactorKm']  ,0)
+    amodes= [5,6]
+    pstatsa['FactorActiveKm']= np.where(np.isin(pstatsa['KHvm'], amodes ),pstatsa['FactorKm']  ,0)
+    pstatsa['FactorActiveV']= np.where(np.isin(pstatsa['KHvm'], amodes ),pstatsa['FactorV']  ,0)
     return pstatsa
 
 def mkdfverplklasflgs(df,myspecvals,pltgrps,grp1map,myinfoflds,myKAfstV,myxlatKAfstV):
@@ -735,7 +737,7 @@ def mkdfverplklasflgs(df,myspecvals,pltgrps,grp1map,myinfoflds,myKAfstV,myxlatKA
 
 
 allodinyr['FactorKm']= allodinyr['FactorV'] * allodinyr['AfstS'] *10
-kflgsflds=['FactorV',"FactorKm","FactorAutoKm","FactorActiveKm"]
+kflgsflds=['FactorV',"FactorKm","FactorAutoKm","FactorActiveKm","FactorActiveV"]
 odinverplflgs = mkdfverplklasflgs (allodinyr ,specvaltab,fitgrps,isnhexpl,kflgsflds, useKAfstV,xlatKAfstV)
 odinverplflgs
 # -

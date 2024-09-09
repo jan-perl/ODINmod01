@@ -130,14 +130,6 @@ if 1==1:
 pland= cbspc4data.to_crs(epsg=plot_crs).plot()
 cx.add_basemap(pland, source= prov0)
 
-cbspc4datahtn = cbspc4data[(cbspc4data['postcode4']>3990) & (cbspc4data['postcode4']<3999)]
-phtn = cbspc4datahtn.to_crs(epsg=plot_crs).plot()
-cx.add_basemap(phtn, source= prov0)
-
-cbspc4datahtn = cbspc4data[(cbspc4data['postcode4']==3995)]
-phtn = cbspc4datahtn.to_crs(epsg=plot_crs).plot()
-cx.add_basemap(phtn, source= prov0)
-
 pc4tifname=calcgdir+'/cbs2020pc4-NL.tif'
 pc4excols= ['aantal_inwoners','aantal_mannen', 'aantal_vrouwen']
 pc4inwgrid= rasterio.open(pc4tifname)
@@ -208,15 +200,19 @@ def calccats(ingr,flgs):
     return pcatr
 calccats(rudifungcache[3],'noextr')
 
+#flags
+expposs1= ['base' ,'same', 'swap','verd' ,'icat' ,'scat' ]
+expposs2= ['fmx1','smx1','frb1','srb1','xfm1','xfb1','atm1','stm1','snm1']
+exprrun= expposs1+expposs2
+exprrun = ['snm1','stm1']
+exprdists= [2500]
+exprdists= [2500,3700,5000]
+
 
 # +
 def _renorm1(pat,tot):
     return np.sum(tot)* pat / (np.sum(pat))
 
-expposs1= ['base' ,'same', 'swap','verd' ,'icat' ,'scat' ]
-expposs2= ['fmx1','smx1','frb1','srb1','xfm1','xfb1','atm1','stm1']
-exprrun= expposs1+expposs2
-exprrun = ['verd']
 
 def writeexperiment(expname,incache0,promille,mtrrang,prefix):
     outsetnm= '{}_{:_>6}_{:0>4}_{:0>5}'.format(prefix,expname,promille,mtrrang) 
@@ -314,7 +310,14 @@ def writeexperiment(expname,incache0,promille,mtrrang,prefix):
         F_OW = rasteruts1.convfiets2d(incache[3], filt ,bdim=8)
         F_OT = rasteruts1.convfiets2d(incacheoth, filt ,bdim=8)
         mycache[3] = _renorm1 (catso *F_OW*F_OT ,incache[3]) *mfact
-        mycache[5] = _renorm1 (cats3 *F_OW*F_OT ,incacheoth) *mfact           
+        mycache[5] = _renorm1 (cats3 *F_OW*F_OT ,incacheoth) *mfact
+    elif expname == 'snm1':
+        filt=rasteruts1.roundfilt(100,mtrrang)
+        F_OW = rasteruts1.convfiets2d(incache[3], filt ,bdim=8)
+        F_OT = rasteruts1.convfiets2d(incacheoth, filt ,bdim=8)
+        FM1 = F_OW * (np.sum(F_OW+F_OT)) / np.sum (F_OW) / (F_OW+F_OT)
+        mycache[3] = _renorm1 (catso *F_OW*F_OT * (FM1 <0.90) ,incache[3]) *mfact
+        mycache[5] = _renorm1 (cats3 *F_OW*F_OT * (FM1 >0.45) ,incacheoth) *mfact                
     else:
         print("Error: type not defined : " +expname)
         raise()
@@ -323,7 +326,7 @@ def writeexperiment(expname,incache0,promille,mtrrang,prefix):
     ogrid.write(mycache[5],5)
     ogrid.close()
     ogrid= rasterio.open(fname)
-    return ([ogrid, fname, mycache ])
+    return ([ogrid, outsetnm, mycache ])
 
 oset03, fname03, mycache03=writeexperiment('fmx1',rudifungcache,10,2500,'tst') 
 # -
@@ -340,7 +343,7 @@ def showaddhtn(dataset3):
 #    cx.add_basemap(pland, source= prov0)
 showaddhtn(oset03)    
 
-oset04l, fnamel, mycachel=writeexperiment('atm1',rudifungcache,10,2500,'e0904b') 
+oset04l, fnamel, mycachel=writeexperiment('atm1',rudifungcache,10,2500,'tst0904b') 
 
 
 def showlogs(dataset3):
@@ -357,7 +360,7 @@ showaddhtn(oset03)
 
 
 # +
-def logpltland(ecache,fld,txt):
+def logpltland(ecache,fld,fname,txt):
     minv=1
     mos=np.log(minv)/ np.log(10)
     image1= np.log(np.where(ecache[3]<minv,1,ecache[3]/minv)) /np.log(10)
@@ -382,18 +385,20 @@ def logpltland(ecache,fld,txt):
 #    axes[1].plot(x2, y2)
     ax2.set_title(lststr)
     fig.tight_layout()
-    figname = "../intermediate/addgrds/fig_"+txt+'.png';
+    figname = "../intermediate/addgrds/fig_"+fname+'.png';
     fig.savefig(figname) 
     return fig
     
-logpltland(mycache03,3,'tstexample')
+logpltland(mycache03,3,'tstexample','tstexample')
 # -
 
 expcach=dict()
 gset=dict()
+fnamec=dict()
 for exp in exprrun :
-    gset[exp], fname, expcach[exp]=writeexperiment(exp,rudifungcache,10,2500,'e0904a') 
-    logpltland(expcach[exp],3,exp) 
+    for dist in exprdists:
+        gset[exp], fnamec[exp], expcach[exp]=writeexperiment(exp,rudifungcache,10,dist,'e0906a') 
+        logpltland(expcach[exp],3,fnamec[exp],exp) 
 #    print (showaddhtn(oset04)   )
 
 #expposs2
@@ -403,6 +408,6 @@ for exp in {}  :
 
 expposs2 
 for exp in [] :
-    print( logpltland(expcach[exp],3,exp) )
+    print( logpltland(expcach[exp],3,fnamec[exp],exp) )
 
 

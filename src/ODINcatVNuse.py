@@ -145,7 +145,7 @@ deffactorv(odinverplgr_o)
 fitgrps=['MotiefV','isnaarhuis']
 
 odinverplflgs_o=pd.read_pickle("../intermediate/ODINcatVN03db.pkl")
-kflgsflds=['FactorV',"FactorKm","FactorAutoKm","FactorActiveKm"]
+kflgsflds=['FactorV',"FactorKm","FactorAutoKm","FactorActiveKm","FactorActiveV"]
 
 odinverplklinfo_o=pd.read_pickle("../intermediate/ODINcatVN02db.pkl")
 landcod=np.max(odinverplklinfo_o['KAfstCluCode'])
