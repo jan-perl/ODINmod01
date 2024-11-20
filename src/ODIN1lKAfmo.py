@@ -62,13 +62,6 @@
 # binnen cirkels
 # -
 
-# scenarios
-# #+ 10 % wonen en +10 werken (8% en 10 % oppervlak resp)
-# A) beide op plaatsen waar het al is
-# b) tegengesteld
-# C) werk op huidige plek , wonen alleen waar nu lage dichtheid is (+20 % daar)
-
-
 import pandas as pd
 import numpy as np
 import seaborn as sns
@@ -473,7 +466,7 @@ ODINmissint = -99997
 
 
 # +
-def loglogregrplot(indfo,xcol,ycol):
+def loglogregrplot(indfo,xcol,ycol,savtag,xtit):
     print ((np.min(indfo[xcol] ) ,np.max(indfo[xcol] ),np.min(indfo[ycol]),np.max(indfo[ycol]))) 
     
     indf = indfo[ (indfo [xcol] >0)  & (indfo [ycol] >0)].copy()
@@ -487,12 +480,17 @@ def loglogregrplot(indfo,xcol,ycol):
     indf['Predictl']=indf['Predict']*np.exp(-1)
     print( model.coef_, model.intercept_)
     fig, ax = plt.subplots(figsize=(6, 4))
-    seaborn.lineplot(data=indf,x=xcol,y='Predict', color='g',ax=ax)
+    chart=seaborn.lineplot(data=indf,x=xcol,y='Predict', color='g',ax=ax)
     seaborn.lineplot(data=indf,x=xcol,y='Predictu', color='r',ax=ax)
     seaborn.lineplot(data=indf,x=xcol,y='Predictl', color='r',ax=ax)
     seaborn.scatterplot(data=indf,x=xcol,y=ycol,ax=ax)
     ax.set_xscale('log')
     ax.set_yscale('log')
+    fig.suptitle("Centrale lijn macht %.2f  asafsnede %.2g"% (model.coef_[0][0],np.exp(model.intercept_)) )
+    ax.set_xlabel(xtit)
+#    chart.set_ylabels(ylab)
+    figname = "../output/gplo_reg_"+savtag+"_"+'G1.svg';
+    fig.savefig(figname, bbox_inches="tight") 
     print(fig)
     return model
 
@@ -504,23 +502,23 @@ geoschpc4r1=geoschpc4land[(  ~ np.isnan(geoschpc4land['M_LW_AL'])) &
 #geoschpc4r2= cbspc4data[['postcode4','oppervlak'] ] .merge (geoschpc4r1 ,left_on=('postcode4'), right_on = ('PC4') )
 geoschpc4r2 = geoschpc4r1
 
-buurtlogmod= loglogregrplot(geoschpc4r2,'M_LW_AL','aantal_inwoners' )
+buurtlogmod= loglogregrplot(geoschpc4r2,'M_LW_AL','aantal_inwoners' ,'M_LW_AL_PC4','Woon oppervlak (m2) per PC4')
 
 # +
 #enigszine onverwacht komnt hier dezelfde relatie uit al in wijken en buurten
 #wat dit betreft lijken postcodes dus homogeen
 # -
 
-buurtlogmod= loglogregrplot(geoschpc4r2,'oppervlak','aantal_inwoners' )
+buurtlogmod= loglogregrplot(geoschpc4r2,'oppervlak','aantal_inwoners','OPPINW_PC4','Gebied oppervlak (are) per PC4')
 
-buurtlogmod= loglogregrplot(geoschpc4r2,'oppervlak','M_LW_AL' )
+buurtlogmod= loglogregrplot(geoschpc4r2,'oppervlak','M_LW_AL' ,'OPPBEB_PC4','Gebied oppervlak (are) per PC4')
 
 # +
 #Poging2: uit behouwings ratio
 geoschpc4r2['m2perinw']= geoschpc4r2['M_LW_AL']/geoschpc4r2['aantal_inwoners' ]
 geoschpc4r2['inwperare']= 10000*geoschpc4r2['aantal_inwoners' ]/ geoschpc4r2['M_LW_AL']
 geoschpc4r2['pctow']= geoschpc4r2['M_LW_AL']/geoschpc4r2['oppervlak' ]
-buurtlogmod= loglogregrplot(geoschpc4r2,'pctow','inwperare' )
+buurtlogmod= loglogregrplot(geoschpc4r2,'pctow','inwperare' ,'RELINW_PC4','Woonoppervlak fractie (m2/are) per PC4')
 
 #deze ratio zouden we ook op buurtniveau kunnen berekenen
 # -
@@ -528,7 +526,7 @@ geogeenwerk = geoschpc4r2 [geoschpc4r2 ['M_LW_AL'] > 20 * geoschpc4r2 ['M_LO_AL'
 geogeenwerk
 
 
-alleenwoonexp=loglogregrplot(geogeenwerk,'M_LW_AL','TotaalVAankPC' )
+alleenwoonexp=loglogregrplot(geogeenwerk,'M_LW_AL','TotaalVAankPC' ,'MOBV_PC4','Woonoppervlak (m2) per PC4')
 
 
 # +
@@ -545,8 +543,8 @@ geoschpc4r2 ['VminWAankPC']=  geoschpc4r2 ['TotaalVAankPC'] -laagwoonexp(alleenw
 geogeenwoon = geoschpc4r2 [(geoschpc4r2 ['M_LW_AL'] *5 < geoschpc4r2 ['M_LO_AL'] ) & (geoschpc4r2 ['VminWAankPC'] >0) ] 
 #geogeenwoon
 
-geenwoonexpC= loglogregrplot(geogeenwoon,'M_LO_AL','VminWAankPC')
-geenwoonexpA= loglogregrplot(geogeenwoon,'M_LO_AL','TotaalVAankPC')
+geenwoonexpC= loglogregrplot(geogeenwoon,'M_LO_AL','VminWAankPC','MOBGEWO_VminW','Woonoppervlak (m2) per PC4')
+geenwoonexpA= loglogregrplot(geogeenwoon,'M_LO_AL','TotaalVAankPC','MOBGEWO_TotV','Woonoppervlak (m2) per PC4')
 
 
 # +
@@ -1814,6 +1812,7 @@ elst
 
 
 def grosumm(dfm,lbl,myuseKAfstV,normfr):
+    dfm.reset_index().to_pickle("../output/fitdf_"+lbl+".pd")
     mymaskKAfstV= list(myuseKAfstV['KAfstCluCode'])
     if lbl=='brondat':
         dfmu=dfm[np.isin(dfm['KAfstCluCode'],mymaskKAfstV)].copy (deep=False)
@@ -1852,7 +1851,7 @@ def grosres (explst,incache0,mult,fitp,oridat,myuseKAfst,setname):
     dto= grosumm(oridat,'brondat',myuseKAfst ,gs00N)
     #print(dto)
     st=st.append(dto)
-    st.reset_index().to_excel("../output/fitrelres"+setname+".xlsx")
+    st.reset_index().to_excel("../output/fitrelres_"+setname+".xlsx")
     return st
 stQ = grosres (elst[0:3],rudifungcache,1,fitpara, fitdatverplgr,useKAfstVQ,'Dbg01Q-'+globset)
 stQ

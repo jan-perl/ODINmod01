@@ -142,17 +142,14 @@ rudifuntifname=calcgdir+'/oriTN2-NL.tif'
 rudifungrid= rasterio.open(rudifuntifname)
 
 
-# +
-def setaxhtn(ax):
-    ax.set_xlim(left=137000, right=143000)
-    ax.set_ylim(bottom=444000, top=452000)
-    
-def setaxutr(ax):
-    ax.set_xlim(left=113000, right=180000)
-    ax.set_ylim(bottom=480000, top=430000)
+def setaxreg(ax,reg):
+    if reg=='htn':
+        ax.set_xlim(left=137000, right=143000)
+        ax.set_ylim(bottom=444000, top=452000)
+    elif reg=='utr':    
+        ax.set_xlim(left=113000, right=180000)
+        ax.set_ylim(bottom=480000, top=430000)
 
-
-# -
 
 def getcachedgrids(src):
     clst={}
@@ -333,15 +330,17 @@ oset03, fname03, mycache03=writeexperiment('fmx1',rudifungcache,10,2500,'tst')
 oset03, fname03, mycache03=writeexperiment('atm1',rudifungcache,10,2500,'txt') 
 
 
-def showaddhtn(dataset3):
+def showaddutr(dataset3):
     fig, ax = plt.subplots()
 #   dataset3=dataset2.to_crs(epsg=plot_crs)
-    base=grgem.boundary.plot(color='green',ax=ax,alpha=.2);
+#    base=grgem.boundary.plot(color='green',ax=ax,alpha=.2);
+    base=gemeentendata.boundary.plot(color='green',ax=ax,alpha=.2);
+    
     rasterio.plot.show((dataset3,3),cmap='Reds',ax=ax,alpha=0.1)
     rasterio.plot.show((dataset3,5),cmap='Blues',ax=ax,alpha=0.5)
-    setaxutr(ax)
+    setaxreg(ax,'utr')
 #    cx.add_basemap(pland, source= prov0)
-showaddhtn(oset03)    
+showaddutr(oset03)    
 
 oset04l, fnamel, mycachel=writeexperiment('atm1',rudifungcache,10,2500,'tst0904b') 
 
@@ -352,15 +351,15 @@ def showlogs(dataset3):
     base=grgem.boundary.plot(color='green',ax=ax,alpha=.2);
     rasterio.plot.show((dataset3,3),cmap='Reds',ax=ax,alpha=0.1)
     rasterio.plot.show((dataset3,5),cmap='Blues',ax=ax,alpha=0.5)
-    setaxutr(ax)
+    setaxreg(ax,'utr')
 #    cx.add_basemap(pland, source= prov0)
 showlogs(oset03) 
 
-showaddhtn(oset03)
-
+showaddutr(oset03)
 
 # +
-def logpltland(ecache,fld,fname,txt):
+nlextent=[0,280000,300000, 625000]
+def logpltland(ecache,fld,selextent,fname,txt):
     minv=1
     mos=np.log(minv)/ np.log(10)
     image1= np.log(np.where(ecache[3]<minv,1,ecache[3]/minv)) /np.log(10)
@@ -371,13 +370,12 @@ def logpltland(ecache,fld,fname,txt):
                     .min(image1)-mos,np.max(image1)-mos , np.min(image2)-mos,np.max(image2)-mos,np.max(image3)-mos)
     print (lststr)
     fig, (ax1, ax2,ax3) = plt.subplots(nrows=1, ncols=3, figsize=(50, 20))
-    nlextent=[0,280000,300000, 625000]
     #image = np.isnan(image)
-    ax1.imshow(image1,cmap='jet',alpha=.6,extent=nlextent)
-    ax2.imshow(image2,cmap='jet',alpha=.6,extent=nlextent)
-    ax3.imshow(image1,cmap='Reds',alpha=.6,extent=nlextent)
-    ax3.imshow(image2,cmap='Blues',alpha=.6,extent=nlextent)
-    ax3.imshow(image3,cmap='Greens',alpha=.6,extent=nlextent)
+    ax1.imshow(image1,cmap='jet',alpha=.6,extent=selextent)
+    ax2.imshow(image2,cmap='jet',alpha=.6,extent=selextent)
+    ax3.imshow(image1,cmap='Reds',alpha=.6,extent=selextent)
+    ax3.imshow(image2,cmap='Blues',alpha=.6,extent=selextent)
+    ax3.imshow(image3,cmap='Greens',alpha=.6,extent=selextent)
     grgem.boundary.plot(color='green',ax=ax3,alpha=.2)
 #   ax1.colorbar()
 #    ax2.colorbar()
@@ -389,7 +387,7 @@ def logpltland(ecache,fld,fname,txt):
     fig.savefig(figname) 
     return fig
     
-logpltland(mycache03,3,'tstexample','tstexample')
+logpltland(mycache03,3,nlextent,'tstexample','tstexample')
 # -
 
 expcach=dict()
@@ -402,11 +400,11 @@ for exp in exprrun :
 #    print (showaddhtn(oset04)   )
 
 #expposs2
-for exp in {}  :
+for exp in [expposs2]  :
     print(exp)
-    print (showaddhtn(gset[exp] )) 
+    print (showaddutr(gset[exp] )) 
 
-expposs2 
+#expposs2 
 for exp in [] :
     print( logpltland(expcach[exp],3,fnamec[exp],exp) )
 
