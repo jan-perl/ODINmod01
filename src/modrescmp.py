@@ -222,6 +222,8 @@ odindiffflginfo= ODINcatVNuse.convert_diffgrpsidat(odinverplflgs,
 lblo='origchk'
 fitdatverplgr = pd.read_pickle("../output/fitdf_"+lblo+".pd")
 
+fitdatverplgr.dtypes
+
 #ddc_indat =  ODINcatVNuse.mkdatadiff(fitdatverplgr,ODINcatVNuse.fitgrpse,ODINcatVNuse.landcod)
 ddc_indat =  mkdatadiff2(fitdatverplgr,
                          ODINcatVNuse.fitgrpse,ODINcatVNuse.infoflds,'mxigrp',ODINcatVNuse.landcod)
@@ -299,39 +301,45 @@ woonbalans(totinf_fitdat,ODINcatVNuse.kflgsflds).reset_index() # .drop(columns='
 
 rdf00=fitdatverplgr
 
-
-# +
-def runexperiment(expname,incache0,mult,fitp,myuseKAfst):
-    print("runexperiment: start processing "+expname)
-    incache=dict()
-    for fld in [3,5]:
-        incache[fld]=np.where(np.isnan( incache0[fld]),0, incache0[fld])
-    fname = "../intermediate/addgrds/"+expname+'.tif';
-    ogrid= rasterio.open(fname)
-    addcache = getcachedgrids(ogrid)
-
-    mycache=dict()
-    mycache[3] = incache[3] + mult*addcache[3]
-    mycache[5] = incache[5] + mult * (addcache[3] + addcache[5])
-    mycache[5]= np.where(mycache[5] < mycache[3] , mycache[3],  mycache[5])    
-    ogrid.close()
-
-#gebuik de parameters       
-    rdf=predictnewdistr(cbspc4data,pc4inwgcache,mycache,myuseKAfst,xlatKAfstV,
-                skipPCMdf,fitgrps, expdefs,fitp)
-    return rdf
-
-#rdf01=runexperiment('e0903a___swap_0010_02500',rudifungcache,1,fitpara,useKAfstVQ)
-
-
-# -
-
 globset="e0904a"
 flst = glob.glob ("../intermediate/addgrds/"+globset+"*[a-z]_00*.tif")
 elst = list(re.sub(".tif$",'',re.sub('^.*/','',f) ) for f in flst) 
 elst
 
 
+#vergelijkbaar met origineel; gebruikt gelezen data
+def gropc4stats(dfm,lbl,myuseKAfstV,normfr):
+    dfm=pd.read_pickle("../output/fitdf_"+lbl+".pd")
+    mymaskKAfstV= list(myuseKAfstV['KAfstCluCode'])
+    if lbl=='brondat':
+        dfmu=dfm[np.isin(dfm['KAfstCluCode'],mymaskKAfstV)].copy (deep=False)
+    else:
+        dfmu=dfm.rename (columns={'FactorV':'FactorO', 'FactorEst':'FactorV' })
+    ddc_fitdat =  mkdatadiff2(dfmu, ODINcatVNuse.fitgrpse,  ODINcatVNuse.infoflds,'mxigrp',ODINcatVNuse.landcod)
+
+    # myodinverplflgs / myodindiffflginfo kunnen ook buiten loop worden berekend, maar dit borgt consisitente
+    # voor relatief weinig extra rekentijd
+    myodinverplflgs =ODINcatVNuse.odinverplflgs_o[np.isin(
+         ODINcatVNuse.odinverplflgs_o['KAfstCluCode'],mymaskKAfstV)].copy (deep=False)
+    myodindiffflginfo= ODINcatVNuse.convert_diffgrpsidat(myodinverplflgs,
+                ODINcatVNuse.fitgrpse,[],ODINcatVNuse.kflgsflds, [],"_c",ODINcatVNuse.landcod,False)
+    totinf_fitdat = ODINcatVNuse.mkinfosums(ddc_fitdat,myodindiffflginfo,                                            
+                       ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,ODINcatVNuse.landcod)
+    rv =totinf_fitdat.groupby(["GeoInd"]).agg('sum')
+    wb =woonbalans(totinf_fitdat,ODINcatVNuse.kflgsflds).groupby(["GeoInd"]).agg('sum')
+    rv=rv.join(wb)
+#    rv=rv.set_index(['GeoInd'])
+    if (len (normfr) >0):
+        rv = rv/ normfr
+        rv['label']=lbl
+    return rv 
+gs00=gropc4stats(rdf00,"orig",useKAfstVQ,[])
+#print(gs00)
+gs00T = gropc4stats(rdf00,"origchk",useKAfstVQ,gs00)
+gs00T
+
+
+#vergelijkbaar met origineel; gebruikt gelezen data
 def grosumm(dfmdummy,lbl,myuseKAfstV,normfr):
     dfm=pd.read_pickle("../output/fitdf_"+lbl+".pd")
     mymaskKAfstV= list(myuseKAfstV['KAfstCluCode'])
@@ -357,13 +365,43 @@ def grosumm(dfmdummy,lbl,myuseKAfstV,normfr):
         rv = rv/ normfr
         rv['label']=lbl
     return rv 
-rdf00="dummydonotuse"
 gs00=grosumm(rdf00,"orig",useKAfstVQ,[])
 #print(gs00)
 gs00T = grosumm(rdf00,"origchk",useKAfstVQ,gs00)
 gs00T
 
 
+#vergelijkbaar met origineel; gebruikt gelezen data
+def gropctots(dfmdummy,lbl,myuseKAfstV,normfr):
+    dfm=pd.read_pickle("../output/fitdf_"+lbl+".pd")
+#    dfm['mxigrp'] = dfm['PC4ori'] 
+    mymaskKAfstV= list(myuseKAfstV['KAfstCluCode'])
+    if lbl=='brondat':
+        dfmu=dfm[np.isin(dfm['KAfstCluCode'],mymaskKAfstV)].copy (deep=False)
+    else:
+        dfmu=dfm.rename (columns={'FactorV':'FactorO', 'FactorEst':'FactorV' })
+    ddc_fitdat =  mkdatadiff2(dfmu, ODINcatVNuse.fitgrpse,  ODINcatVNuse.infoflds,'mxigrp',ODINcatVNuse.landcod)
+
+    # myodinverplflgs / myodindiffflginfo kunnen ook buiten loop worden berekend, maar dit borgt consisitente
+    # voor relatief weinig extra rekentijd
+    myodinverplflgs =ODINcatVNuse.odinverplflgs_o[np.isin(
+         ODINcatVNuse.odinverplflgs_o['KAfstCluCode'],mymaskKAfstV)].copy (deep=False)
+    mxifitgrp= ['mxigrp']
+    myodindiffflginfo= ODINcatVNuse.convert_diffgrpsidat(myodinverplflgs,
+                mxifitgrp,[],ODINcatVNuse.kflgsflds, [],"_c",ODINcatVNuse.landcod,False)
+    totinf_fitdat = ODINcatVNuse.mkinfosums(ddc_fitdat,myodindiffflginfo,                                            
+                       mxifitgrp,ODINcatVNuse.kflgsflds,ODINcatVNuse.landcod)
+    rv =totinf_fitdat.groupby(["mxigrp"]).agg('sum')
+
+    return rv 
+rdf00="dummydonotuse"
+gs00=gropctots(rdf00,"orig",useKAfstVQ,[])
+#print(gs00)
+gs00T = gropctots(rdf00,"origchk",useKAfstVQ,gs00)
+gs00T
+
+
+#vergelijkbaar met origineel; gebruikt gelezen data
 def grosres (explst,incache0,mult,fitp,oridat,myuseKAfst,setname):
     rdf00N="dummydonotuse"
     gs00N = grosumm(rdf00N,"orig",myuseKAfst,[])

@@ -201,10 +201,9 @@ calccats(rudifungcache[3],'noextr')
 expposs1= ['base' ,'same', 'swap','verd' ,'icat' ,'scat' ]
 expposs2= ['fmx1','smx1','frb1','srb1','xfm1','xfb1','atm1','stm1','snm1']
 exprrun= expposs1+expposs2
-exprrun = ['snm1','stm1']
+#exprrun = ['snm1','stm1']
 exprdists= [2500]
-exprdists= [2500,3700,5000]
-
+#exprdists= [2500,3700,5000]
 
 # +
 def _renorm1(pat,tot):
@@ -377,6 +376,9 @@ def logpltland(ecache,fld,selextent,fname,txt):
     ax3.imshow(image2,cmap='Blues',alpha=.6,extent=selextent)
     ax3.imshow(image3,cmap='Greens',alpha=.6,extent=selextent)
     grgem.boundary.plot(color='green',ax=ax3,alpha=.2)
+    if (selextent[0] == 113000):
+        setaxreg(ax3,'utr')
+        ax3.invert_yaxis()
 #   ax1.colorbar()
 #    ax2.colorbar()
 #    axes[0].plot(x1, y1)
@@ -390,13 +392,38 @@ def logpltland(ecache,fld,selextent,fname,txt):
 logpltland(mycache03,3,nlextent,'tstexample','tstexample')
 # -
 
+utrextent=[113000,180000,430000,480000 ]
+def mkloccach(ecache,selextent,oriextent):
+    oridim = ecache[3].shape
+    xmul= oridim[1]/(oriextent[1]-oriextent[0])
+    ymul= oridim[0]/(oriextent[2]-oriextent[3])
+    #print([oridim,oriextent,xmul,ymul])
+    
+    xmin=int((selextent[0]-oriextent[0])*xmul)
+    xmax=int((selextent[1]-oriextent[0])*xmul)
+    ymin=int((selextent[2]-oriextent[3])*ymul)
+    ymax=int((selextent[3]-oriextent[3])*ymul)
+    #print([xmin,xmax,ymin,ymax])
+    ocache=dict()
+    for imgidx in [3,5]:
+        #print(ecache[imgidx].shape)
+        sli= ecache[imgidx][ymax:ymin,xmin:xmax]
+        odim = sli.shape
+        #print(odim)
+        ocache[imgidx]= sli
+    return ocache
+utrcache03=mkloccach(mycache03,utrextent,nlextent)
+logpltland(utrcache03,3,utrextent,'tstexampleut','tstexampleut')    
+
 expcach=dict()
 gset=dict()
 fnamec=dict()
 for exp in exprrun :
     for dist in exprdists:
         gset[exp], fnamec[exp], expcach[exp]=writeexperiment(exp,rudifungcache,10,dist,'e0906a') 
-        logpltland(expcach[exp],3,fnamec[exp],exp) 
+        logpltland(expcach[exp],3,nlextent,fnamec[exp],exp)
+        utrcache03=mkloccach(expcach[exp],utrextent,nlextent)
+        logpltland(utrcache03,3,utrextent,fnamec[exp]+'_utr',exp+'_utr')   
 #    print (showaddhtn(oset04)   )
 
 #expposs2
@@ -406,6 +433,6 @@ for exp in [expposs2]  :
 
 #expposs2 
 for exp in [] :
-    print( logpltland(expcach[exp],3,fnamec[exp],exp) )
+    print( logpltland(expcach[exp],3,nlextent,fnamec[exp],exp) )
 
 

@@ -435,7 +435,7 @@ def gridoncenters (grid,r1):
 def centergridcoords (grid,ctrser):
     r1= np.array(rasterio.transform.rowcol(grid.transform,xs=ctrser.x,ys=ctrser.y)).T
     return r1
-    
+#usage of centergridcoords:     
 #ctrxform = centergridcoords (smftg1,buurtendata[ "center"]) 
 #gridoncenters (smftg1,ctrxform)
 

@@ -357,6 +357,9 @@ def _qcutmxi(df,mxivarin1,mxivarin2,mxiout,nbins):
 #    rv= pd.Series(mxiout*1.1, index=range(len(df)))
     return  df[['mxiout']]
 
+#add df into mxi bins, retulting in outdf with mxi in addition to PC4
+#returned binfr is not used, provided for debugging
+
 def addmxibins (df,nbins):
     outdf=df.set_index(keys=['KAfstCluCode','PC4'],drop=False)
 #    print(outdf)
@@ -1756,11 +1759,19 @@ woonbalans(totinf_fitdat,ODINcatVNuse.kflgsflds).reset_index() # .drop(columns='
 
 # +
 def predictnewdistr(pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,myskipPCMdf,pltgrps,puin,
-                    myfitpara):
+                    myfitpara,predgrping):
     pu= puin.copy()
     mygeoschpc4all= mkgeoschparafr(pc4data,pc4grid,rudigrid,myKAfstV,pu)
-    mygeoschpc4i, geobingr = addmxibins(mygeoschpc4all,nmxibins_glb)
-    mygeoschmixpMotief= allmotmxicorrgrp(summmxigrp(mygeoschpc4i),
+    if predgrping == 'mxigrp':        
+        mygeoschpc4i, geobingr = addmxibins(mygeoschpc4all,nmxibins_glb)
+        mygeoschmxigrp = summmxigrp(mygeoschpc4i)
+        mygeoschpc4i['PC4ori'] =mygeoschpc4i['PC4']
+    elif predgrping == 'PC4':    
+        mygeoschpc4i= mygeoschpc4all
+        mygeoschpc4i['mxigrp'] =mygeoschpc4i['PC4']
+    else:
+        raise('predictnewdistr: unimplemented predgrping:'+predgrping)
+    mygeoschmixpMotief= allmotmxicorrgrp( summmxigrp(mygeoschpc4i),
                     summmxicorrgrp(mygeoschpc4i,myskipPCMdf),np.max(odinverplgr['MotiefV']))
     myodinverplmxigr = odinmergemxi (odinverplgr ,mygeoschpc4i,grpexpcontrs)
     myxlatKAfstV=myKAfstV[['KAfstCluCode']].merge(inxlatKAfstV,how='left')
@@ -1777,12 +1788,12 @@ def predictnewdistr(pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,myskipPCMdf,p
     return(myfitverplgr)
 
 rdf00=predictnewdistr (cbspc4data,pc4inwgcache,rudifungcache,useKAfstVQ,xlatKAfstV,
-                skipPCMdf,fitgrps,expdefs,fitpara)
+                skipPCMdf,fitgrps,expdefs,fitpara,'mxigrp')
 rdf00
-
+#to change for PC4 /geo comparison: use something like indatverplpc4gr instead of  myodinverplmxigr 
 
 # +
-def runexperiment(expname,incache0,mult,fitp,myuseKAfst):
+def runexperiment(expname,incache0,mult,fitp,myuseKAfst,predgrping):
     print("runexperiment: start processing "+expname)
     incache=dict()
     for fld in [3,5]:
@@ -1799,10 +1810,10 @@ def runexperiment(expname,incache0,mult,fitp,myuseKAfst):
 
 #gebuik de parameters       
     rdf=predictnewdistr(cbspc4data,pc4inwgcache,mycache,myuseKAfst,xlatKAfstV,
-                skipPCMdf,fitgrps, expdefs,fitp)
+                skipPCMdf,fitgrps, expdefs,fitp,predgrping)
     return rdf
 
-rdf01=runexperiment('e0903a___swap_0010_02500',rudifungcache,1,fitpara,useKAfstVQ)
+rdf01=runexperiment('e0903a___swap_0010_02500',rudifungcache,1,fitpara,useKAfstVQ,'mxigrp')
 # -
 
 globset="e0904a"
@@ -1812,7 +1823,7 @@ elst
 
 
 def grosumm(dfm,lbl,myuseKAfstV,normfr):
-    dfm.reset_index().to_pickle("../output/fitdf_"+lbl+".pd")
+    dfm.reset_index().to_pickle("../output/fitdf_%s.pd"%(lbl))
     mymaskKAfstV= list(myuseKAfstV['KAfstCluCode'])
     if lbl=='brondat':
         dfmu=dfm[np.isin(dfm['KAfstCluCode'],mymaskKAfstV)].copy (deep=False)
@@ -1841,19 +1852,26 @@ gs00=grosumm(rdf00,"orig",useKAfstVQ,[])
 gs00T = grosumm(rdf00,"origchk",useKAfstVQ,gs00)
 gs00T
 
+rdf00PC4=predictnewdistr (cbspc4data,pc4inwgcache,rudifungcache,useKAfstVQ,xlatKAfstV,
+                skipPCMdf,fitgrps,expdefs,fitpara,'PC4')
+gs00PC4 = grosumm(rdf00,"origPC4chk",useKAfstVQ,gs00)
+gs00PC4
 
-def grosres (explst,incache0,mult,fitp,oridat,myuseKAfst,setname):
+
+def grosres (explst,incache0,mult,fitp,oridat,myuseKAfst,setname,predgrping):
     rdf00N=predictnewdistr (cbspc4data,pc4inwgcache,rudifungcache,myuseKAfst,myuseKAfst,
-                skipPCMdf,fitgrps,expdefs,fitpara)
+                skipPCMdf,fitgrps,expdefs,fitpara,predgrping)
     gs00N = grosumm(rdf00N,"orig",myuseKAfst,[])
-    st = ( grosumm(runexperiment(exp,incache0,mult,fitp,myuseKAfst),exp,myuseKAfst ,gs00N)  for exp in explst )
+    st = ( grosumm(runexperiment(exp,incache0,mult,fitp,myuseKAfst,predgrping),
+                   exp,myuseKAfst ,gs00N)  for exp in explst )
     st = pd.concat (st)
     dto= grosumm(oridat,'brondat',myuseKAfst ,gs00N)
     #print(dto)
     st=st.append(dto)
     st.reset_index().to_excel("../output/fitrelres_"+setname+".xlsx")
     return st
-stQ = grosres (elst[0:3],rudifungcache,1,fitpara, fitdatverplgr,useKAfstVQ,'Dbg01Q-'+globset)
+stQ = grosres (elst[0:3],rudifungcache,1,fitpara, fitdatverplgr,
+               useKAfstVQ,'Dbg01Q-'+globset,'mxigrp')
 stQ
 
 stQ
