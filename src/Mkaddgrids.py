@@ -420,7 +420,7 @@ gset=dict()
 fnamec=dict()
 for exp in exprrun :
     for dist in exprdists:
-        gset[exp], fnamec[exp], expcach[exp]=writeexperiment(exp,rudifungcache,10,dist,'e0906a') 
+        gset[exp], fnamec[exp], expcach[exp]=writeexperiment(exp,rudifungcache,10,dist,'e1121a') 
         logpltland(expcach[exp],3,nlextent,fnamec[exp],exp)
         utrcache03=mkloccach(expcach[exp],utrextent,nlextent)
         logpltland(utrcache03,3,utrextent,fnamec[exp]+'_utr',exp+'_utr')   

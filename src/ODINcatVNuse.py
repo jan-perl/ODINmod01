@@ -165,7 +165,8 @@ odinverplgr[['KAfstCluCode','GeoInd']].groupby('KAfstCluCode').agg('count')
 #odinverplklinfo[['KAfstCluCode','FactorV']].groupby('KAfstCluCode').agg('count')
 
 # +
-nfogrps=['KHvm','AankUur','VertUur','Jaar']
+#variabele nfogrps was not used; infogrps is in ODINcatVN.py
+# nfogrps=['KHvm','AankUur','VertUur','Jaar']
 # definition in ODINcatVN: allodinyr['FactorKm']= allodinyr['FactorV'] * allodinyr['AfstS'] *10
 infoflds=['FactorV','FactorKm']
 
@@ -174,9 +175,13 @@ kinfoflds=["GrpTyp", "GrpVal","GrpV_label"]
 odinverplklinfo
 # -
 
-odinverplgr[['FactorVGen','FactorVSpec']].sum()
+#synchronize with ODINcatVN
+FactorVincols=['FactorVGen','FactorVSpec','FactorActiveVGen','FactorActiveVSpec']
+odinverplgr[FactorVincols].sum()
 
 
+#controleer de initiele database odinverplklinfo die afstandsommen / motief vertaalt
+#naar afgeleide waardes van GrpTyp
 def mkverplsum1(indf,landcod):    
     totdf=indf[indf['KAfstCluCode']==landcod]    
     rv=totdf.groupby(['KAfstCluCode',"GrpTyp"])[infoflds].agg('sum')
@@ -194,8 +199,9 @@ t2=(mkverplsum1metlab(odinverplklinfo,kinfoflds,landcod)/1e9/5).reset_index()
 def convert_duurzaam_slice(t3):
     t2= t3[t3['GrpTyp']=='KHvm'].copy(deep=False)
     TTW_kgco2pkm=.149    
+    amodes= [5,6]
     t2['CO2GT']=t2['FactorKm'] * np.where(t2['GrpVal']==1,TTW_kgco2pkm,0)
-    t2['KmActive']=t2['FactorKm'] * np.where(np.isin(t2['GrpVal'],[5,6]),1,0)
+    t2['KmActive']=t2['FactorKm'] * np.where(np.isin(t2['GrpVal'],amodes),1,0)
     return t2
 #aantallen in miljarden per jaar, laatste kolom in kms
 #t2
@@ -212,7 +218,8 @@ mkverplsum1metlab(odinverplklinfo[odinverplklinfo['GrpTyp']=='Jaar'],kinfoflds,l
 
 
 # +
-#nu kenmerken per opvolgend slice
+#nu kenmerken per opvolgend slice,verouderde versie
+#deze code wordt niet meer gebruikt
 
 def _mkratioso (indfs,indfgr):
     indfr=indfs.merge(indfgr,how='left')
@@ -361,6 +368,8 @@ s2r = _dbg(odinverplklinfo)
 s2r.groupby('KAfstCluCode').sum()
 # -
 
+#dit stukje code vergelijkt de data van de oude en nieuwe methode
+#en laat de verschillend zien in FactorVd. Deze blijken nul te zijn
 odindiffgrpinfo = odindiffgrpinfo2
 odindiffgrpinfodifa = odindiffgrpinfo2.merge(odindiffgrpinfo0)
 odindiffgrpinfodifa['FactorVd']= odindiffgrpinfodifa['FactorC'] - odindiffgrpinfodifa['FactorV_c']
@@ -407,7 +416,8 @@ def mkdatadiff(verpl,fg,landcod):
 #    print(('vg',len(vg),vg.dtypes))
     return vg
 datadiffcache =    mkdatadiff(odinverplgr,fitgrpse,landcod)
-#datadiffcache
+datadiffcache.dtypes
+
 
 # +
 def _normflgvals (vg,kenmu,fg,cflds):    
@@ -441,12 +451,16 @@ def mkinfosums(vg,kenmu,fg,kenmcols,landcod):
     return dssu
     
 infotots2 = mkinfosums(datadiffcache ,odindiffflginfo,fitgrpse,kflgsflds,landcod)
-#infotots2
+infotots2.dtypes
 # -
 
+infotots2 
+
+#dubbel check: komen FactorV_v en FactorV precies uit (resultaat 1.0) op de totalen in ODINcatVN ?
+totaalmotief =74170863993
 if True:
     o2=infotots2.groupby(["GeoInd"]).agg('sum')
-    print(o2/74170863993)    
+    print(o2/totaalmotief)    
 o2
 
 
@@ -475,11 +489,11 @@ def _sumtogrpvals (vg,kenmua,fg,gt):
 #pak nu database als odinverplgr, differentieer per slice, en plak 
 #daar gegevens aan uit per groep genormeerde database als
 def mksumperklas(vg,kenmu,fg,landcod):
-    print(('vg',len(vg),vg.dtypes))
-#    kenmu=kenm.rename(columns={'FactorC':'FCone','FactorKm':'RitAfst'})
-    print(('kenmu',len(kenmu),kenmu.dtypes))
+#    print(('vg',len(vg),vg.dtypes))
+    kenmu=kenm.rename(columns={'FactorC':'FCone','FactorKm':'RitAfst'})
+#    print(('kenmu',len(kenmu),kenmu.dtypes))
     kenmgr = kenmu.groupby(["GrpTyp"])[['GrpVal']].agg('count').reset_index()
-    print (kenmgr)
+#    print (kenmgr)
     hasret=False
     #nu ontstaat de combinatie. Deze in geheugen opslaan maakt het erg groot, en daarmee traag
     for gt in list(kenmgr["GrpTyp"]) :
@@ -491,10 +505,11 @@ def mksumperklas(vg,kenmu,fg,landcod):
         hasret=True
     return dssu
     
-if False:
+if True:
     cattots2 = mksumperklas(datadiffcache,odindiffgrpinfo,fitgrpse,landcod)
     o2=cattots2.groupby(["GrpTyp","GeoInd"]).agg('sum')
-    print(o2/74170863993)    
+    print(o2/totaalmotief)    
+    #resultaten in o2 FactorV horen te normaliseren tot 1
     cattots2
 # -
 

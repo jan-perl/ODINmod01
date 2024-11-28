@@ -540,7 +540,8 @@ def addgrpexpl(indf,myspecvals,col0,col1,grp1map):
 # +
 #other file merge geo
 #other file addparsrecs
-
+#synchronize with ODINcatVNuse
+FactorVincols=['FactorVGen','FactorVSpec','FactorActiveVGen','FactorActiveVSpec']
 #dan een dataframe dat
 #2) per lengteschaal, 1 PC (van of naar en anderegroepen (maar bijv ook Motief ODin data verzamelt)
 
@@ -550,7 +551,7 @@ def mkdfverplxypc4d1 (df,myspecvals,xvarPC,pltgrps,grp1map,selstr,myKAfstV,myxla
 #    oprecs = df [df['OP']==1]
     gcols=pltgrps+ ['KAfstV',xvarPC]
     #sommeer per groep per oorspronkelijke KAfstV, maar niet voor internationaal
-    pstats = dfvrecs[gcols+['FactorVGen','FactorVSpec']].groupby(gcols).sum().reset_index()
+    pstats = dfvrecs[gcols+FactorVincols].groupby(gcols).sum().reset_index()
     if debug:
         print( ( "oorspr lengte groepen", len(pstats)) )
     #nu kleiner dataframe, dupliceer records in groep
@@ -582,6 +583,9 @@ def mkdfverplxypc4d1 (df,myspecvals,xvarPC,pltgrps,grp1map,selstr,myKAfstV,myxla
 def mkdfverplxypc4 (df,myspecvals,pltgrps,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4):
     df['FactorVGen']  = np.where(df['HighPCfls'],0, df['FactorV'] )
     df['FactorVSpec'] = np.where(df['HighPCfls'], df['FactorV'],0 )
+    amodes= [5,6]
+    df['FactorActiveVGen']= np.where(np.isin(df['KHvm'], amodes ),df['FactorVGen']  ,0)
+    df['FactorActiveVSpec']= np.where(np.isin(df['KHvm'], amodes ),df['FactorVSpec']  ,0)
 
     fr2= (mkdfverplxypc4d1 (df,myspecvals,grp,pltgrps,isnhexpl,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4)
             for grp in ['AankPC','VertPC'] )
@@ -600,9 +604,9 @@ odinverplgr[['KAfstCluCode','GeoInd']].groupby('KAfstCluCode').agg('count')
 
 allodinyr[['KAfstV','Verpl']].groupby('KAfstV').agg('count')
 
-odinverplgr[['FactorVGen','FactorVSpec']].sum()
+odinverplgr[FactorVincols].sum()
 
-odinverplgr[odinverplgr['PC4']==9711].groupby('MotiefV')[['FactorVGen','FactorVSpec']].sum()
+odinverplgr[odinverplgr['PC4']==9711].groupby('MotiefV')[FactorVincols].sum()
 
 
 # +
@@ -745,8 +749,56 @@ odinverplgr.to_pickle("../intermediate/ODINcatVN01db.pkl")
 odinverplklinfo.to_pickle("../intermediate/ODINcatVN02db.pkl")
 odinverplflgs.to_pickle("../intermediate/ODINcatVN03db.pkl")
 
-# mooi, nu analyses welke raar zijn
+# analyses welke afwijkend zijn kunnen pas in gebruiksfase
 
+
+# +
+#ga eerst uit van input data
+def mkpc4odinact(indf,pc4fld):
+    usedf = indf.copy(deep=False)
+    amodes= [5,6]
+    #mind: FactorKm is in allodinyr always zero
+    usedf['FactorActiveV']= np.where(np.isin(usedf['KHvm'], amodes ),usedf['FactorV']  ,0)
+    odf= usedf[['FactorV','FactorActiveV']+[pc4fld]].groupby([pc4fld]).sum()
+    odf['ActFractOri'] = odf['FactorActiveV']/odf['FactorV'] 
+    odf['GeoInd'] =pc4fld
+    odf=odf.reset_index().rename ( columns={pc4fld:'PC4'}) 
+    return odf
+
+pc4ODINinAct =  pd.concat( [ mkpc4odinact (allodinyr,'VertPC'),mkpc4odinact (allodinyr,'AankPC') ])
+#pc4ODINinAct =  pd.concat( [ mkpc4odinact (allodinyr,'AankPC') ])
+print(pc4ODINinAct.sum())
+pc4ODINinAct
+# -
+
+
+
+#even algemene grafiek maken
+KafstActiveVori = mkpc4odinact (allodinyr,'KAfstV').rename (columns={'PC4':'KAfstV'})
+KafstActiveVori['FactorVr'] = KafstActiveVori['FactorV'] / np.max(KafstActiveVori['FactorV'] )
+#KafstActiveVori.dtypes
+sns.relplot(data=KafstActiveVori, x='KAfstV',y='ActFractOri',kind='scatter')
+sns.relplot(data=KafstActiveVori, x='KAfstV',y='FactorVr',kind='line')
+
+
+# +
+#sommeer dan doorgegeven data
+def mkpc4odinact(indf,pc4fld):
+    usedf = indf.copy(deep=False)
+    amodes= [5,6]
+    #mind: FactorKm is in allodinyr always zero
+    usedf['FactorActiveV']= np.where(np.isin(usedf['KHvm'], amodes ),usedf['FactorV']  ,0)
+    odf= usedf[['FactorV','FactorActiveV']+[pc4fld]].groupby([pc4fld]).sum()
+    odf['ActFractOri'] = odf['FactorActiveV']/odf['FactorV'] 
+    odf['GeoInd'] =pc4fld
+    odf=odf.reset_index().rename ( columns={pc4fld:'PC4'}) 
+    return odf
+
+pc4ODINinAct =  pd.concat( [ mkpc4odinact (allodinyr,'VertPC'),mkpc4odinact (allodinyr,'AankPC') ])
+#pc4ODINinAct =  pd.concat( [ mkpc4odinact (allodinyr,'AankPC') ])
+print(pc4ODINinAct.sum())
+pc4ODINinAct
+# -
 
 print("Finished")
 
