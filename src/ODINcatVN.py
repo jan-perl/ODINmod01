@@ -773,12 +773,38 @@ pc4ODINinAct
 
 
 
+# +
 #even algemene grafiek maken
-KafstActiveVori = mkpc4odinact (allodinyr,'KAfstV').rename (columns={'PC4':'KAfstV'})
+KafstActiveVori = mkpc4odinact (allodinyr,'KAfstV').rename (columns={'PC4':'KAfstV'}).merge(useKAfstVall,how='left')
 KafstActiveVori['FactorVr'] = KafstActiveVori['FactorV'] / np.max(KafstActiveVori['FactorV'] )
+KafstActiveVori['FactorVCum'] = KafstActiveVori['FactorV'].cumsum()
+KafstActiveVori['FactorVCum'] = KafstActiveVori['FactorVCum']/ np.max( KafstActiveVori['FactorVCum'])
+KafstActiveVori['FactorPCum'] = KafstActiveVori['FactorVCum'].shift(1,fill_value=0)+1e-6
+KafstActiveVori['KAfstVFmt'] = KafstActiveVori['MaxAfst'].map(lambda x:"%3g"%(x))
+
 #KafstActiveVori.dtypes
 sns.relplot(data=KafstActiveVori, x='KAfstV',y='ActFractOri',kind='scatter')
 sns.relplot(data=KafstActiveVori, x='KAfstV',y='FactorVr',kind='line')
+# -
+
+KafstActiveVori
+
+KafstActiveVorid= KafstActiveVori.copy(deep=True)
+KafstActiveVorid['FactorPCum']=KafstActiveVorid['FactorVCum']
+KafstActiveVorid = pd.concat([ KafstActiveVori,KafstActiveVorid] ) .sort_values(by='FactorPCum')                       
+KafstActiveVorid                                                                             
+
+chart= sns.relplot(data=KafstActiveVorid, x='FactorPCum',y='ActFractOri',kind='line')
+totavgact= sum(KafstActiveVori['ActFractOri'] * KafstActiveVori['FactorV'] ) /sum( KafstActiveVori['FactorV'] )
+#totavgact= sum( KafstActiveVori['FactorVr'] )
+chart.fig.suptitle('Totaal aandeel actieve mobiliteit %.3f'%(totavgact))            
+chart.set_xlabels('Aandeel actieve modes')
+chart.set_ylabels('Fractie van reizen, per afstandsklasse' )
+labcolor="#3498db" # choose a color
+for x, y, name in zip(KafstActiveVori['FactorVCum'],KafstActiveVori['ActFractOri'],
+                      KafstActiveVori['KAfstVFmt']):
+    chart.ax.text(x+.02, y , name, color=labcolor)
+chart.ax.text(.2,.2 , 'aandeel %.3f'%(totavgact), color=labcolor)    
 
 
 # +

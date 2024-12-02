@@ -418,7 +418,7 @@ odinverplflgs =ODINcatVNuse.odinverplflgs_o[np.isin(ODINcatVNuse.odinverplflgs_o
 def deffactorv(rv):
     rv['FactorV'] = np.where ((rv['FactorVGen'] ==0 ) & ( rv['FactorVSpec']>0) ,
                0,rv['FactorVGen'] + 0* rv['FactorVSpec'] )
-    skipsdf = rv [(rv['FactorVGen'] ==0 ) & ( rv['FactorVSpec']>0) ] [['PC4','MotiefV']].copy()
+    skipsdf = rv [(rv['FactorVGen'] ==0 ) & ( rv['FactorVSpec']>0) ] [['PC4','MotiefV']].copy(deep=False)
     return skipsdf
 skipPCMdf = deffactorv(odinverplgr)
 skipPCMdf
@@ -1656,39 +1656,19 @@ datpltverplp = mkpltverplp (naarhuis,dspecvaltab,'AankPC/rudifun/S_MXI22_GB','Mo
 
 # +
 #check 1 reisigerskm auto kilometers
-
-# +
-def mkdatadiff3(verpl,fg,infof,landcod):    
-    return ODINcatVNuse.mkdatadiff(verpl,fg,landcod)
-
-def mkdatadiff2(verpl,fg,infof,grpind,landcod):    
-#    print(('verpl',len(verpl),verpl.dtypes) )
-    v2=verpl.copy(deep=False)
-#    v2['FactorV']= v2['FactorVGen']+ v2['FactorVSpec']
-    #in deze totalen zijn afstanden zinloos
-    v2['FactorKm']=v2['FactorV']
-    #deze dus niet normaliseren
-    vg= ODINcatVNuse.convert_diffgrpsidat(v2,fg,[grpind,'GeoInd'],
-                                          infof,['GeoInd'],"_v",landcod,False) 
-#    print(('vg',len(vg),vg.dtypes))
-    return vg
-#ddc_indat =  mkdatadiff2(fitdatverplgr,ODINcatVNuse.fitgrpse,
-#                         DINcatVNuse.infoflds,ODINcatVNuse.landcod)
-
-
 # -
 
 odindiffflginfo= ODINcatVNuse.convert_diffgrpsidat(odinverplflgs,
                 ODINcatVNuse.fitgrpse,[],ODINcatVNuse.kflgsflds, [],"_c",ODINcatVNuse.landcod,False)
 
 #ddc_indat =  ODINcatVNuse.mkdatadiff(fitdatverplgr,ODINcatVNuse.fitgrpse,ODINcatVNuse.landcod)
-ddc_indat =  mkdatadiff2(fitdatverplgr,
+ddc_indat =  ODINcatVNuse.mkdatadiff(fitdatverplgr,
                          ODINcatVNuse.fitgrpse,ODINcatVNuse.infoflds,'mxigrp',ODINcatVNuse.landcod)
 totinf_indat = ODINcatVNuse.mkinfosums(ddc_indat,odindiffflginfo,
                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,ODINcatVNuse.landcod)
 totinf_indat
 
-ddc_fitdat =  mkdatadiff2(fitdatverplgr.rename (
+ddc_fitdat =  ODINcatVNuse.mkdatadiff(fitdatverplgr.rename (
        columns={'FactorV':'FactorO', 'FactorEst':'FactorV' }),
             ODINcatVNuse.fitgrpse,  ODINcatVNuse.infoflds,'mxigrp',ODINcatVNuse.landcod)
 
@@ -1829,7 +1809,7 @@ def grosumm(dfm,lbl,myuseKAfstV,normfr):
         dfmu=dfm[np.isin(dfm['KAfstCluCode'],mymaskKAfstV)].copy (deep=False)
     else:
         dfmu=dfm.rename (columns={'FactorV':'FactorO', 'FactorEst':'FactorV' })
-    ddc_fitdat =  mkdatadiff2(dfmu, ODINcatVNuse.fitgrpse,  ODINcatVNuse.infoflds,'mxigrp',ODINcatVNuse.landcod)
+    ddc_fitdat =  ODINcatVNuse.mkdatadiff(dfmu, ODINcatVNuse.fitgrpse,  ODINcatVNuse.infoflds,'mxigrp',ODINcatVNuse.landcod)
 
     # myodinverplflgs / myodindiffflginfo kunnen ook buiten loop worden berekend, maar dit borgt consisitente
     # voor relatief weinig extra rekentijd

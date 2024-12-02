@@ -125,6 +125,7 @@ xlatKAfstV  = xlatKAfstVa [(xlatKAfstVa['KAfstCluCode']<=maxcuse ) |
 #print(xlatKAfstV)   
 print(useKAfstV)   
 
+#dit was alleen voor 
 useKAfstVQ  = useKAfstV [useKAfstV ["MaxAfst"] <4]
 #print(xlatKAfstV)   
 print(useKAfstVQ)   
@@ -372,37 +373,7 @@ gs00T
 
 
 #vergelijkbaar met origineel; gebruikt gelezen data
-def gropctots(dfmdummy,lbl,myuseKAfstV,normfr):
-    dfm=pd.read_pickle("../output/fitdf_"+lbl+".pd")
-#    dfm['mxigrp'] = dfm['PC4ori'] 
-    mymaskKAfstV= list(myuseKAfstV['KAfstCluCode'])
-    if lbl=='brondat':
-        dfmu=dfm[np.isin(dfm['KAfstCluCode'],mymaskKAfstV)].copy (deep=False)
-    else:
-        dfmu=dfm.rename (columns={'FactorV':'FactorO', 'FactorEst':'FactorV' })
-    ddc_fitdat =  mkdatadiff2(dfmu, ODINcatVNuse.fitgrpse,  ODINcatVNuse.infoflds,'mxigrp',ODINcatVNuse.landcod)
-
-    # myodinverplflgs / myodindiffflginfo kunnen ook buiten loop worden berekend, maar dit borgt consisitente
-    # voor relatief weinig extra rekentijd
-    myodinverplflgs =ODINcatVNuse.odinverplflgs_o[np.isin(
-         ODINcatVNuse.odinverplflgs_o['KAfstCluCode'],mymaskKAfstV)].copy (deep=False)
-    mxifitgrp= ['mxigrp']
-    myodindiffflginfo= ODINcatVNuse.convert_diffgrpsidat(myodinverplflgs,
-                mxifitgrp,[],ODINcatVNuse.kflgsflds, [],"_c",ODINcatVNuse.landcod,False)
-    totinf_fitdat = ODINcatVNuse.mkinfosums(ddc_fitdat,myodindiffflginfo,                                            
-                       mxifitgrp,ODINcatVNuse.kflgsflds,ODINcatVNuse.landcod)
-    rv =totinf_fitdat.groupby(["mxigrp"]).agg('sum')
-
-    return rv 
-rdf00="dummydonotuse"
-gs00=gropctots(rdf00,"orig",useKAfstVQ,[])
-#print(gs00)
-gs00T = gropctots(rdf00,"origchk",useKAfstVQ,gs00)
-gs00T
-
-
-#vergelijkbaar met origineel; gebruikt gelezen data
-def grosres (explst,incache0,mult,fitp,oridat,myuseKAfst,setname):
+def grosres (explst,incache0dummy,mult,fitpdummy,oridat,myuseKAfst,setname):
     rdf00N="dummydonotuse"
     gs00N = grosumm(rdf00N,"orig",myuseKAfst,[])
     st = ( grosumm("dummy2",exp,myuseKAfst ,gs00N)  for exp in explst )
@@ -412,12 +383,27 @@ def grosres (explst,incache0,mult,fitp,oridat,myuseKAfst,setname):
     st=st.append(dto)
     st.reset_index().to_excel("../output/fitrelres2_"+setname+".xlsx")
     return st
-stQ = grosres (elst[0:3],rudifungcache,1,"fitparadummy", fitdatverplgr,useKAfstVQ,'Dbg01Q-'+globset)
+stQ = grosres (elst[0:3],'rudifungcachedummy',1,"fitparadummy", 'fitdatverplgr',useKAfstV,'Dbg01Q-'+globset)
 stQ
 
 stQ
 
-     
+# +
+#allerlei active modes vergelijkingen
+# -
+
+pc4orisum = odinverplgr[odinverplgr['KAfstCluCode'] == ODINcatVNuse.landcod] .groupby (
+    ['PC4','GeoInd'] ).agg('sum').reset_index().rename(columns={"FactorV":"FactorVin"}).drop (
+     columns=['index','MotiefV','isnaarhuis','KAfstCluCode'])
+pc4orisum
+
+#maak een frame met FactorActiveV geschat op basis van FactorV, gesommeerd over astandsklasses
+#maak nog apart per motief
+infotots2pc = ODINcatVNuse._normflgvals(datadiffcache ,ODINcatVNuse.odindiffflginfo,
+                                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,['PC4']
+            ).      groupby(['PC4','GeoInd'] ).agg('sum').reset_index().drop (
+     columns=['MotiefV','isnaarhuis','KAfstCluCode'])
+infotots2pc
 
 # +
 #check eens alles

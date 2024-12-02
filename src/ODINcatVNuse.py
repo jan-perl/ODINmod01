@@ -130,16 +130,15 @@ pc4inwgcache = getcachedgrids(pc4inwgrid)
 
 # +
 odinverplgr_o=pd.read_pickle("../intermediate/ODINcatVN01db.pkl")
-
-def deffactorv(rv):
-    onlyok=False
+#bij onlyOK=True: zet waarden van gemaskeerde postcodes op NaN
+def deffactorv(rv,onlyok): 
     if onlyok:
         rv['FactorV'] = np.where ((rv['FactorVGen'] ==0 ) & ( rv['FactorVSpec']>0) ,
                np.nan,rv['FactorVGen'] + 0* rv['FactorVSpec'] )
     else:
         rv['FactorV'] = rv['FactorVGen'] + rv['FactorVSpec'] 
         
-deffactorv(odinverplgr_o)
+deffactorv(odinverplgr_o,False)
 # -
 
 fitgrps=['MotiefV','isnaarhuis']
@@ -405,7 +404,7 @@ odindiffflginfo = convert_diffgrpsidat(odinverplflgs,fitgrpse,[],kflgsflds, [],"
 odindiffflginfo
 
 
-def mkdatadiff(verpl,fg,landcod):    
+def mkdatadiff0(verpl,fg,landcod):    
 #    print(('verpl',len(verpl),verpl.dtypes) )
     v2=verpl.copy(deep=False)
 #    v2['FactorV']= v2['FactorVGen']+ v2['FactorVSpec']
@@ -415,12 +414,31 @@ def mkdatadiff(verpl,fg,landcod):
     vg= convert_diffgrpsidat(v2,fg,['PC4','GeoInd'],infoflds,['GeoInd'],"_v",landcod,False) 
 #    print(('vg',len(vg),vg.dtypes))
     return vg
-datadiffcache =    mkdatadiff(odinverplgr,fitgrpse,landcod)
+#datadiffcache =    mkdatadiff0(odinverplgr,fitgrpse,landcod)
+#datadiffcache.dtypes
+
+
+# +
+#Maak per afstandsgroep oplopende verschillen zodat die 
+#voor een deel categorie (PC4/ Geoind en fitgrpse ) oplopen tot het totaal in landcod
+
+def mkdatadiff(verpl,fg,infof,grpind,landcod):    
+#    print(('verpl',len(verpl),verpl.dtypes) )
+    v2=verpl.copy(deep=False)
+#    v2['FactorV']= v2['FactorVGen']+ v2['FactorVSpec']
+    #in deze totalen zijn afstanden zinloos
+    v2['FactorKm']=v2['FactorV']
+    #deze dus niet normaliseren
+    vg= convert_diffgrpsidat(v2,fg,[grpind,'GeoInd'],
+                                          infof,['GeoInd'],"_v",landcod,False) 
+#    print(('vg',len(vg),vg.dtypes))
+    return vg
+datadiffcache = mkdatadiff(odinverplgr,fitgrpse,infoflds,'PC4',landcod)
 datadiffcache.dtypes
 
 
 # +
-def _normflgvals (vg,kenmu,fg,cflds):    
+def _normflgvals (vg,kenmu,fg,cflds,outkeeppart):    
     ds=vg.merge(kenmu,how='left',on=fg+['KAfstCluCode'])
 #    print(('ds',len(ds),ds.dtypes))
     #normaliseren doen we hier, omdat er steeds precies 1 match is
@@ -438,7 +456,7 @@ def _normflgvals (vg,kenmu,fg,cflds):
     todrop2= list ( (fld+"_c" for fld in cflds) ) 
 #    print(todrop2)
     dsc= ds.drop(columns=todrop2)               
-    dssu=dsc.groupby(fg+ ['GeoInd'] ).agg('sum').reset_index()    
+    dssu=dsc.groupby(fg+outkeeppart+ ['GeoInd'] ).agg('sum').reset_index()    
     return dssu
 
 
@@ -447,7 +465,7 @@ def _normflgvals (vg,kenmu,fg,cflds):
 def mkinfosums(vg,kenmu,fg,kenmcols,landcod):    
 #    print(('vg',len(vg),vg.dtypes))    
 #    print(('kenmu',len(kenmu),kenmu.dtypes))
-    dssu=  _normflgvals (vg,kenmu,fg,kenmcols ) 
+    dssu=  _normflgvals (vg,kenmu,fg,kenmcols,[] ) 
     return dssu
     
 infotots2 = mkinfosums(datadiffcache ,odindiffflginfo,fitgrpse,kflgsflds,landcod)
@@ -463,24 +481,58 @@ if True:
     print(o2/totaalmotief)    
 o2
 
+pc4orisum = odinverplgr[odinverplgr['KAfstCluCode'] == landcod] .groupby (
+    ['PC4','GeoInd'] ).agg('sum').reset_index().rename(columns={"FactorV":"FactorVin"}).drop (
+     columns=['index','MotiefV','isnaarhuis','KAfstCluCode'])
+pc4orisum
+
+#maak een frame met FactorActiveV geschat op basis van FactorV, gesommeerd over astandsklasses
+#maak nog apart per motief
+infotots2pc = _normflgvals(datadiffcache ,odindiffflginfo,fitgrpse,kflgsflds,['PC4']
+            ).      groupby(['PC4','GeoInd'] ).agg('sum').reset_index().drop (
+     columns=['MotiefV','isnaarhuis','KAfstCluCode'])
+infotots2pc
+
+infotots2pcdiff=  infotots2pc.merge(pc4orisum,how='inner')
+infotots2pcdiff['FactorVChk'] =infotots2pcdiff['FactorV']- infotots2pcdiff['FactorVin']
+infotots2pcdiff['FactorActiveVIn'] =infotots2pcdiff['FactorActiveVGen']+ infotots2pcdiff['FactorActiveVSpec']
+infotots2pcdiff['RatActiveVIn'] = infotots2pcdiff['FactorActiveVIn']/infotots2pcdiff['FactorV']
+infotots2pcdiff['RatActiveV'] = infotots2pcdiff['FactorActiveV']/infotots2pcdiff['FactorV']
+infotots2pcdiff['FactorActiveVChk'] =infotots2pcdiff['FactorActiveV'] -infotots2pcdiff['FactorActiveVIn']
+#infotots2pcdiff[infotots2pcdiff['FactorVChk']  !=0]
+infotots2pcdiff.groupby(['GeoInd']).sum()/totaalmotief 
+
+#deze scatter plot ziet er goed uit
+infotots2pcdiffs=infotots2pcdiff[infotots2pcdiff['FactorV']>2e6]
+sns.relplot(data=infotots2pcdiffs, x='RatActiveVIn',y='RatActiveV',kind='scatter')
+
+# nu maskeren en tof wegschrijven per PC4
+
 
 # +
+#dit is kopie uit _normflgvals, die kennelijk nog niet heel consistent is
+
+#merge de data groep voor groep op gt 
+#controleer ook of er geen data kwijt zijn geraakt
 def _sumtogrpvals (vg,kenmua,fg,gt):
-    print (("_sumtogrpvals"),gt)
+    print (("debug: _sumtogrpvals"),gt)
     kenmu = kenmua[np.isin(kenmua["GrpTyp"],gt)].copy(deep=False)
-    print(('kenmu',len(kenmu)))
+    print(('len kenmu',len(kenmu)))
     ds=vg.merge(kenmu,how='left',on=fg+['KAfstCluCode'])
-    print(('ds',len(ds),ds.dtypes))
+    print(('len ds',len(ds),ds.dtypes))
     ds['FactorV'] = ds['FactorV_v'] * ds['FactorV_c']
     ds['FactorKm'] = ds['FactorV_v'] * ds['FactorKm_c']
     ds=ds.drop(columns=[ "GrpVal","GrpV_label"])
-    debug =True
+    debug =False
     if debug:
         ds['Checkn2'] = 1 *  ds['FactorV_c']
         indftst=ds.groupby(fg+['KAfstCluCode'] +  ["GrpTyp",'GeoInd'] ).agg('sum').reset_index()    
         indfail1 = indftst[(abs(indftst['Checkn2']-1)> 1e-6) & (indftst['Checkn2'] !=0)]
+        #TODO: uitzoeken wat deze check doet en waarom deze waarschuwt
         if len(indfail1)>0:
+            print("Interne consistentie: Checkn2 hoort 1 of 0 te zijn, niets er tussen in")   
             print(indfail1)
+            print("programming error")   
 #            raise("programming error")   
     dssu=ds.groupby(fg+ ["GrpTyp",'GeoInd'] ).agg('sum').reset_index()    
     return dssu
@@ -488,25 +540,20 @@ def _sumtogrpvals (vg,kenmua,fg,gt):
 
 #pak nu database als odinverplgr, differentieer per slice, en plak 
 #daar gegevens aan uit per groep genormeerde database als
-def mksumperklas(vg,kenmu,fg,landcod):
+def mksumperklas(vg,kenmu,fg):
 #    print(('vg',len(vg),vg.dtypes))
-    kenmu=kenm.rename(columns={'FactorC':'FCone','FactorKm':'RitAfst'})
+#    kenmu=kenm.rename(columns={'FactorC':'FCone','FactorKm':'RitAfst'})
 #    print(('kenmu',len(kenmu),kenmu.dtypes))
     kenmgr = kenmu.groupby(["GrpTyp"])[['GrpVal']].agg('count').reset_index()
 #    print (kenmgr)
-    hasret=False
     #nu ontstaat de combinatie. Deze in geheugen opslaan maakt het erg groot, en daarmee traag
-    for gt in list(kenmgr["GrpTyp"]) :
-        dssp=  _sumtogrpvals (vg,kenmu,fg,[gt] ) 
-        if hasret:
-            dssu= dssu.append(dssp)
-        else:
-            dssu=dssp
-        hasret=True
-    return dssu
+    #gebruik map om deze een voor een uit te voeren
+    dssu0 = map(lambda gt: _sumtogrpvals (vg,kenmu,fg,[gt] )  ,list(kenmgr["GrpTyp"])) 
+    dssu1 = pd.concat(dssu0)
+    return dssu1
     
 if True:
-    cattots2 = mksumperklas(datadiffcache,odindiffgrpinfo,fitgrpse,landcod)
+    cattots2 = mksumperklas(datadiffcache,odindiffgrpinfo,fitgrpse)
     o2=cattots2.groupby(["GrpTyp","GeoInd"]).agg('sum')
     print(o2/totaalmotief)    
     #resultaten in o2 FactorV horen te normaliseren tot 1
