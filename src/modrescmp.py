@@ -39,6 +39,9 @@ import rasteruts1
 import rasterio
 calcgdir="../intermediate/calcgrids"
 
+#voor gemeentegrenzen; kost hier wel heel veel geheugen voor. Kijken hoe dit te vermijden
+import ODiN2readpkl
+
 from sklearn.linear_model import LinearRegression
 from scipy.optimize import nnls
 from sklearn import linear_model
@@ -125,10 +128,10 @@ xlatKAfstV  = xlatKAfstVa [(xlatKAfstVa['KAfstCluCode']<=maxcuse ) |
 #print(xlatKAfstV)   
 print(useKAfstV)   
 
-#dit was alleen voor 
-useKAfstVQ  = useKAfstV [useKAfstV ["MaxAfst"] <4]
-#print(xlatKAfstV)   
-print(useKAfstVQ)   
+# +
+#dit was alleen voor ODIN1KAFmo om met kleine sets te werken.
+#deze variabele niet gebruiken voor verwerken hele sets
+#useKAfstVQ  = useKAfstV [useKAfstV ["MaxAfst"] <4]
 
 # +
 #import ODiN2pd
@@ -334,9 +337,9 @@ def gropc4stats(dfm,lbl,myuseKAfstV,normfr):
         rv = rv/ normfr
         rv['label']=lbl
     return rv 
-gs00=gropc4stats(rdf00,"orig",useKAfstVQ,[])
+gs00=gropc4stats(rdf00,"orig",useKAfstV,[])
 #print(gs00)
-gs00T = gropc4stats(rdf00,"origchk",useKAfstVQ,gs00)
+gs00T = gropc4stats(rdf00,"origchk",useKAfstV,gs00)
 gs00T
 
 
@@ -366,9 +369,9 @@ def grosumm(dfmdummy,lbl,myuseKAfstV,normfr):
         rv = rv/ normfr
         rv['label']=lbl
     return rv 
-gs00=grosumm(rdf00,"orig",useKAfstVQ,[])
+gs00=grosumm(rdf00,"orig",useKAfstV,[])
 #print(gs00)
-gs00T = grosumm(rdf00,"origchk",useKAfstVQ,gs00)
+gs00T = grosumm(rdf00,"origchk",useKAfstV,gs00)
 gs00T
 
 
@@ -389,26 +392,269 @@ stQ
 stQ
 
 # +
-#allerlei active modes vergelijkingen
-# -
-
-pc4orisum = odinverplgr[odinverplgr['KAfstCluCode'] == ODINcatVNuse.landcod] .groupby (
-    ['PC4','GeoInd'] ).agg('sum').reset_index().rename(columns={"FactorV":"FactorVin"}).drop (
-     columns=['index','MotiefV','isnaarhuis','KAfstCluCode'])
-pc4orisum
-
-#maak een frame met FactorActiveV geschat op basis van FactorV, gesommeerd over astandsklasses
-#maak nog apart per motief
-infotots2pc = ODINcatVNuse._normflgvals(datadiffcache ,ODINcatVNuse.odindiffflginfo,
-                                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,['PC4']
-            ).      groupby(['PC4','GeoInd'] ).agg('sum').reset_index().drop (
-     columns=['MotiefV','isnaarhuis','KAfstCluCode'])
-infotots2pc
-
-# +
 #check eens alles
 #stQa = grosres (elst,rudifungcache,1,fitpara, fitdatverplgr,useKAfstVQ,'DBgf01Q-'+globset)
 #stQa
+# +
+#allerlei active modes vergelijkingen
 # -
+
+pc4orisumng = (odinverplgr[odinverplgr['KAfstCluCode'] == ODINcatVNuse.landcod] .groupby (
+    ['PC4'] ).agg('sum')*0.5).reset_index().rename(columns={"FactorV":"FactorVin"}).drop (
+     columns=['index','MotiefV','isnaarhuis','KAfstCluCode'])
+pc4orisumng
+pc4orisum = (odinverplgr[odinverplgr['KAfstCluCode'] == ODINcatVNuse.landcod] .groupby (
+    ['PC4','GeoInd'] ).agg('sum')).reset_index().rename(columns={"FactorV":"FactorVin"}).drop (
+     columns=['index','MotiefV','isnaarhuis','KAfstCluCode'])
+pc4orisum
+
+ODINcatVNuse.deffactorv(ODINcatVNuse.odinverplgr_o,False)
+odinverplgrmspec =ODINcatVNuse.odinverplgr_o[np.isin(ODINcatVNuse.odinverplgr_o['KAfstCluCode'],maskKAfstV)].copy (deep=False)
+
+ODINcatVNuse.deffactorv(ODINcatVNuse.odinverplgr_o,True)
+odinverplgr =ODINcatVNuse.odinverplgr_o[np.isin(ODINcatVNuse.odinverplgr_o['KAfstCluCode'],maskKAfstV)].copy (deep=False)
+
+datadiffcachemspec = ODINcatVNuse.mkdatadiff(odinverplgrmspec,ODINcatVNuse.fitgrpse,
+                                        ODINcatVNuse.infoflds,'PC4',ODINcatVNuse.landcod)
+datadiffcache = ODINcatVNuse.mkdatadiff(odinverplgr,ODINcatVNuse.fitgrpse,
+                                        ODINcatVNuse.infoflds,'PC4',ODINcatVNuse.landcod)
+
+datadiffcachemspec.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief
+
+totaalVgen=6.930094e+10
+#69340695887
+datadiffcache.groupby(['GeoInd']).sum()/totaalVgen
+
+datadiffcache.groupby(['KAfstCluCode','GeoInd']).sum()
+
+
+#maak een frame met FactorActiveV geschat op basis van FactorV, gesommeerd over astandsklasses
+#maak nog apart per motief
+def calcFactVPC4(ddc,perGeoInd):
+    if perGeoInd:
+        return (ODINcatVNuse.normflgvals(ddc ,odindiffflginfo,
+                                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,['PC4']
+            ).      groupby(['PC4','GeoInd'] ).agg('sum')).reset_index().drop (
+     columns=['MotiefV','isnaarhuis','KAfstCluCode'])
+    else:
+        return (ODINcatVNuse.normflgvals(ddc ,odindiffflginfo,
+                                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,['PC4']
+            ).      groupby(['PC4'] ).agg('sum')*0.5).reset_index().drop (
+                columns=['MotiefV','isnaarhuis','KAfstCluCode'])
+calcFactVPC4(datadiffcache,False)
+calcFactVPC4(datadiffcache,True)
+
+
+def mrgpcdiffr(in2pc,inpc4ori):
+    infotots2pcdiff=  in2pc.merge(inpc4ori,how='inner')
+    infotots2pcdiff['FactorVChk'] =infotots2pcdiff['FactorV']- infotots2pcdiff['FactorVin']
+    infotots2pcdiff['FactorActiveVIn'] =infotots2pcdiff['FactorActiveVGen']
+    #+ infotots2pcdiff['FactorActiveVSpec']
+    infotots2pcdiff['RatActiveVIn'] = infotots2pcdiff['FactorActiveVIn']/infotots2pcdiff['FactorV']
+    infotots2pcdiff['RatActiveV'] = infotots2pcdiff['FactorActiveV']/infotots2pcdiff['FactorV']
+    infotots2pcdiff['FactorActiveVChk'] =infotots2pcdiff['FactorActiveV'] -infotots2pcdiff['FactorActiveVIn']
+    #infotots2pcdiff[infotots2pcdiff['FactorVChk']  !=0]
+    return(infotots2pcdiff)
+infotots2pcdiff=mrgpcdiffr(calcFactVPC4(datadiffcachemspec,True),pc4orisum)
+infotots2pcdiff.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief
+#/totaalVgen
+
+infotots2pcdiffmspecng=mrgpcdiffr(calcFactVPC4(datadiffcachemspec,False),pc4orisumng)
+infotots2pcdiffmspecng.sum()/ODINcatVNuse.totaalmotief
+
+infotots2pcdiffng=mrgpcdiffr(calcFactVPC4(datadiffcache,False),pc4orisumng)
+infotots2pcdiffng.sum()/totaalVgen
+
+
+#deze scatter plot ziet er goed uit
+def mkactpccmpfig(indf0,title):
+    indf=indf0[indf0['FactorV']>5e6]
+    fig, ax = plt.subplots(figsize=(6, 4))
+    c2=sns.lineplot(data=indf, x='RatActiveVIn',y='RatActiveVIn',ax=ax)
+    c1=sns.scatterplot(data=indf, x='RatActiveVIn',y='RatActiveV',ax=ax)
+    fig.suptitle(title)
+    return(fig)
+r1=mkactpccmpfig(infotots2pcdiffng,'Data center functions excluded')
+
+
+r1=mkactpccmpfig(infotots2pcdiffmspecng,'All ODIN data incl center functions')
+
+# +
+showgdir="../intermediate/showgrids"
+act1tifname=showgdir+'/actmo01.tif'
+#let op: gaat uit van gesorteerd en reset_index dataframa
+def make1stgridgeorel (tifname,indf,usecols,nanval):
+    if (np.max(indf.index -np.array(range(len(indf)))) !=0):
+        raise(GridArgError("make1stgridgeo: Index not in order (sorting not checked)"))        
+    grid = rasteruts1.createNLgrid(100,tifname,8,'')
+    dfrefs= rasteruts1.makegridcorr (indf,grid)
+    #veel niet gevonden uit landelijk !
+    indf['area_geo'] = indf.area
+    missptdf= rasteruts1.findmiss(indf,dfrefs)
+    for col in usecols:
+        indf[col]=np.where(indf[col] == nanval,0,indf[col])
+    imagelst=rasteruts1.mkimgpixavgs(grid,dfrefs,False,False, indf[usecols],False)  
+    grid.close()
+    grid = rasterio.open(tifname)
+    return grid
+
+act1tifcols= ['RatActiveVIn','RatActiveV']
+act1grid= make1stgridgeorel (act1tifname,cbspc4data.merge(infotots2pcdiffng,how='left',
+                                                         left_on=['postcode4'],right_on='PC4'),act1tifcols,999)
+# -
+
+#common code with Mkaddgrids
+gemeentendata ,  wijkgrensdata ,    buurtendata = ODiN2readpkl.getgwb(2020)
+
+#common code with Mkaddgrids
+grgem = gemeentendata[(gemeentendata['H2O']=='NEE') & (gemeentendata['AANT_INW']>1e5) ]
+
+
+#common code with Mkaddgrids
+def setaxreg(ax,reg):
+    if reg=='htn':
+        ax.set_xlim(left=137000, right=143000)
+        ax.set_ylim(bottom=444000, top=452000)
+    elif reg=='utr':    
+        ax.set_xlim(left=113000, right=180000)
+        ax.set_ylim(bottom=480000, top=430000)
+
+
+act1grid= rasterio.open(act1tifname)
+actcache={}
+actcache[3]= act1grid.read(3) 
+actcache[5]= act1grid.read(4) 
+
+# +
+#code modified from Mkaddgrids
+nlextent=[0,280000,300000, 625000]
+def actpltland(ecache,fld,selextent,fname,txt):
+    minv=1e-7
+    mos=np.log(minv)/ np.log(10)
+    image1= ecache[3]
+    image1[0][0]=1
+    image1[0][1]=0
+    image2= ecache[5]
+    image2[0][0]=1
+    image2[0][1]=0
+    nv = ecache[3] - ecache[5]    
+    image3= nv
+
+    lststr =  'Values for {}, min1 log10 W {}, max log10 W {}, min O {} , max log10 O {}  , max log10 negs {}'. format (txt, np
+                    .min(image1)-mos,np.max(image1)-mos , np.min(image2)-mos,np.max(image2)-mos,np.max(image3)-mos)
+    print (lststr)
+    fig, (ax1, ax2,ax3) = plt.subplots(nrows=1, ncols=3, figsize=(50, 20))
+    #image = np.isnan(image)
+    ax1.imshow(image1,cmap='jet',alpha=.6,extent=selextent)
+    ax2.imshow(image2,cmap='jet',alpha=.6,extent=selextent)
+    ax3.imshow(np.where(image3>=0, image3,np.nan),cmap='Reds',alpha=.6,extent=selextent)
+    ax3.imshow(np.where(image3<=0, -image3,np.nan),cmap='Blues',alpha=.6,extent=selextent)
+#    ax3.imshow(image3,cmap='Greens',alpha=.6,extent=selextent)
+    grgem.boundary.plot(color='green',ax=ax1,alpha=.8)
+    grgem.boundary.plot(color='green',ax=ax2,alpha=.8)
+    grgem.boundary.plot(color='green',ax=ax3,alpha=.8)
+    if (selextent[0] == 113000):
+        setaxreg(ax1,'utr')
+        ax1.invert_yaxis()
+        setaxreg(ax2,'utr')
+        ax2.invert_yaxis()
+        setaxreg(ax3,'utr')
+        ax3.invert_yaxis()
+#   ax1.colorbar()
+#    ax2.colorbar()
+#    axes[0].plot(x1, y1)
+#    axes[1].plot(x2, y2)
+    ax2.set_title(lststr)
+    fig.tight_layout()
+    figname = "../intermediate/addgrds/fig_"+fname+'.png';
+    fig.savefig(figname) 
+    return fig
+
+r1=actpltland(actcache,3,nlextent,'actexample','actexample')
+# -
+
+#common code with Mkaddgrids
+utrextent=[113000,180000,430000,480000 ]
+def mkloccach(ecache,selextent,oriextent):
+    oridim = ecache[3].shape
+    xmul= oridim[1]/(oriextent[1]-oriextent[0])
+    ymul= oridim[0]/(oriextent[2]-oriextent[3])
+    #print([oridim,oriextent,xmul,ymul])
+    
+    xmin=int((selextent[0]-oriextent[0])*xmul)
+    xmax=int((selextent[1]-oriextent[0])*xmul)
+    ymin=int((selextent[2]-oriextent[3])*ymul)
+    ymax=int((selextent[3]-oriextent[3])*ymul)
+    #print([xmin,xmax,ymin,ymax])
+    ocache=dict()
+    for imgidx in [3,5]:
+        #print(ecache[imgidx].shape)
+        sli= ecache[imgidx][ymax:ymin,xmin:xmax]
+        odim = sli.shape
+        #print(odim)
+        ocache[imgidx]= sli
+    return ocache
+actcacheutr=mkloccach(actcache,utrextent,nlextent)
+r1=actpltland(actcacheutr,3,utrextent,'actexampleut','actexampleut')
+
+#goede check, maar geen actieve mode info:
+datadiffcache.groupby(['KAfstCluCode','GeoInd']).sum().rename(columns= {"FactorV_v":"FactorV" })
+
+
+#bijdrage actieve mode per afstandsklasse, uit odinverplflgs
+def mkverplAsftsu(inflgs):
+    odinverplAsftsu=inflgs.groupby(['KAfstCluCode']).sum().reset_index()
+    #.rename(       columns= {"KAfstCluCode":"Kafst"})
+    odinverplAsftsu["FactorV"] = odinverplAsftsu["FactorV"] - odinverplAsftsu["FactorV"].shift(1,fill_value=0)
+    odinverplAsftsu["FactorActiveV"] = odinverplAsftsu["FactorActiveV"] - odinverplAsftsu["FactorActiveV"].shift(1,fill_value=0)
+    odinverplAsftsu["ActFractOri"] = odinverplAsftsu["FactorActiveV"] / odinverplAsftsu["FactorV"]
+    return(odinverplAsftsu)
+odinverplAsftsu=mkverplAsftsu(odinverplflgs)
+
+
+# +
+#even algemene grafiek maken
+def prepactsdb(db1,myKAfstV):
+    KafstActiveVori = db1.merge(myKAfstV,how='left')
+    KafstActiveVori['FactorVr'] = KafstActiveVori['FactorV'] / np.max(KafstActiveVori['FactorV'] )
+    KafstActiveVori['FactorVCum'] = KafstActiveVori['FactorV'].cumsum()
+    KafstActiveVori['FactorVCum'] = KafstActiveVori['FactorVCum']/ np.max( KafstActiveVori['FactorVCum'])
+    KafstActiveVori['FactorPCum'] = KafstActiveVori['FactorVCum'].shift(1,fill_value=0)+1e-6
+    KafstActiveVori['KAfstVFmt'] = np.where(KafstActiveVori['MaxAfst'] ==0,"verder",
+                                            KafstActiveVori['MaxAfst'].map(lambda x:"%3g"%(x)) )
+    return(KafstActiveVori)
+
+KafstActiveVori = prepactsdb(odinverplAsftsu,useKAfstV)
+
+
+# +
+def pltactsdb(myActiveVori,savtag,title):
+    KafstActiveVorid= myActiveVori.copy(deep=True)
+    KafstActiveVorid['FactorPCum']=KafstActiveVorid['FactorVCum']
+    KafstActiveVorid = pd.concat([ myActiveVori,KafstActiveVorid] ) .sort_values(by='FactorPCum')                       
+    KafstActiveVorid  
+
+    chart= sns.relplot(data=KafstActiveVorid, x='FactorPCum',y='ActFractOri',kind='line')
+    totavgact= sum(myActiveVori['ActFractOri'] * myActiveVori['FactorV'] ) /sum( myActiveVori['FactorV'] )
+    #totavgact= sum( KafstActiveVori['FactorVr'] )
+    chart.fig.suptitle(title)
+    #chart.fig.suptitle('Totaal aandeel actieve mobiliteit %.3f'%(totavgact))            
+    chart.set_xlabels('Aandeel actieve modes')
+    chart.set_ylabels('Fractie van reizen, per afstandsklasse' )
+    labcolor="#3498db" # choose a color
+    for x, y, name in zip(myActiveVori['FactorVCum'],myActiveVori['ActFractOri'],
+                          myActiveVori['KAfstVFmt']):
+        chart.ax.text(x+.02, y , name, color=labcolor)
+    chart.ax.text(.2,.2 , 'aandeel actieve\nmodes %.3f'%(totavgact), color=labcolor) 
+    chart.ax.text(.7,.7 , 'aandeel gemotoriseerde\nmodes %.3f'%(1-totavgact), color=labcolor) 
+    chart.ax.set_xlim(0,1)
+    chart.ax.set_ylim(0,1)
+    figname = "../output/act_reg_"+savtag+"_"+'m1.svg';
+    chart.fig.savefig(figname, bbox_inches="tight")
+
+pltactsdb(KafstActiveVori,'orisel','Originele ODIN data - afstanden > 15 geclusterd')  
+# -
+
+print("Finished")
 
 

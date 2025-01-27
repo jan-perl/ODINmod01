@@ -130,5 +130,44 @@ chkAantVpl
 chkAantRit= chkaantal(ODiN2readpkl.allodinyr,dbk_2022_cols,'VerplID','AantRit','Verpl','Rit')
 chkAantRit
 
+
+#from https://stackoverflow.com/questions/14507794/how-to-flatten-a-hierarchical-index-in-columns
+def flatten_columns(self):
+    """Monkey patchable function onto pandas dataframes to flatten multiindex column names from tuples. Especially useful
+    with plotly.
+
+    pd.DataFrame.flatten_columns = flatten_columns
+
+    """
+    df = self.copy()
+    df.columns = [
+        '_'.join([str(x)
+                  for x in [y for y in item
+                            if y]]) if not isinstance(item, str) else item
+        for item in df.columns
+    ]
+    return df
+pd.DataFrame.flatten_columns = flatten_columns
+
+
 # +
 #TODO check sum FactorV versus FactorP
+# -
+
+#TODO check AfstV versus KAfstV
+def chkKafstVvsAfstV(dfin):
+    df= dfin [dfin ['Rit'] ==1] 
+    grp = df.groupby(['KAfstV'])[['AfstV']].agg(['min','mean','max','count']).reset_index().flatten_columns()
+    grp['AfstV_mid'] = 0.5*(grp['AfstV_min'] + grp['AfstV_max'])
+    return grp
+chkKafstVvsAfstV(ODiN2readpkl.allodinyr)
+
+
+#check AfstR versus KAfstR
+#deze kloppen gewoon, ritten worden overigens niet gebruikt
+def chkKafstRvsAfstR(df):
+    grp = df.groupby(['KAfstR'])[['AfstR']].agg(['min','mean','max','count']).reset_index()
+    return grp
+chkKafstRvsAfstR(ODiN2readpkl.allodinyr)
+
+

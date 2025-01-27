@@ -174,6 +174,15 @@ allodinyr=_onlyverpl(ODiN2readpkl.allodinyr)
 len(allodinyr.index)
 
 
+#voor normalisatie van Factor V per jaar
+def getjaren(indf):
+    ntab = indf.groupby('Jaar')[['Jaar']].agg('count')
+    return ntab
+welkejaren = getjaren (allodinyr).index
+aantaljaren=len(welkejaren)
+print(aantaljaren)
+
+
 # +
 #nu ODIN ranges opzetten
 #we veranderen NIETS aan odin data
@@ -465,32 +474,60 @@ highman
 
 
 # +
-def surplusPCmotief(allpc4,df,man):
+def surplusPCmotief(allpc4,df,man,filtered,njaar):
     pc4data=allpc4[['postcode4','aantal_inwoners','oppervlak']].rename(columns={'postcode4':'OthPC'} ) .copy()
     pc4totaal = pc4data[['aantal_inwoners','oppervlak']].sum()
 #       .reset_index().rename(
 #          columns={'aantal_inwoners':'inwoners_totaal', 'oppervlak': 'oppervlak_totaal' } )
 #    print(pc4totaal.oppervlak)
-    allemotief = df.groupby(['OthPC', 'MotiefV'])[['FactorV']].sum().reset_index()
+    allemotief = (df.groupby(['OthPC', 'MotiefV'])[['FactorV']].sum()/njaar).reset_index()
     allemotief = allemotief[allemotief['OthPC']!=0].merge(pc4data,how='left')
-    motieftotaal = allemotief.groupby([ 'MotiefV'])[['FactorV']].sum().reset_index().rename(
+    motieftotaal = (allemotief.groupby([ 'MotiefV'])[['FactorV']].sum()).reset_index().rename(
         columns={'FactorV':'MotiefTot'} )
 #    print(motieftotaal)
     allemotief = allemotief.merge(motieftotaal,how='left')
     allemotief['oppfrac']=  allemotief['MotiefTot'] * allemotief['oppervlak']/ pc4totaal.oppervlak
 #    print(allemotief)
-    allemotief['siggrens'] = 1e6+  .002 *  allemotief['MotiefTot'] + .2*allemotief['oppfrac']
+    allemotief['siggrens'] = 2e5+  .002 *  allemotief['MotiefTot'] + .2*allemotief['oppfrac']
     tehoog=abs(allemotief['FactorV'] - allemotief['oppfrac'])  >allemotief['siggrens'] 
+    tehoog = tehoog | ( (allemotief['FactorV'] <.05 * allemotief['oppfrac']) | \
+                      (allemotief['FactorV'] >100 * allemotief['oppfrac'])  ) & \
+                      ( (allemotief['FactorV'] + allemotief['oppfrac'] ) >4e5 )
     man['flgman']=1.1
     allemotief=allemotief.merge(man,how='left')
-    rv =allemotief[ tehoog | (False== np.isnan(allemotief['flgman']))  ]
+    allemotief['isSpec']= tehoog | (False== np.isnan(allemotief['flgman'])) 
+    if filtered:
+        rv =allemotief[ allemotief['isSpec']]
+    else:
+        rv =allemotief
     return rv
                                                                                             
-highpcs = surplusPCmotief(cbspc4data,allodinyr,highman)
+highpcs = surplusPCmotief(cbspc4data,allodinyr,highman,True,aantaljaren)
 print(len(highpcs))
 print( highpcs.groupby('MotiefV')[['OthPC']].count() )
 print( highpcs.groupby('OthPC')[['MotiefV']].count() )
 highpcs.to_excel("../output/highmotiefPCs.xlsx")
+
+
+# +
+def pcfactorgraph():
+    allemotief = surplusPCmotief(cbspc4data,allodinyr,highman,False)
+    allemotief['FactorOppFact'] = allemotief['FactorV'] / (allemotief['oppfrac']+1e-16)
+    allemotief = allemotief.sort_values(by=['isSpec','FactorOppFact'])
+    allemotief['Deelfact'] =( allemotief['FactorV'] + allemotief['oppfrac']) .cumsum()
+    allemotief['Deelfact'] = allemotief['Deelfact']/ max(allemotief['Deelfact'])    
+    fig, ax = plt.subplots(figsize=(6, 4))
+    seaborn.lineplot(data=allemotief,x='Deelfact',y='FactorOppFact', color='g',ax=ax)    
+    seaborn.lineplot(data=allemotief,x='Deelfact',y=0.05, color='r',ax=ax)    
+    seaborn.lineplot(data=allemotief,x='Deelfact',y=100, color='r',ax=ax)    
+    seaborn.lineplot(data=allemotief,x='Deelfact',y=1, color='b',ax=ax)    
+#    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.set_ylabel('aantal reizen / oppervlak verdeling (woonfunc niet specifiek)')
+    ax.set_xlabel('Fractie van alle reizen, opgedeeld in Gen/Spec')
+    print(fig)
+    
+pcfactorgraph()
 
 
 # -
@@ -578,7 +615,7 @@ def mkdfverplxypc4d1 (df,myspecvals,xvarPC,pltgrps,grp1map,selstr,myKAfstV,myxla
     
     return(pstatsc)
 
-#code werk nog niet 
+#code werkt nog niet 
 
 def mkdfverplxypc4 (df,myspecvals,pltgrps,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4):
     df['FactorVGen']  = np.where(df['HighPCfls'],0, df['FactorV'] )
@@ -616,18 +653,20 @@ odinverplgr[odinverplgr['PC4']==9711].groupby('MotiefV')[FactorVincols].sum()
 #dan een dataframe dat
 #2) per lengteschaal, 1 PC (van of naar en anderegroepen (maar bijv ook Motief ODin data verzamelt)
 
-def mkdfverplklas1 (df,myspecvals,xvarPC,pltgrps,grp1map,myinfoflds,myKAfstV,myxlatKAfstV):
+def mkdfverplklas1 (df,myspecvals,xvarPC,pltgrps,grp1map,myinfoflds,myKAfstV,myxlatKAfstV,njaar):
     debug=False
     dfvrecs = df [(df['Verpl']==1 ) & (df['AankPC'] > 500) & (df['VertPC'] > 500)  ].copy(deep=False)   
 #    oprecs = df [df['OP']==1]
     gcols=pltgrps+ ['KAfstV',xvarPC]
     #sommeer per groep per oorspronkelijke KAfstV, maar niet voor internationaal
+    dfvrecs['FactorV']= dfvrecs['FactorV'] /njaar
+    dfvrecs['FactorKm']= dfvrecs['FactorV'] * dfvrecs['AfstV'] *10
     pstats = dfvrecs[gcols+myinfoflds].groupby(gcols).sum().reset_index()
     if debug:
         print( ( "oorspr lengte groepen", len(pstats)) )
     #nu kleiner dataframe, dupliceer records in groep
     pstatsa= pstats.merge(useKAfstVall[['KAfstV','AvgAfst']],how='left')
-    pstatsa['FactorKm']= pstatsa['FactorV'] * pstatsa['AvgAfst']
+    #pstatsa['FactorKm']= pstatsa['FactorV'] * pstatsa['AvgAfst']    
     pstatsc = pstatsa[pstatsa ['KAfstV'] >0].merge(myxlatKAfstV,how='left').drop( columns='KAfstV')
     if debug:    
         print( ( "oorspr lengte groepen met duplicaten", len(pstats)) )
@@ -666,18 +705,17 @@ def mkdfverplklas1 (df,myspecvals,xvarPC,pltgrps,grp1map,myinfoflds,myKAfstV,myx
 
 #code werk nog niet 
 
-def mkdfverplklas (df,myspecvals,pltgrps,myinfogrps,lisnhexpl,myinfoflds,myKAfstV,myxlatKAfstV):
-    fr2= (mkdfverplklas1(df,myspecvals,grp,pltgrps,lisnhexpl,myinfoflds,myKAfstV,myxlatKAfstV)
+def mkdfverplklas (df,myspecvals,pltgrps,myinfogrps,lisnhexpl,myinfoflds,myKAfstV,myxlatKAfstV,njaar):
+    fr2= (mkdfverplklas1(df,myspecvals,grp,pltgrps,lisnhexpl,myinfoflds,myKAfstV,myxlatKAfstV,njaar)
             for grp in myinfogrps)
     rv=pd.concat(fr2).reset_index()
     return rv
 
 
 infogrps=['KHvm','AankUur','VertUur','Jaar','Verpl']
-allodinyr['FactorKm']= allodinyr['FactorV'] * allodinyr['AfstS'] *10
 infoflds=['FactorV','FactorKm']
 odinverplklinfo = mkdfverplklas (allodinyr ,specvaltab,fitgrps,infogrps,isnhexpl,infoflds,
-                                useKAfstV,xlatKAfstV)
+                                useKAfstV,xlatKAfstV,aantaljaren)
 fitgrpse=fitgrps+['GrpExpl']
 kinfoflds=["GrpTyp", "GrpVal","GrpV_label"]
 odinverplklinfo
@@ -690,21 +728,25 @@ odinverplklinfo
 #dan een dataframe dat
 #2) per lengteschaal, 1 PC (van of naar en anderegroepen (maar bijv ook Motief ODin data verzamelt)
 
-def _addfields(pstats,useKAfstVall):
-    pstatsa= pstats.merge(useKAfstVall[['KAfstV','AvgAfst']],how='left')
-    pstatsa['FactorKm']= pstatsa['FactorV'] * pstatsa['AvgAfst']
+def _addfields(pstats,useKAfstVall,njaar):
+    #onterechte manier om FactorKm te vullen
+    #pstatsa= pstats.merge(useKAfstVall[['KAfstV','AvgAfst']],how='left')
+    #pstatsa['FactorKm']= pstatsa['FactorV'] * pstatsa['AvgAfst']
+    pstatsa=pstats.copy(deep=False)
+    pstatsa['FactorV']= pstatsa['FactorV'] /njaar
+    pstatsa['FactorKm']= pstatsa['FactorV'] * pstatsa['AfstV'] *10
     pstatsa['FactorAutoKm']= np.where(pstatsa['KHvm'] ==1 ,pstatsa['FactorKm']  ,0)
     amodes= [5,6]
     pstatsa['FactorActiveKm']= np.where(np.isin(pstatsa['KHvm'], amodes ),pstatsa['FactorKm']  ,0)
     pstatsa['FactorActiveV']= np.where(np.isin(pstatsa['KHvm'], amodes ),pstatsa['FactorV']  ,0)
     return pstatsa
 
-def mkdfverplklasflgs(df,myspecvals,pltgrps,grp1map,myinfoflds,myKAfstV,myxlatKAfstV):
+def mkdfverplklasflgs(df,myspecvals,pltgrps,grp1map,myinfoflds,myKAfstV,myxlatKAfstV,njaar):
     debug=False
     dfvrecs0 = df [(df['Verpl']==1 ) & (df['AankPC'] > 500) & (df['VertPC'] > 500)  ].copy(deep=False)   
 #    oprecs = df [df['OP']==1]
     gcols=pltgrps+ ['KAfstV']
-    dfvrecs = _addfields(dfvrecs0,useKAfstVall)
+    dfvrecs = _addfields(dfvrecs0,useKAfstVall,njaar)
     #sommeer per groep per oorspronkelijke KAfstV, maar niet voor internationaal
     pstats = dfvrecs[gcols+myinfoflds].groupby(gcols).sum().reset_index()
     if debug:
@@ -733,9 +775,10 @@ def mkdfverplklasflgs(df,myspecvals,pltgrps,grp1map,myinfoflds,myKAfstV,myxlatKA
 #code werk nog niet 
 
 
-allodinyr['FactorKm']= allodinyr['FactorV'] * allodinyr['AfstS'] *10
+
 kflgsflds=['FactorV',"FactorKm","FactorAutoKm","FactorActiveKm","FactorActiveV"]
-odinverplflgs = mkdfverplklasflgs (allodinyr ,specvaltab,fitgrps,isnhexpl,kflgsflds, useKAfstV,xlatKAfstV)
+odinverplflgs = mkdfverplklasflgs (allodinyr ,specvaltab,fitgrps,isnhexpl,kflgsflds, 
+                                   useKAfstV,xlatKAfstV,aantaljaren)
 odinverplflgs
 # -
 
@@ -745,6 +788,9 @@ odinflgtots
 useKAfstV.to_pickle("../intermediate/ODINcatVN01uKA.pkl")
 xlatKAfstV.to_pickle("../intermediate/ODINcatVN01xKA.pkl")
 
+#odinverplgr per PC aank of vertr
+#odinverplklinfo: in diverse groepen (tijd, uur, jaar) mogelijk toe te voegen data
+#odinverplflgs: vlaggen die gejoind kunnen worden aan oorspronkelijke data
 odinverplgr.to_pickle("../intermediate/ODINcatVN01db.pkl")
 odinverplklinfo.to_pickle("../intermediate/ODINcatVN02db.pkl")
 odinverplflgs.to_pickle("../intermediate/ODINcatVN03db.pkl")
@@ -769,42 +815,58 @@ pc4ODINinAct =  pd.concat( [ mkpc4odinact (allodinyr,'VertPC'),mkpc4odinact (all
 #pc4ODINinAct =  pd.concat( [ mkpc4odinact (allodinyr,'AankPC') ])
 print(pc4ODINinAct.sum())
 pc4ODINinAct
-# -
-
+# +
+#active modes grafiek
 
 
 # +
 #even algemene grafiek maken
-KafstActiveVori = mkpc4odinact (allodinyr,'KAfstV').rename (columns={'PC4':'KAfstV'}).merge(useKAfstVall,how='left')
-KafstActiveVori['FactorVr'] = KafstActiveVori['FactorV'] / np.max(KafstActiveVori['FactorV'] )
-KafstActiveVori['FactorVCum'] = KafstActiveVori['FactorV'].cumsum()
-KafstActiveVori['FactorVCum'] = KafstActiveVori['FactorVCum']/ np.max( KafstActiveVori['FactorVCum'])
-KafstActiveVori['FactorPCum'] = KafstActiveVori['FactorVCum'].shift(1,fill_value=0)+1e-6
-KafstActiveVori['KAfstVFmt'] = KafstActiveVori['MaxAfst'].map(lambda x:"%3g"%(x))
+def prepactsdb(db1,myKAfstV):
+    KafstActiveVori = db1.merge(myKAfstV,how='left')
+    KafstActiveVori['FactorVr'] = KafstActiveVori['FactorV'] / np.max(KafstActiveVori['FactorV'] )
+    KafstActiveVori['FactorVCum'] = KafstActiveVori['FactorV'].cumsum()
+    KafstActiveVori['FactorVCum'] = KafstActiveVori['FactorVCum']/ np.max( KafstActiveVori['FactorVCum'])
+    KafstActiveVori['FactorPCum'] = KafstActiveVori['FactorVCum'].shift(1,fill_value=0)+1e-6
+    KafstActiveVori['KAfstVFmt'] = KafstActiveVori['MaxAfst'].map(lambda x:"%3g"%(x))
+    return(KafstActiveVori)
+
+KafstActiveVori = prepactsdb(mkpc4odinact (allodinyr,'KAfstV').rename (columns={'PC4':'KAfstV'}),useKAfstVall)
+
 
 #KafstActiveVori.dtypes
-sns.relplot(data=KafstActiveVori, x='KAfstV',y='ActFractOri',kind='scatter')
-sns.relplot(data=KafstActiveVori, x='KAfstV',y='FactorVr',kind='line')
+#sns.relplot(data=KafstActiveVori, x='KAfstV',y='ActFractOri',kind='scatter')
+#sns.relplot(data=KafstActiveVori, x='KAfstV',y='FactorVr',kind='line')
 # -
 
 KafstActiveVori
 
-KafstActiveVorid= KafstActiveVori.copy(deep=True)
-KafstActiveVorid['FactorPCum']=KafstActiveVorid['FactorVCum']
-KafstActiveVorid = pd.concat([ KafstActiveVori,KafstActiveVorid] ) .sort_values(by='FactorPCum')                       
-KafstActiveVorid                                                                             
 
-chart= sns.relplot(data=KafstActiveVorid, x='FactorPCum',y='ActFractOri',kind='line')
-totavgact= sum(KafstActiveVori['ActFractOri'] * KafstActiveVori['FactorV'] ) /sum( KafstActiveVori['FactorV'] )
-#totavgact= sum( KafstActiveVori['FactorVr'] )
-chart.fig.suptitle('Totaal aandeel actieve mobiliteit %.3f'%(totavgact))            
-chart.set_xlabels('Aandeel actieve modes')
-chart.set_ylabels('Fractie van reizen, per afstandsklasse' )
-labcolor="#3498db" # choose a color
-for x, y, name in zip(KafstActiveVori['FactorVCum'],KafstActiveVori['ActFractOri'],
-                      KafstActiveVori['KAfstVFmt']):
-    chart.ax.text(x+.02, y , name, color=labcolor)
-chart.ax.text(.2,.2 , 'aandeel %.3f'%(totavgact), color=labcolor)    
+# +
+def pltactsdb(myActiveVori,savtag,title):
+    KafstActiveVorid= myActiveVori.copy(deep=True)
+    KafstActiveVorid['FactorPCum']=KafstActiveVorid['FactorVCum']
+    KafstActiveVorid = pd.concat([ myActiveVori,KafstActiveVorid] ) .sort_values(by='FactorPCum')                       
+    KafstActiveVorid  
+
+    chart= sns.relplot(data=KafstActiveVorid, x='FactorPCum',y='ActFractOri',kind='line')
+    totavgact= sum(myActiveVori['ActFractOri'] * myActiveVori['FactorV'] ) /sum( myActiveVori['FactorV'] )
+    #totavgact= sum( KafstActiveVori['FactorVr'] )
+    chart.fig.suptitle(title)
+    #chart.fig.suptitle('Totaal aandeel actieve mobiliteit %.3f'%(totavgact))            
+    chart.set_xlabels('Aandeel van de afstandklasse')
+    chart.set_ylabels('Fractie van reizen, per afstandsklasse' )
+    labcolor="#3498db" # choose a color
+    for x, y, name in zip(myActiveVori['FactorVCum'],myActiveVori['ActFractOri'],
+                          myActiveVori['KAfstVFmt']):
+        chart.ax.text(x+.02, y , name, color=labcolor)
+    chart.ax.text(.2,.2 , 'aandeel actieve\nmodes %.3f'%(totavgact), color=labcolor) 
+    chart.ax.text(.7,.7 , 'aandeel gemotoriseerde\nmodes %.3f'%(1-totavgact), color=labcolor) 
+    chart.ax.set_xlim(0,1)
+    chart.ax.set_ylim(0,1)
+    figname = "../output/act_reg_"+savtag+"_"+'m1.svg';
+    chart.fig.savefig(figname, bbox_inches="tight")
+
+pltactsdb(KafstActiveVori,'ori','Originele ODIN data')    
 
 
 # +

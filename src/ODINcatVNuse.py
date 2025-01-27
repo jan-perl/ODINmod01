@@ -121,7 +121,10 @@ pc4inwgcache = getcachedgrids(pc4inwgrid)
 
 # nu nog MXI overzetten naar PC4 ter referentie
 
-
+# +
+#odinverplgr per PC aank of vertr
+#odinverplklinfo: in diverse groepen (tijd, uur, jaar) mogelijk toe te voegen data
+#odinverplflgs: vlaggen die gejoind kunnen worden aan oorspronkelijke data
 
 
 # +
@@ -131,6 +134,7 @@ pc4inwgcache = getcachedgrids(pc4inwgrid)
 # +
 odinverplgr_o=pd.read_pickle("../intermediate/ODINcatVN01db.pkl")
 #bij onlyOK=True: zet waarden van gemaskeerde postcodes op NaN
+#todo: onlyOK wordt string: "ALL","Gen","Spec"
 def deffactorv(rv,onlyok): 
     if onlyok:
         rv['FactorV'] = np.where ((rv['FactorVGen'] ==0 ) & ( rv['FactorVSpec']>0) ,
@@ -166,7 +170,7 @@ odinverplgr[['KAfstCluCode','GeoInd']].groupby('KAfstCluCode').agg('count')
 # +
 #variabele nfogrps was not used; infogrps is in ODINcatVN.py
 # nfogrps=['KHvm','AankUur','VertUur','Jaar']
-# definition in ODINcatVN: allodinyr['FactorKm']= allodinyr['FactorV'] * allodinyr['AfstS'] *10
+# definition in ODINcatVN: allodinyr['FactorKm']= allodinyr['FactorV'] * allodinyr['AfstV'] *10
 infoflds=['FactorV','FactorKm']
 
 fitgrpse=fitgrps+['GrpExpl']
@@ -438,7 +442,8 @@ datadiffcache.dtypes
 
 
 # +
-def _normflgvals (vg,kenmu,fg,cflds,outkeeppart):    
+#routine wordt ook aangegoepen om totalen per PC4 te maken
+def normflgvals (vg,kenmu,fg,cflds,outkeeppart):    
     ds=vg.merge(kenmu,how='left',on=fg+['KAfstCluCode'])
 #    print(('ds',len(ds),ds.dtypes))
     #normaliseren doen we hier, omdat er steeds precies 1 match is
@@ -465,7 +470,7 @@ def _normflgvals (vg,kenmu,fg,cflds,outkeeppart):
 def mkinfosums(vg,kenmu,fg,kenmcols,landcod):    
 #    print(('vg',len(vg),vg.dtypes))    
 #    print(('kenmu',len(kenmu),kenmu.dtypes))
-    dssu=  _normflgvals (vg,kenmu,fg,kenmcols,[] ) 
+    dssu=  normflgvals (vg,kenmu,fg,kenmcols,[] ) 
     return dssu
     
 infotots2 = mkinfosums(datadiffcache ,odindiffflginfo,fitgrpse,kflgsflds,landcod)
@@ -480,31 +485,6 @@ if True:
     o2=infotots2.groupby(["GeoInd"]).agg('sum')
     print(o2/totaalmotief)    
 o2
-
-pc4orisum = odinverplgr[odinverplgr['KAfstCluCode'] == landcod] .groupby (
-    ['PC4','GeoInd'] ).agg('sum').reset_index().rename(columns={"FactorV":"FactorVin"}).drop (
-     columns=['index','MotiefV','isnaarhuis','KAfstCluCode'])
-pc4orisum
-
-#maak een frame met FactorActiveV geschat op basis van FactorV, gesommeerd over astandsklasses
-#maak nog apart per motief
-infotots2pc = _normflgvals(datadiffcache ,odindiffflginfo,fitgrpse,kflgsflds,['PC4']
-            ).      groupby(['PC4','GeoInd'] ).agg('sum').reset_index().drop (
-     columns=['MotiefV','isnaarhuis','KAfstCluCode'])
-infotots2pc
-
-infotots2pcdiff=  infotots2pc.merge(pc4orisum,how='inner')
-infotots2pcdiff['FactorVChk'] =infotots2pcdiff['FactorV']- infotots2pcdiff['FactorVin']
-infotots2pcdiff['FactorActiveVIn'] =infotots2pcdiff['FactorActiveVGen']+ infotots2pcdiff['FactorActiveVSpec']
-infotots2pcdiff['RatActiveVIn'] = infotots2pcdiff['FactorActiveVIn']/infotots2pcdiff['FactorV']
-infotots2pcdiff['RatActiveV'] = infotots2pcdiff['FactorActiveV']/infotots2pcdiff['FactorV']
-infotots2pcdiff['FactorActiveVChk'] =infotots2pcdiff['FactorActiveV'] -infotots2pcdiff['FactorActiveVIn']
-#infotots2pcdiff[infotots2pcdiff['FactorVChk']  !=0]
-infotots2pcdiff.groupby(['GeoInd']).sum()/totaalmotief 
-
-#deze scatter plot ziet er goed uit
-infotots2pcdiffs=infotots2pcdiff[infotots2pcdiff['FactorV']>2e6]
-sns.relplot(data=infotots2pcdiffs, x='RatActiveVIn',y='RatActiveV',kind='scatter')
 
 # nu maskeren en tof wegschrijven per PC4
 
@@ -576,6 +556,8 @@ ltot
 t2=mkverplsum1(odinverplklinfo,landcod)
 t2['GemAfst']=t2['FactorKm']/ t2['FactorV']            
 t2
+
+datadiffcache.groupby(['GeoInd']).sum()
 
 print("Finished")
 

@@ -95,6 +95,7 @@ import numba
 #from numba.utils import IS_PY3
 from numba.decorators import jit
 
+#voor gemeentegrenzen; kost hier wel heel veel geheugen voor. Kijken hoe dit te vermijden
 import ODiN2readpkl
 
 gemeentendata ,  wijkgrensdata ,    buurtendata = ODiN2readpkl.getgwb(2020)
