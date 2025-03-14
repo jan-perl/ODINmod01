@@ -435,8 +435,7 @@ o2=datadiffcachemspec.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief
 #ODINcatVNuse.chkvalues(o2[['FactorV_v','FactorKm_v']],1.0, "datadiffcache FactorV_v")
 o2
 
-totaalVgen=6.930094e+10
-#69340695887
+totaalVgen=69115694090
 datadiffcache.groupby(['GeoInd']).sum()/totaalVgen
 
 datadiffcache.groupby(['KAfstCluCode','GeoInd']).sum()
@@ -479,17 +478,24 @@ infotots2pcdiffmspecng.sum()/ODINcatVNuse.totaalmotief
 infotots2pcdiffng=mrgpcdiffr(calcFactVPC4(datadiffcache,False),pc4orisumng)
 infotots2pcdiffng.sum()/totaalVgen
 
-
 #deze scatter plot ziet er goed uit
+minFactorVplot=5e6
 def mkactpccmpfig(indf0,title):
-    indf=indf0[indf0['FactorV']>5e6]
+    indf0['RatActiveVSc'] = 1.75*indf0['RatActiveV']**2 +.05
+    indf=indf0[(indf0['FactorV']>minFactorVplot ) & (indf0['RatActiveVIn']>1e-2)].copy(deep=False)
     fig, ax = plt.subplots(figsize=(6, 4))
-    c2=sns.lineplot(data=indf, x='RatActiveVIn',y='RatActiveVIn',ax=ax)
-    c1=sns.scatterplot(data=indf, x='RatActiveVIn',y='RatActiveV',ax=ax)
+    c2=sns.lineplot(data=indf, x='RatActiveV',y='RatActiveVSc',ax=ax)
+    c1=sns.scatterplot(data=indf, x='RatActiveV',y='RatActiveVIn',ax=ax)
     fig.suptitle(title)
+    ax.set_xlabel('Schatting active modes a.h.v. land gem. motief en afstand')
+    ax.set_ylabel('Punten: aandeel active per PC4')
+#    ax.set_xscale('log')
+#    ax.set_yscale('log')
     return(fig)
 r1=mkactpccmpfig(infotots2pcdiffng,'Data center functions excluded')
 
+
+infotots2pcdiffng [(infotots2pcdiffng ['RatActiveVIn']>.8 )& (infotots2pcdiffng['FactorV']>minFactorVplot ) ]
 
 r1=mkactpccmpfig(infotots2pcdiffmspecng,'All ODIN data incl center functions')
 
@@ -506,13 +512,13 @@ def make1stgridgeorel (tifname,indf,usecols,nanval):
     indf['area_geo'] = indf.area
     missptdf= rasteruts1.findmiss(indf,dfrefs)
     for col in usecols:
-        indf[col]=np.where(indf[col] == nanval,0,indf[col])
+        indf[col]=np.where((indf[col] == nanval ) | (indf['FactorV'] < minFactorVplot),0,indf[col])
     imagelst=rasteruts1.mkimgpixavgs(grid,dfrefs,False,False, indf[usecols],False)  
     grid.close()
     grid = rasterio.open(tifname)
     return grid
 
-act1tifcols= ['RatActiveVIn','RatActiveV']
+act1tifcols= ['RatActiveVIn','RatActiveVSc']
 act1grid= make1stgridgeorel (act1tifname,cbspc4data.merge(infotots2pcdiffng,how='left',
                                                          left_on=['postcode4'],right_on='PC4'),act1tifcols,999)
 # -

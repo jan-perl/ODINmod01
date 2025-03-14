@@ -1869,5 +1869,7 @@ stQ
 #stQa = grosres (elst,rudifungcache,1,fitpara, fitdatverplgr,useKAfstVQ,'DBgf01Q-'+globset)
 #stQa
 # -
+print("Finished")
+
 
 
