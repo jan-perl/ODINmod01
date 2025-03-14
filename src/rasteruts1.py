@@ -26,6 +26,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 # +
+#Draai deze minimaal 1 maal per docker container
 #os.system("pip install geopandas contextily rasterio rasterstats")
 # -
 
@@ -201,6 +202,7 @@ def convolve2d(result, mask, image):
 
 # -
 
+#deze werk ALLEEN als kernel gaussisch is: k(x,y) = k(x)*k(y)
 def convfietsimg(img,kern1):
     return np.apply_along_axis(lambda sl: np.convolve(sl,kern1['K1D'],mode='same'),1, 
            np.apply_along_axis(lambda sl: np.convolve(sl,kern1['K1D'],mode='same'),0, img) )

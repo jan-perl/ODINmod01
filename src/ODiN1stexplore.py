@@ -16,6 +16,7 @@
 #een set doorsnedes van ODiN gegevens
 #voor exploratie
 #traag door eerst pc6 plotjes
+#draai minimaal 1 maal rasteruts in docker container om geopandas te laden
 # -
 
 import pandas as pd

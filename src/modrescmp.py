@@ -178,18 +178,26 @@ print(useKAfstV)
 maskKAfstV= list(useKAfstV['KAfstCluCode'])
 maskKAfstV
 
-odinverplklinfo = ODINcatVNuse.odinverplklinfo_o[np.isin(ODINcatVNuse.odinverplklinfo_o['KAfstCluCode'],maskKAfstV)].copy (deep=False)
-odinverplgr =ODINcatVNuse.odinverplgr_o[np.isin(ODINcatVNuse.odinverplgr_o['KAfstCluCode'],maskKAfstV)].copy (deep=False)
-odinverplflgs =ODINcatVNuse.odinverplflgs_o[np.isin(ODINcatVNuse.odinverplflgs_o['KAfstCluCode'],maskKAfstV)].copy (deep=False)
+# +
+#odinverplklinfo = ODINcatVNuse.odinverplklinfo_o[np.isin(ODINcatVNuse.odinverplklinfo_o['KAfstCluCode'],maskKAfstV)].copy (deep=False)
+#odinverplgr =ODINcatVNuse.odinverplgr_o[np.isin(ODINcatVNuse.odinverplgr_o['KAfstCluCode'],maskKAfstV)].copy (deep=False)
+#odinverplflgs =ODINcatVNuse.odinverplflgs_o[np.isin(ODINcatVNuse.odinverplflgs_o['KAfstCluCode'],maskKAfstV)].copy (deep=False)
 
+MainUseSelFactorV='FactorVGen'
+odinverplgr= ODINcatVNuse.deffactorv(ODINcatVNuse.odinverplgr_o,maskKAfstV,MainUseSelFactorV )
+odinverplklinfo = ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplklinfo_o,maskKAfstV,MainUseSelFactorV)
+odinverplflgs =ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplflgs_o,maskKAfstV,MainUseSelFactorV)
+
+
+# -
 
 #was odinverplgr=pd.read_pickle("../intermediate/ODINcatVN01db.pkl")
-def deffactorv(rv):
+def findskippc(rv):
     rv['FactorV'] = np.where ((rv['FactorVGen'] ==0 ) & ( rv['FactorVSpec']>0) ,
                0,rv['FactorVGen'] + 0* rv['FactorVSpec'] )
     skipsdf = rv [(rv['FactorVGen'] ==0 ) & ( rv['FactorVSpec']>0) ] [['PC4','MotiefV']].copy()
     return skipsdf
-skipPCMdf = deffactorv(odinverplgr)
+skipPCMdf = findskippc(odinverplgr)
 skipPCMdf
 
 # +
@@ -408,18 +416,24 @@ pc4orisum = (odinverplgr[odinverplgr['KAfstCluCode'] == ODINcatVNuse.landcod] .g
      columns=['index','MotiefV','isnaarhuis','KAfstCluCode'])
 pc4orisum
 
-ODINcatVNuse.deffactorv(ODINcatVNuse.odinverplgr_o,False)
-odinverplgrmspec =ODINcatVNuse.odinverplgr_o[np.isin(ODINcatVNuse.odinverplgr_o['KAfstCluCode'],maskKAfstV)].copy (deep=False)
+MainUseSelFactorV='FactorV'
+odinverplgrmspec= ODINcatVNuse.deffactorv(ODINcatVNuse.odinverplgr_o,maskKAfstV,MainUseSelFactorV )
+odinverplklinfomspec = ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplklinfo_o,maskKAfstV,MainUseSelFactorV)
+odinverplflgsmspec =ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplflgs_o,maskKAfstV,MainUseSelFactorV)
 
-ODINcatVNuse.deffactorv(ODINcatVNuse.odinverplgr_o,True)
-odinverplgr =ODINcatVNuse.odinverplgr_o[np.isin(ODINcatVNuse.odinverplgr_o['KAfstCluCode'],maskKAfstV)].copy (deep=False)
+MainUseSelFactorV='FactorVGen'
+odinverplgr= ODINcatVNuse.deffactorv(ODINcatVNuse.odinverplgr_o,maskKAfstV,MainUseSelFactorV )
+odinverplklinfo = ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplklinfo_o,maskKAfstV,MainUseSelFactorV)
+odinverplflgs =ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplflgs_o,maskKAfstV,MainUseSelFactorV)
 
 datadiffcachemspec = ODINcatVNuse.mkdatadiff(odinverplgrmspec,ODINcatVNuse.fitgrpse,
                                         ODINcatVNuse.infoflds,'PC4',ODINcatVNuse.landcod)
 datadiffcache = ODINcatVNuse.mkdatadiff(odinverplgr,ODINcatVNuse.fitgrpse,
                                         ODINcatVNuse.infoflds,'PC4',ODINcatVNuse.landcod)
 
-datadiffcachemspec.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief
+o2=datadiffcachemspec.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief
+#ODINcatVNuse.chkvalues(o2[['FactorV_v','FactorKm_v']],1.0, "datadiffcache FactorV_v")
+o2
 
 totaalVgen=6.930094e+10
 #69340695887
@@ -433,12 +447,12 @@ datadiffcache.groupby(['KAfstCluCode','GeoInd']).sum()
 def calcFactVPC4(ddc,perGeoInd):
     if perGeoInd:
         return (ODINcatVNuse.normflgvals(ddc ,odindiffflginfo,
-                                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,['PC4']
-            ).      groupby(['PC4','GeoInd'] ).agg('sum')).reset_index().drop (
+                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,['PC4'] 
+                    ).      groupby(['PC4','GeoInd'] ).agg('sum')).reset_index().drop (
      columns=['MotiefV','isnaarhuis','KAfstCluCode'])
     else:
         return (ODINcatVNuse.normflgvals(ddc ,odindiffflginfo,
-                                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,['PC4']
+                                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,['PC4'],
             ).      groupby(['PC4'] ).agg('sum')*0.5).reset_index().drop (
                 columns=['MotiefV','isnaarhuis','KAfstCluCode'])
 calcFactVPC4(datadiffcache,False)
@@ -450,7 +464,7 @@ def mrgpcdiffr(in2pc,inpc4ori):
     infotots2pcdiff['FactorVChk'] =infotots2pcdiff['FactorV']- infotots2pcdiff['FactorVin']
     infotots2pcdiff['FactorActiveVIn'] =infotots2pcdiff['FactorActiveVGen']
     #+ infotots2pcdiff['FactorActiveVSpec']
-    infotots2pcdiff['RatActiveVIn'] = infotots2pcdiff['FactorActiveVIn']/infotots2pcdiff['FactorV']
+    infotots2pcdiff['RatActiveVIn'] = infotots2pcdiff['FactorActiveVIn']/infotots2pcdiff['FactorVin']
     infotots2pcdiff['RatActiveV'] = infotots2pcdiff['FactorActiveV']/infotots2pcdiff['FactorV']
     infotots2pcdiff['FactorActiveVChk'] =infotots2pcdiff['FactorActiveV'] -infotots2pcdiff['FactorActiveVIn']
     #infotots2pcdiff[infotots2pcdiff['FactorVChk']  !=0]
@@ -613,7 +627,9 @@ odinverplAsftsu=mkverplAsftsu(odinverplflgs)
 
 
 # +
-#even algemene grafiek maken
+#maakt een database voor active mode vergelijking
+#neemt een database db1, gesommeerd naar KAfstV en tabel myKAfstV
+#voegt samen, en maakt velden voor berekende waarden en labels
 def prepactsdb(db1,myKAfstV):
     KafstActiveVori = db1.merge(myKAfstV,how='left')
     KafstActiveVori['FactorVr'] = KafstActiveVori['FactorV'] / np.max(KafstActiveVori['FactorV'] )
@@ -628,6 +644,8 @@ KafstActiveVori = prepactsdb(odinverplAsftsu,useKAfstV)
 
 
 # +
+#neemt een database  myActiveVori en maakt standaard plot
+# gebruikt kolommen FactorVCum ,ActFractOri , FactorV en KAfstVFmt
 def pltactsdb(myActiveVori,savtag,title):
     KafstActiveVorid= myActiveVori.copy(deep=True)
     KafstActiveVorid['FactorPCum']=KafstActiveVorid['FactorVCum']
@@ -635,11 +653,12 @@ def pltactsdb(myActiveVori,savtag,title):
     KafstActiveVorid  
 
     chart= sns.relplot(data=KafstActiveVorid, x='FactorPCum',y='ActFractOri',kind='line')
-    totavgact= sum(myActiveVori['ActFractOri'] * myActiveVori['FactorV'] ) /sum( myActiveVori['FactorV'] )
+    totavgact= sum(myActiveVori['ActFractOri'] * myActiveVori['FactorV'] ) / \
+                      sum( myActiveVori['FactorV'] )
     #totavgact= sum( KafstActiveVori['FactorVr'] )
     chart.fig.suptitle(title)
     #chart.fig.suptitle('Totaal aandeel actieve mobiliteit %.3f'%(totavgact))            
-    chart.set_xlabels('Aandeel actieve modes')
+    chart.set_xlabels('Aandeel van de afstandklasse')
     chart.set_ylabels('Fractie van reizen, per afstandsklasse' )
     labcolor="#3498db" # choose a color
     for x, y, name in zip(myActiveVori['FactorVCum'],myActiveVori['ActFractOri'],
