@@ -59,7 +59,7 @@ Rf_net_buurt.columns
 
 Rf_net_buurt
 
-pip install itables
+os.system("pip install itables")
 
 Rf_net_buurt['area_geo'] = Rf_net_buurt.area
 Rf_net_buurt['center']= Rf_net_buurt.representative_point()
@@ -504,5 +504,7 @@ dataset5 = rasterio.open(lasttifname)
 fig, ax = plt.subplots()
 #base=Rf_net_buurt.boundary.plot(color='green',ax=ax,alpha=.3);
 rasterio.plot.show((dataset5,4), cmap='OrRd',ax=ax)
+
+print("Finished")
 
 

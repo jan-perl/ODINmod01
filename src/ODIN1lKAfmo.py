@@ -1808,8 +1808,8 @@ elst = list(re.sub(".tif$",'',re.sub('^.*/','',f) ) for f in flst)
 elst
 
 
-def grosumm(dfm,lbl,myuseKAfstV,normfr):
-    dfm.reset_index().to_pickle("../output/fitdf_%s.pd"%(lbl))
+def grosumm(dfm,runname,lbl,myuseKAfstV,normfr):
+    dfm.reset_index().to_pickle("../output/fitdf_%s_%s.pd"%(runname,lbl))
     mymaskKAfstV= list(myuseKAfstV['KAfstCluCode'])
     if lbl=='brondat':
         dfmu=dfm[np.isin(dfm['KAfstCluCode'],mymaskKAfstV)].copy (deep=False)
@@ -1833,31 +1833,31 @@ def grosumm(dfm,lbl,myuseKAfstV,normfr):
         rv = rv/ normfr
         rv['label']=lbl
     return rv 
-gs00=grosumm(rdf00,"orig",useKAfstVQ,[])
+gs00=grosumm(rdf00,"Dbg01Q","orig",useKAfstVQ,[])
 #print(gs00)
-gs00T = grosumm(rdf00,"origchk",useKAfstVQ,gs00)
+gs00T = grosumm(rdf00,"Dbg01Q","origchk",useKAfstVQ,gs00)
 gs00T
 
 rdf00PC4=predictnewdistr (cbspc4data,pc4inwgcache,rudifungcache,useKAfstVQ,xlatKAfstV,
                 skipPCMdf,fitgrps,expdefs,fitpara,'PC4')
-gs00PC4 = grosumm(rdf00,"origPC4chk",useKAfstVQ,gs00)
+gs00PC4 = grosumm(rdf00,'Dbg01Q',"origPC4chk",useKAfstVQ,gs00)
 gs00PC4
 
 
-def grosres (explst,incache0,mult,fitp,oridat,myuseKAfst,setname,predgrping):
+def grosres (explst,incache0,mult,fitp,oridat,myuseKAfst,runname,setname,predgrping):
     rdf00N=predictnewdistr (cbspc4data,pc4inwgcache,rudifungcache,myuseKAfst,myuseKAfst,
                 skipPCMdf,fitgrps,expdefs,fitpara,predgrping)
-    gs00N = grosumm(rdf00N,"orig",myuseKAfst,[])
+    gs00N = grosumm(rdf00N,runname,"orig",myuseKAfst,[])
     st = ( grosumm(runexperiment(exp,incache0,mult,fitp,myuseKAfst,predgrping),
-                   exp,myuseKAfst ,gs00N)  for exp in explst )
+                   runname,exp,myuseKAfst ,gs00N)  for exp in explst )
     st = pd.concat (st)
-    dto= grosumm(oridat,'brondat',myuseKAfst ,gs00N)
+    dto= grosumm(oridat,runname,'brondat',myuseKAfst ,gs00N)
     #print(dto)
     st=st.append(dto)
-    st.reset_index().to_excel("../output/fitrelres_"+setname+".xlsx")
+    st.reset_index().to_excel("../output/fitrelres_"+runname+setname+".xlsx")
     return st
 stQ = grosres (elst[0:3],rudifungcache,1,fitpara, fitdatverplgr,
-               useKAfstVQ,'Dbg01Q-'+globset,'mxigrp')
+               useKAfstVQ,'Dbg02Q-',globset,'mxigrp')
 stQ
 
 stQ
@@ -1870,6 +1870,7 @@ stQ
 #stQa
 # -
 print("Finished")
+
 
 
 

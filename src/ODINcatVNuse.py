@@ -135,7 +135,7 @@ pc4inwgcache = getcachedgrids(pc4inwgrid)
 fitgrps=['MotiefV','isnaarhuis']
 
 odinverplflgs_o=pd.read_pickle("../intermediate/ODINcatVN03db.pkl")
-kflgsflds=['FactorV',"FactorKm","FactorAutoKm","FactorActiveKm","FactorActiveV"]
+kflgsflds=['FactorV',"FactorKm","FactorKmAuto","FactorKmActive","FactorVActive"]
 
 odinverplklinfo_o=pd.read_pickle("../intermediate/ODINcatVN02db.pkl")
 landcod=np.max(odinverplklinfo_o['KAfstCluCode'])
@@ -229,7 +229,7 @@ aantaljaren=len(welkejaren)
 print(aantaljaren)
 
 #synchronize with ODINcatVN, note: values of totals depend on MainUseSelFactorV
-FactorVincols=['FactorVGen','FactorVSpec','FactorActiveVGen','FactorActiveVSpec']
+FactorVincols=['FactorVGen','FactorVSpec','FactorVGenActive','FactorVSpecActive']
 odinverplgr[odinverplgr['KAfstCluCode'] ==landcod][FactorVincols].sum() / totaalmotief/2
 
 

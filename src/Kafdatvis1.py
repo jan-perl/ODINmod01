@@ -58,7 +58,7 @@ odindiffflginfo
 
 
 def mkmotsumdiff1(diffin,myspecvals):
-    motafstgrp =  diffin.groupby(['MotiefV','KAfstCluCode'])[['FactorV_c','FactorKm_c','FactorActiveV_c']].agg('sum').reset_index()
+    motafstgrp =  diffin.groupby(['MotiefV','KAfstCluCode'])[['FactorV_c','FactorKm_c','FactorVActive_c']].agg('sum').reset_index()
     totgrp = motafstgrp.groupby(['MotiefV'])[['FactorV_c']].agg('sum').reset_index(). rename (columns={'FactorV_c':'MotiefSum'})
     motafstgrp= motafstgrp.merge(totgrp)
     explhere1 = myspecvals [myspecvals['Variabele_naam'] == 'MotiefV'].copy()
@@ -66,7 +66,7 @@ def mkmotsumdiff1(diffin,myspecvals):
     motafstgrp = (motafstgrp.merge(explhere1,left_on='MotiefV', right_on='Code', how='left').rename(
                columns={'Code_label':'MotiefV_label'}) )
     motafstgrp['MotiefS'] = (motafstgrp['MotiefV'].astype(int) .astype(str) ) + " "+ motafstgrp['MotiefV_label']
-    motafstgrp['FractAct'] = motafstgrp['FactorActiveV_c']/ motafstgrp['FactorV_c'] 
+    motafstgrp['FractAct'] = motafstgrp['FactorVActive_c']/ motafstgrp['FactorV_c'] 
     motafstgrp['GemAfst'] = motafstgrp['FactorKm_c']/ motafstgrp['FactorV_c'] 
     motafstgrp['FractMot'] = motafstgrp['FactorV_c']/ motafstgrp['MotiefSum'] 
     
@@ -75,7 +75,7 @@ motafstgrp_glb = mkmotsumdiff1(odindiffflginfo,specvaltab)
 #motafstgrp_glb
 
 def mkmotsum1(diffin,myspecvals,myKAfstV):
-    motafstgrp =  diffin.groupby(['MotiefV','KAfstCluCode'])[['FactorV','FactorKm','FactorActiveV']].agg('sum').reset_index()
+    motafstgrp =  diffin.groupby(['MotiefV','KAfstCluCode'])[['FactorV','FactorKm','FactorVActive']].agg('sum').reset_index()
     totgrp = motafstgrp[motafstgrp['KAfstCluCode']==15][['MotiefV','FactorV']]. rename (columns={'FactorV':'MotiefSum'})
     motafstgrp= motafstgrp.merge(totgrp).merge(myKAfstV)
     explhere1 = myspecvals [myspecvals['Variabele_naam'] == 'MotiefV'].copy()
@@ -83,7 +83,7 @@ def mkmotsum1(diffin,myspecvals,myKAfstV):
     motafstgrp = (motafstgrp.merge(explhere1,left_on='MotiefV', right_on='Code', how='left').rename(
                columns={'Code_label':'MotiefV_label'}) )
     motafstgrp['MotiefS'] = (motafstgrp['MotiefV'].astype(int) .astype(str) ) + " "+ motafstgrp['MotiefV_label']
-    motafstgrp['FractAct'] = motafstgrp['FactorActiveV']/ motafstgrp['FactorV'] 
+    motafstgrp['FractAct'] = motafstgrp['FactorVActive']/ motafstgrp['FactorV'] 
     motafstgrp['GemAfst'] = np.where(motafstgrp['MaxAfst'] ==0,100 , motafstgrp['MaxAfst'] )
     motafstgrp['FractMot'] = motafstgrp['FactorV']/ motafstgrp['MotiefSum'] 
     

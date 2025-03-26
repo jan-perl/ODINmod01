@@ -59,7 +59,6 @@ import getCBS
 import CBS2pkl
 
 #import ODiN2readpkl, ook gebruikt als subroutines
-#
 import ODiN2readpkl
 
 #import conversion routines buurt to PC4/6, ook gebruikt als subrouteines
@@ -68,4 +67,26 @@ import viewCBS
 #convert RUDIFUN to usable PC4 data
 import cnvRUDIFUN
 
+#quick checks
+import ROfietsb_Utchk
+
+import Rofietsbalans2
+
 import preproc_spss
+
+import ODINcatVN
+
+import ODINcatVN
+
+import modrescmp
+
+import Mkaddgrids
+
+
+
+#run full national models
+import KafmoRun
+
+import Kafdatvis1
+
+print("Finished")

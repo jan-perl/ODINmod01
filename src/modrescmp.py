@@ -128,10 +128,9 @@ xlatKAfstV  = xlatKAfstVa [(xlatKAfstVa['KAfstCluCode']<=maxcuse ) |
 #print(xlatKAfstV)   
 print(useKAfstV)   
 
-# +
 #dit was alleen voor ODIN1KAFmo om met kleine sets te werken.
-#deze variabele niet gebruiken voor verwerken hele sets
-#useKAfstVQ  = useKAfstV [useKAfstV ["MaxAfst"] <4]
+#deze variabele niet gebruiken voor verwerken hele sets, wel voor regressie tests op Q set
+useKAfstVQ  = useKAfstV [useKAfstV ["MaxAfst"] <4]
 
 # +
 #import ODiN2pd
@@ -313,6 +312,8 @@ woonbalans(totinf_fitdat,ODINcatVNuse.kflgsflds).reset_index() # .drop(columns='
 
 rdf00=fitdatverplgr
 
+#eerste proging: bouw elst precies zo op als in ODIN1KAfmo
+#eigenlijk goede manier van regressie
 globset="e0904a"
 flst = glob.glob ("../intermediate/addgrds/"+globset+"*[a-z]_00*.tif")
 elst = list(re.sub(".tif$",'',re.sub('^.*/','',f) ) for f in flst) 
@@ -320,8 +321,8 @@ elst
 
 
 #vergelijkbaar met origineel; gebruikt gelezen data
-def gropc4stats(dfm,lbl,myuseKAfstV,normfr):
-    dfm=pd.read_pickle("../output/fitdf_"+lbl+".pd")
+def gropc4stats(dfm,runname,lbl,myuseKAfstV,normfr):
+    dfm=pd.read_pickle("../output/fitdf_"+runname+"_"+lbl+".pd")
     mymaskKAfstV= list(myuseKAfstV['KAfstCluCode'])
     if lbl=='brondat':
         dfmu=dfm[np.isin(dfm['KAfstCluCode'],mymaskKAfstV)].copy (deep=False)
@@ -345,15 +346,15 @@ def gropc4stats(dfm,lbl,myuseKAfstV,normfr):
         rv = rv/ normfr
         rv['label']=lbl
     return rv 
-gs00=gropc4stats(rdf00,"orig",useKAfstV,[])
+gs00=gropc4stats(rdf00,"Dbg01","orig",useKAfstV,[])
 #print(gs00)
-gs00T = gropc4stats(rdf00,"origchk",useKAfstV,gs00)
+gs00T = gropc4stats(rdf00,"Dbg01","origchk",useKAfstV,gs00)
 gs00T
 
 
 #vergelijkbaar met origineel; gebruikt gelezen data
-def grosumm(dfmdummy,lbl,myuseKAfstV,normfr):
-    dfm=pd.read_pickle("../output/fitdf_"+lbl+".pd")
+def grosumm(dfmdummy,runname,lbl,myuseKAfstV,normfr):
+    dfm=pd.read_pickle("../output/fitdf_"+runname+"_"+lbl+".pd")
     mymaskKAfstV= list(myuseKAfstV['KAfstCluCode'])
     if lbl=='brondat':
         dfmu=dfm[np.isin(dfm['KAfstCluCode'],mymaskKAfstV)].copy (deep=False)
@@ -377,27 +378,60 @@ def grosumm(dfmdummy,lbl,myuseKAfstV,normfr):
         rv = rv/ normfr
         rv['label']=lbl
     return rv 
-gs00=grosumm(rdf00,"orig",useKAfstV,[])
+gs00=grosumm(rdf00,"Dbg01","orig",useKAfstV,[])
 #print(gs00)
-gs00T = grosumm(rdf00,"origchk",useKAfstV,gs00)
+gs00T = grosumm(rdf00,"Dbg01","origchk",useKAfstV,gs00)
 gs00T
 
 
 #vergelijkbaar met origineel; gebruikt gelezen data
-def grosres (explst,incache0dummy,mult,fitpdummy,oridat,myuseKAfst,setname):
+def grosres (explst,incache0dummy,mult,fitpdummy,oridat,myuseKAfst,runname,setname):
     rdf00N="dummydonotuse"
-    gs00N = grosumm(rdf00N,"orig",myuseKAfst,[])
-    st = ( grosumm("dummy2",exp,myuseKAfst ,gs00N)  for exp in explst )
+    gs00N = grosumm(rdf00N,runname,"orig",myuseKAfst,[])
+    st = ( grosumm("dummy2",runname,exp,myuseKAfst ,gs00N)  for exp in explst )
     st = pd.concat (st)
-    dto= grosumm(oridat,'brondat',myuseKAfst ,gs00N)
+    dto= grosumm(oridat,runname,'brondat',myuseKAfst ,gs00N)
     #print(dto)
     st=st.append(dto)
-    st.reset_index().to_excel("../output/fitrelres2_"+setname+".xlsx")
+    st.reset_index().to_excel("../output/fitrelres2-"+runname+setname+".xlsx")
     return st
-stQ = grosres (elst[0:3],'rudifungcachedummy',1,"fitparadummy", 'fitdatverplgr',useKAfstV,'Dbg01Q-'+globset)
+stQ = grosres (elst[0:3],'rudifungcachedummy',1,"fitparadummy", 'fitdatverplgr',useKAfstVQ,'Dbg02Q-',globset)
 stQ
 
-stQ
+
+# +
+def getStori(runname,setname):
+    stqori= pd.read_excel("../output/fitrelres_"+runname+setname+".xlsx")
+    return stqori 
+
+def chkStori(stqcalc,stqori):
+    ci=  stqcalc.reset_index().set_index(["label","GeoInd"])
+    oi= stqori.set_index(["label","GeoInd"])
+    stqdiff= ci -oi
+    return stqdiff
+rv= chkStori(stQ,getStori('Dbg02Q-',globset))
+np.max(np.abs(rv))
+# -
+
+if 1==1:
+    StoriQ=getStori('Set04Q-',globset)
+    EloriQ=list(StoriQ[StoriQ['GeoInd']=="AankPC"]['label'])
+    EloriQ=EloriQ[0:-1]
+    EloriQ
+    StorcQ=grosres (EloriQ,'rudifungcachedummy',1,"fitparadummy", 'fitdatverplgr',useKAfstVQ,'Set04Q-',globset)
+rv= chkStori(StorcQ,StoriQ)
+np.max(np.abs(rv))
+#succes: all < 1e-8
+
+if 1==1:
+    StoriN=getStori('Set04N-',globset)
+    EloriN=list(StoriN[StoriN['GeoInd']=="AankPC"]['label'])
+    EloriN=EloriN[0:-1]
+    EloriN
+    StorcN=grosres (EloriN,'rudifungcachedummy',1,"fitparadummy", 'fitdatverplgr',useKAfstV,'Set04N-',globset)
+rv= chkStori(StorcN,StoriN)
+np.max(np.abs(rv))
+#succes: all < 1e-8
 
 # +
 #check eens alles
@@ -441,7 +475,7 @@ datadiffcache.groupby(['GeoInd']).sum()/totaalVgen
 datadiffcache.groupby(['KAfstCluCode','GeoInd']).sum()
 
 
-#maak een frame met FactorActiveV geschat op basis van FactorV, gesommeerd over astandsklasses
+#maak een frame met FactorVActive geschat op basis van FactorV, gesommeerd over astandsklasses
 #maak nog apart per motief
 def calcFactVPC4(ddc,perGeoInd):
     if perGeoInd:
@@ -461,11 +495,12 @@ calcFactVPC4(datadiffcache,True)
 def mrgpcdiffr(in2pc,inpc4ori):
     infotots2pcdiff=  in2pc.merge(inpc4ori,how='inner')
     infotots2pcdiff['FactorVChk'] =infotots2pcdiff['FactorV']- infotots2pcdiff['FactorVin']
-    infotots2pcdiff['FactorActiveVIn'] =infotots2pcdiff['FactorActiveVGen']
-    #+ infotots2pcdiff['FactorActiveVSpec']
-    infotots2pcdiff['RatActiveVIn'] = infotots2pcdiff['FactorActiveVIn']/infotots2pcdiff['FactorVin']
-    infotots2pcdiff['RatActiveV'] = infotots2pcdiff['FactorActiveV']/infotots2pcdiff['FactorV']
-    infotots2pcdiff['FactorActiveVChk'] =infotots2pcdiff['FactorActiveV'] -infotots2pcdiff['FactorActiveVIn']
+    infotots2pcdiff['FactorVInActive'] =infotots2pcdiff['FactorVGenActive']
+    #+ infotots2pcdiff['FactorVSpecActive']
+    infotots2pcdiff['RatActiveVIn'] = infotots2pcdiff['FactorVInActive']/infotots2pcdiff['FactorVin']
+    infotots2pcdiff['RatActiveV'] = infotots2pcdiff['FactorVActive']/infotots2pcdiff['FactorV']
+    infotots2pcdiff['FitRatVActive'] = infotots2pcdiff['RatActiveV'] 
+    infotots2pcdiff['FactorVChkActive'] =infotots2pcdiff['FactorVActive'] -infotots2pcdiff['FactorVInActive']
     #infotots2pcdiff[infotots2pcdiff['FactorVChk']  !=0]
     return(infotots2pcdiff)
 infotots2pcdiff=mrgpcdiffr(calcFactVPC4(datadiffcachemspec,True),pc4orisum)
@@ -481,11 +516,12 @@ infotots2pcdiffng.sum()/totaalVgen
 #deze scatter plot ziet er goed uit
 minFactorVplot=5e6
 def mkactpccmpfig(indf0,title):
-    indf0['RatActiveVSc'] = 1.75*indf0['RatActiveV']**2 +.05
-    indf=indf0[(indf0['FactorV']>minFactorVplot ) & (indf0['RatActiveVIn']>1e-2)].copy(deep=False)
+#    indf0['RatActiveVSc'] = 1.75*indf0['RatActiveV']**2 +.05
+    indf=indf0[(indf0['FactorVin']>minFactorVplot ) & (indf0['RatActiveVIn']>1e-2)].copy(deep=False)
     fig, ax = plt.subplots(figsize=(6, 4))
-    c2=sns.lineplot(data=indf, x='RatActiveV',y='RatActiveVSc',ax=ax)
-    c1=sns.scatterplot(data=indf, x='RatActiveV',y='RatActiveVIn',ax=ax)
+    indf['sizser'] = np.abs(indf['FactorVin']) 
+    c2=sns.lineplot(data=indf, x='RatActiveV',y='FitRatVActive',ax=ax)
+    c1=sns.scatterplot(data=indf, x='RatActiveV',y='RatActiveVIn',hue='sizser',size='sizser',ax=ax)
     fig.suptitle(title)
     ax.set_xlabel('Schatting active modes a.h.v. land gem. motief en afstand')
     ax.set_ylabel('Punten: aandeel active per PC4')
@@ -495,8 +531,103 @@ def mkactpccmpfig(indf0,title):
 r1=mkactpccmpfig(infotots2pcdiffng,'Data center functions excluded')
 
 
+# +
+#deze scatter plot ziet er goed uit
+minFactorVplot=5e6
+def mkactpccmpfig(indf0,title):
+#    indf0['RatActiveVSc'] = 1.75*indf0['RatActiveV']**2 +.05
+    indf=indf0[(indf0['FactorVin']>minFactorVplot ) & (indf0['RatActiveVIn']>1e-2)].copy(deep=False)
+    fig, ax = plt.subplots(figsize=(6, 4))
+    indf['sizser'] = np.abs(indf['FactorVin']) 
+    nlev=50
+    mybin=np.linspace(0,1,10)
+#    print(mybin)
+    indf['RatActiveVl']=np.round (indf['RatActiveV'] *nlev)*1.0/nlev
+    indf['RatActiveVInl']=np.round (indf['RatActiveVIn'] *nlev)*1.0/nlev
+#    indflev = indf[['RatActiveVl','RatActiveVInl','sizser']].groupby(['RatActiveVl','RatActiveVInl']).agg('sum').reset_index()
+    indflev= np.histogram2d(indf['RatActiveV'],indf['RatActiveVIn'],bins=mybin,weights=indf['sizser'] )
+    indflevh= indf.pivot_table(index='RatActiveVl',columns='RatActiveVInl',values='sizser'
+                            ,aggfunc='sum'  ,fill_value=0)
+    indflevh=np.sqrt(indflevh)
+#    print(indflev)
+    c2=sns.lineplot(data=indf, x='RatActiveV',y='FitRatVActive',ax=ax)
+    indf['sizsers'] = (indf['sizser']) 
+    c1=plt.hist2d(indf['RatActiveV'],indf['RatActiveVIn'],bins=100,weights=indf['sizsers'],
+                 cmap="rocket_r" ,alpha=0.3)
+    
+#    c1=sns.heatmap(data=indflev, ax=ax,cmap="rocket_r" ,cbar=True,alpha=0.3)
+#    ax.invert_yaxis()
+#cmap="mako",     
+
+#    c1=sns.scatterplot(data=indf, x='RatActiveV',y='RatActiveVIn',hue='sizser',size='sizser',ax=ax)
+    fig.suptitle(title)
+    ax.set_xlabel('Schatting active modes a.h.v. land gem. motief en afstand')
+    ax.set_ylabel('Punten: aandeel active per PC4')
+#    ax.set_xscale('log')
+#    ax.set_yscale('log')
+    return(fig)
+r1=mkactpccmpfig(infotots2pcdiffng,'Data center functions excluded')
+# -
+
+
+
+# +
+def _regressgrp(indf, yvar, xvars,pcols):  
+#        reg_nnls = LinearRegression(fit_intercept=False )
+#        print(('o',len(indf)) )
+        y_train=indf[yvar]
+        X_train=indf[xvars]
+        if 1==1:
+            #smask = ~ (np.isnan(y_train) | np.isnan(np.sum(X_train)) )
+            smask =  (y_train >0) & (np.sum(X_train,axis=1) >0) 
+            indf= indf[smask]
+            y_train=indf[yvar]
+            X_train=indf[xvars]
+#            print(('f', len(indf)))
+        else:
+            y_train[np.isnan(y_train)]=0.1
+        if(len(indf)==0) :
+            rv=np.zeros(len(xvars))
+        else:
+            fit1 = nnls(X_train, y_train)    
+            rv=pd.DataFrame(fit1[0],index=pcols).T
+        return(rv)
+
+
+
+def fitactivem(indf,fitmode):
+    if fitmode=='VGenlin':
+        indf['EstActiveV'] = indf['FactorVin'] *indf['FactorVActive']/indf['FactorV']
+    elif fitmode=='VGensq':
+        indf['EstActiveV'] = indf['FactorVActive']/indf['FactorV']
+        indf['EstActiveV'] = indf['EstActiveV'] * indf['EstActiveV'] * indf['FactorVin'] 
+    if 1==1:
+        fcols=['FactorVin','EstActiveV']
+        pcols=['ParamV','ParamVActive']
+        rf= _regressgrp (indf, 'FactorVInActive', fcols, pcols)   
+        print (rf)
+        #fitdf.merge(rf,how='outer',on=[])
+        indf['FitVActive'] = indf['FactorVin'] * rf['ParamV'][0] +  indf['EstActiveV'] * rf['ParamVActive'][0]
+    diffs = indf['FitVActive'] - indf['FactorVActive']    
+    chisq = np.sum(diffs*diffs) / np.sum(indf['FactorVActive']* indf['FactorVActive'])
+    indf['FitRatVActive'] = indf['FitVActive'] /indf['FactorVin']
+    print(chisq)
+    return (chisq,rf)
+
+#tofit=infotots2pcdiffng.copy(deep=False)
+#noot: VGensq mag er wel mooier uit zien, maar de chi^2 is een factor 4 slechter
+(chisq,rf)= fitactivem(infotots2pcdiffng,'VGensq')
+r1=mkactpccmpfig(infotots2pcdiffng,'fitted VGensq')
+(chisq,rf)= fitactivem(infotots2pcdiffng,'VGenlin')
+r1=mkactpccmpfig(infotots2pcdiffng,'fitted VGenlin')
+
+# -
+
 infotots2pcdiffng [(infotots2pcdiffng ['RatActiveVIn']>.8 )& (infotots2pcdiffng['FactorV']>minFactorVplot ) ]
 
+(chisq,rf)= fitactivem(infotots2pcdiffmspecng,'VGensq')
+r1=mkactpccmpfig(infotots2pcdiffmspecng,'All ODIN data incl center functions')
+(chisq,rf)= fitactivem(infotots2pcdiffmspecng,'VGenlin')
 r1=mkactpccmpfig(infotots2pcdiffmspecng,'All ODIN data incl center functions')
 
 # +
@@ -518,7 +649,7 @@ def make1stgridgeorel (tifname,indf,usecols,nanval):
     grid = rasterio.open(tifname)
     return grid
 
-act1tifcols= ['RatActiveVIn','RatActiveVSc']
+act1tifcols= ['RatActiveVIn','FitRatVActive']
 act1grid= make1stgridgeorel (act1tifname,cbspc4data.merge(infotots2pcdiffng,how='left',
                                                          left_on=['postcode4'],right_on='PC4'),act1tifcols,999)
 # -
@@ -621,13 +752,13 @@ r1=actpltland(actcacheutr,3,utrextent,'actexampleut','actexampleut')
 datadiffcache.groupby(['KAfstCluCode','GeoInd']).sum().rename(columns= {"FactorV_v":"FactorV" })
 
 
-#bijdrage actieve mode per afstandsklasse, uit odinverplflgs
+#bijdrage actieve mode per afstandsklasse, uit odinverplflgs (Gemaakt met VGen - dus zonder VSpec)
 def mkverplAsftsu(inflgs):
     odinverplAsftsu=inflgs.groupby(['KAfstCluCode']).sum().reset_index()
     #.rename(       columns= {"KAfstCluCode":"Kafst"})
     odinverplAsftsu["FactorV"] = odinverplAsftsu["FactorV"] - odinverplAsftsu["FactorV"].shift(1,fill_value=0)
-    odinverplAsftsu["FactorActiveV"] = odinverplAsftsu["FactorActiveV"] - odinverplAsftsu["FactorActiveV"].shift(1,fill_value=0)
-    odinverplAsftsu["ActFractOri"] = odinverplAsftsu["FactorActiveV"] / odinverplAsftsu["FactorV"]
+    odinverplAsftsu["FactorVActive"] = odinverplAsftsu["FactorVActive"] - odinverplAsftsu["FactorVActive"].shift(1,fill_value=0)
+    odinverplAsftsu["ActFractOri"] = odinverplAsftsu["FactorVActive"] / odinverplAsftsu["FactorV"]
     return(odinverplAsftsu)
 odinverplAsftsu=mkverplAsftsu(odinverplflgs)
 
@@ -677,8 +808,12 @@ def pltactsdb(myActiveVori,savtag,title):
     figname = "../output/act_reg_"+savtag+"_"+'m1.svg';
     chart.fig.savefig(figname, bbox_inches="tight")
 
-pltactsdb(KafstActiveVori,'orisel','Originele ODIN data - afstanden > 15 geclusterd')  
+pltactsdb(KafstActiveVori,'orisel','DIN data Gen - afstanden > 15 geclusterd')  
 # -
+
+odinverplAsftsumspec=mkverplAsftsu(odinverplflgsmspec)
+KafstActiveVorimspec = prepactsdb(odinverplAsftsumspec,useKAfstV)
+pltactsdb(KafstActiveVorimspec,'orisel','Originele ODIN data (incl Spec) - afstanden > 15 geclusterd')  
 
 print("Finished")
 

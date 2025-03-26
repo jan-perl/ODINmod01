@@ -14,6 +14,9 @@
 
 # +
 #leest  RUDiFUN en gesmoothde RUDIFUN gegevens en schrijft naar pickles
+#oude manier van doen: op adressen matchen
+#dit is vervangen door geo grids
+#er zijn nog wel routines die deze output vergelijken met geo grids
 # -
 
 import pandas as pd
@@ -57,10 +60,9 @@ import ODiN2readpkl
 print (ODiN2readpkl.fietswijk1pc4)
 
 
-import viewCBS
-
 #import conversion routines buurt to PC4/6
-import viewCBS
+#was: import viewCBS
+import cnv_buwij_to_PC6
 
 pc6gwb2020 = pd.read_csv("../data/CBS/PC6HNR/pc6-gwb2020.csv", encoding = "ISO-8859-1", sep=";")  
 pc6gwb2020['PC4'] = pc6gwb2020['PC6'].str[0:4].astype('int64')
@@ -134,18 +136,29 @@ nhnrperbuurt =pc6hnryr[['Huisnummer','Buurt']].groupby(['Buurt']).sum().reset_in
 pc6hnryrmstats= pc6hnryr.merge(nhnrperbuurt,how='left')
 sffields_sum =['AREA_GEO','O_MXI22T','O_MXI22N']  
 sffields_rel =['S_MXI22_B']  
-RFbu2021pc6 = viewCBS.distrpc6(pc6hnryrmstats,fietswijk1bu,'BU_CODE',sffields_sum,sffields_rel )
-RFbu2021pc4 = viewCBS.cnvpc4(RFbu2021pc6,sffields_sum,sffields_rel )
+RFbu2021pc6 = cnv_buwij_to_PC6.distrpc6(pc6hnryrmstats,fietswijk1bu,'BU_CODE',sffields_sum,sffields_rel )
+RFbu2021pc4 = cnv_buwij_to_PC6.cnvpc4(RFbu2021pc6,sffields_sum,sffields_rel )
 
 RFbu2021pc4.dtypes
 
 fietswijk1bufor4.dtypes
 
-fietswijk1bufor4nona = fietswijk1bufor4[ ~ fietswijk1bufor4['PC4'].isna() ]
+# +
+#oude manier van doen: op adressen matchen
+#dit is vervangen door geo grids
 
-fietswijk1bufor4['PC4'] =fietswijk1bufor4nona['PC4'].astype('int64')
-RFbu2021pc4cmeth=  RFbu2021pc4.merge(fietswijk1bufor4,how='outer')
+# +
+#fietswijk1bufor4nona = fietswijk1bufor4[ ~ fietswijk1bufor4['PC4'].isna() ]
 
-RFbu2021pc4cmeth['d-S_MXI22_B'] = RFbu2021pc4cmeth['S_MXI22_B'] - 
-RFbu2021pc4cmeth['d-S_MXI22_NS'] = RFbu2021pc4cmeth['O_MXI22T'] / RFbu2021pc4cmeth['O_MXI22TN'] -RFbu2021pc4cmeth['S_MXI22_NS']  
-RFbu2021pc4cmeth.sort_values(by=)
+# +
+#fietswijk1bufor4['PC4'] =fietswijk1bufor4nona['PC4'].astype('int64')
+#RFbu2021pc4cmeth=  RFbu2021pc4.merge(fietswijk1bufor4,how='outer')
+
+# +
+
+#RFbu2021pc4cmeth['d-S_MXI22_B'] = RFbu2021pc4cmeth['S_MXI22_B'] - 
+#RFbu2021pc4cmeth['d-S_MXI22_NS'] = RFbu2021pc4cmeth['O_MXI22T'] / RFbu2021pc4cmeth['O_MXI22TN'] -RFbu2021pc4cmeth['S_MXI22_NS']  
+#RFbu2021pc4cmeth.sort_values(by=)
+# -
+
+print("Finished")

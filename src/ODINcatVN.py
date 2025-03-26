@@ -579,7 +579,7 @@ def addgrpexpl(indf,myspecvals,col0,col1,grp1map):
 #other file merge geo
 #other file addparsrecs
 #synchronize with ODINcatVNuse
-FactorVincols=['FactorVGen','FactorVSpec','FactorActiveVGen','FactorActiveVSpec']
+FactorVincols=['FactorVGen','FactorVSpec','FactorVGenActive','FactorVSpecActive']
 #dan een dataframe dat
 #2) per lengteschaal, 1 PC (van of naar en anderegroepen (maar bijv ook Motief ODin data verzamelt)
 
@@ -622,8 +622,8 @@ def mkdfverplxypc4 (df,myspecvals,pltgrps,selstr,myKAfstV,myxlatKAfstV,mygeoschp
     df['FactorVGen']  = np.where(df['HighPCfls'],0, df['FactorV'] )
     df['FactorVSpec'] = np.where(df['HighPCfls'], df['FactorV'],0 )
     amodes= [5,6]
-    df['FactorActiveVGen']= np.where(np.isin(df['KHvm'], amodes ),df['FactorVGen']  ,0)
-    df['FactorActiveVSpec']= np.where(np.isin(df['KHvm'], amodes ),df['FactorVSpec']  ,0)
+    df['FactorVGenActive']= np.where(np.isin(df['KHvm'], amodes ),df['FactorVGen']  ,0)
+    df['FactorVSpecActive']= np.where(np.isin(df['KHvm'], amodes ),df['FactorVSpec']  ,0)
 
     fr2= (mkdfverplxypc4d1 (df,myspecvals,grp,pltgrps,isnhexpl,selstr,myKAfstV,myxlatKAfstV,mygeoschpc4)
             for grp in ['AankPC','VertPC'] )
@@ -746,10 +746,10 @@ def _addfields(pstats,useKAfstVall,njaar,UseSelFactorV):
     pstatsa=pstats.copy(deep=False)
     pstatsa['FactorV']= pstatsa[UseSelFactorV] /njaar
     pstatsa['FactorKm']= pstatsa['FactorV'] * pstatsa['AfstV'] *0.1
-    pstatsa['FactorAutoKm']= np.where(pstatsa['KHvm'] ==1 ,pstatsa['FactorKm']  ,0)
+    pstatsa['FactorKmAuto']= np.where(pstatsa['KHvm'] ==1 ,pstatsa['FactorKm']  ,0)
     amodes= [5,6]
-    pstatsa['FactorActiveKm']= np.where(np.isin(pstatsa['KHvm'], amodes ),pstatsa['FactorKm']  ,0)
-    pstatsa['FactorActiveV']= np.where(np.isin(pstatsa['KHvm'], amodes ),pstatsa['FactorV']  ,0)
+    pstatsa['FactorKmActive']= np.where(np.isin(pstatsa['KHvm'], amodes ),pstatsa['FactorKm']  ,0)
+    pstatsa['FactorVActive']= np.where(np.isin(pstatsa['KHvm'], amodes ),pstatsa['FactorV']  ,0)
     return pstatsa
 
 def mkdfverplklasflgs(df,myspecvals,pltgrps,grp1map,myinfoflds,myKAfstV,myxlatKAfstV,njaar,UseSelFactorV):
@@ -783,7 +783,7 @@ def mkdfverplklasflgs(df,myspecvals,pltgrps,grp1map,myinfoflds,myKAfstV,myxlatKA
 #    print(pstatsc)
     return(pstatsc)
 
-kflgsflds=['FactorV',"FactorKm","FactorAutoKm","FactorActiveKm","FactorActiveV"]
+kflgsflds=['FactorV',"FactorKm","FactorKmAuto","FactorKmActive","FactorVActive"]
 #odinverplflgs_o = mkdfverplklasflgs (allodinyr ,specvaltab,fitgrps,isnhexpl,kflgsflds, 
 #                                   useKAfstV,xlatKAfstV,aantaljaren,'FactorV')
 odinverplflgs_o = pd.concat( [mkdfverplklasflgs (allodinyr ,specvaltab,fitgrps,isnhexpl,kflgsflds, 
@@ -814,9 +814,9 @@ def mkpc4odinact(indf,pc4fld):
     usedf = indf.copy(deep=False)
     amodes= [5,6]
     #mind: FactorKm is in allodinyr always zero
-    usedf['FactorActiveV']= np.where(np.isin(usedf['KHvm'], amodes ),usedf['FactorV']  ,0)
-    odf= usedf[['FactorV','FactorActiveV']+[pc4fld]].groupby([pc4fld]).sum()
-    odf['ActFractOri'] = odf['FactorActiveV']/odf['FactorV'] 
+    usedf['FactorVActive']= np.where(np.isin(usedf['KHvm'], amodes ),usedf['FactorV']  ,0)
+    odf= usedf[['FactorV','FactorVActive']+[pc4fld]].groupby([pc4fld]).sum()
+    odf['ActFractOri'] = odf['FactorVActive']/odf['FactorV'] 
     odf['GeoInd'] =pc4fld
     odf=odf.reset_index().rename ( columns={pc4fld:'PC4'}) 
     return odf
@@ -890,9 +890,9 @@ def mkpc4odinact(indf,pc4fld):
     usedf = indf.copy(deep=False)
     amodes= [5,6]
     #mind: FactorKm is in allodinyr always zero
-    usedf['FactorActiveV']= np.where(np.isin(usedf['KHvm'], amodes ),usedf['FactorV']  ,0)
-    odf= usedf[['FactorV','FactorActiveV']+[pc4fld]].groupby([pc4fld]).sum()
-    odf['ActFractOri'] = odf['FactorActiveV']/odf['FactorV'] 
+    usedf['FactorVActive']= np.where(np.isin(usedf['KHvm'], amodes ),usedf['FactorV']  ,0)
+    odf= usedf[['FactorV','FactorVActive']+[pc4fld]].groupby([pc4fld]).sum()
+    odf['ActFractOri'] = odf['FactorVActive']/odf['FactorV'] 
     odf['GeoInd'] =pc4fld
     odf=odf.reset_index().rename ( columns={pc4fld:'PC4'}) 
     return odf

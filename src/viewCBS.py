@@ -520,5 +520,7 @@ def mktagrds(grid,bdf,selbase,r1):
 
 mktagrds(smftg1,buurtendata,smscs,ctrxform)
 # -
+print("Finished")
+
 
 
