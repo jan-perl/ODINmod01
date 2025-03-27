@@ -58,11 +58,11 @@ def createNLgrid(res,fn,countin,deel):
     if deel == 'Ut':
         transformx = Affine.translation(113000 - res / 2, 480000 - res / 2) * Affine.scale(res, -res)    
         hv=(480000 - 430000)/res
-        wv=(180000- 113000)/res  
+        wv=(180000 - 113000)/res  
     else:
         transformx = Affine.translation(0 - res / 2, 625000  - res / 2) * Affine.scale(res, -res)    
         hv=(625000 - 300000)/res
-        wv=(280000- 0)/res
+        wv=(280000 - 0)/res
 
     new_dataset = rasterio.open(
          fn,          'w',         driver='GTiff',

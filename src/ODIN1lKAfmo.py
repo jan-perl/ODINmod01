@@ -206,6 +206,8 @@ expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0}
 
 
 # +
+#filtgridprecalc_unused wordt in huidige code niet gebruikt: aanname is dat dit toch verschillend is per variant
+#cachen heeft daarom niet zo veel zin
 #eerst een dataframe dat
 #2) per lengteschaal, en PC variabelen eerst geografisch sommeert dan waarde ophaalt per punt
 #   bijv BAM BAT of  (BAM*BAT)/(BAM+BAT)
@@ -216,24 +218,22 @@ expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0}
 #dit moet nog vermenigvuligd worden met het vergelijkbare (heel locale) tuple ->
 #dus steeds 9 kolommen LW LO LM x OW OO OM 
 #radius =0: some over hele land voor O
-def filtgridprecalc (rudigrid,myKAfstV,pu):
+def filtgridprecalc_unused (rudigrid,myKAfstV,pu):
     debug=False
     
     R=dict()
 #    R_LW= rudifungrid.read(3)
 #    R_LT= rudifungrid.read(5)
-    R_LW= rudigrid[3]
-    R_LT= rudigrid[5]
-    R_LO =  R_LT- R_LW   
+    R_LW = rudigrid[3]
+    R_LT = rudigrid[5]
+    R_LO = R_LT- R_LW   
     R_LW = np.power(R_LW,pu['LW'])
     R_LO = np.where(R_LO <0,0, np.power(R_LO,pu['LO']) )
-    R['LW']= R_LW
-    R['LO'] =  R_LO
+    R['LW'] = R_LW
+    R['LO'] = R_LO
 #    R['LM'] =  (R_LO* R_LW) / (R_LO + R_LW+1e-10)
 
     for lkey in R.keys():
-
-        
         for okey in ('OW','OO','OM'):
             colnam="M_"+ lkey +"_" + okey
 #            print(colnam)
@@ -256,6 +256,7 @@ def filtgridprecalc (rudigrid,myKAfstV,pu):
 
 #geoschpc4allQ=mkgeoschparafr(cbspc4data,pc4inwgrid,rudifungrid,useKAfstVQ,1.2,1.0)
 #precgrids1=filtgridprecalc(rudifungcache,useKAfstVQ,expdefs)
+
 
 # +
 #eerst een dataframe dat
@@ -1870,6 +1871,10 @@ stQ
 #stQa
 # -
 print("Finished")
+
+
+
+
 
 
 

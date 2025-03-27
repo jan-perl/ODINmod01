@@ -176,22 +176,19 @@ gridNL100b.close()
 dataset2 = rasterio.open(lasttifname)
 
 
-# +
-def setaxhtn(ax):
-    ax.set_xlim(left=137000, right=143000)
-    ax.set_ylim(bottom=444000, top=452000)
-    
-def setaxutr(ax):
-    ax.set_xlim(left=113000, right=180000)
-    ax.set_ylim(bottom=480000, top=430000)
+def setaxreg(ax,reg):
+    if reg=='htn':
+        ax.set_xlim(left=137000, right=143000)
+        ax.set_ylim(bottom=444000, top=452000)
+    elif reg=='utr':    
+        ax.set_xlim(left=113000, right=180000)
+        ax.set_ylim(bottom=480000, top=430000)
 
-
-# -
 
 fig, ax = plt.subplots()
 base=itotUtr.boundary.plot(color='green',ax=ax,alpha=.3);
 rasterio.plot.show(dataset2, cmap='OrRd',ax=ax)
-setaxhtn(ax)
+setaxreg(ax,'htn')
 
 #read back points, using rasterio directly
 coord_sample = [(x, y) for x, y in zip(itotUtr[ "center"].x, itotUtr[ "center"].y)]
@@ -279,7 +276,7 @@ dataset3.tags(1)
 fig, ax = plt.subplots()
 base=itotUtr.boundary.plot(color='green',ax=ax,alpha=.3);
 rasterio.plot.show((dataset3,5), cmap='OrRd',ax=ax)
-setaxhtn(ax)
+setaxreg(ax,'htn')
 
 # +
 
@@ -291,13 +288,13 @@ fig, ax = plt.subplots()
 base=itotUtr.boundary.plot(color='green',ax=ax,alpha=.3);
 rasterio.plot.show((dataset3,1),cmap='Reds',ax=ax,alpha=0.5)
 rasterio.plot.show((dataset3,2),cmap='Blues',ax=ax,alpha=0.5)
-setaxhtn(ax)
+setaxreg(ax,'htn')
 
 fig, ax = plt.subplots()
 base=itotUtr.boundary.plot(color='green',ax=ax,alpha=.3);
 rasterio.plot.show((dataset3,4),cmap='Reds',ax=ax,alpha=0.5)
 rasterio.plot.show((dataset3,5),cmap='Blues',ax=ax,alpha=0.5)
-setaxhtn(ax)
+setaxreg(ax,'htn')
 
 fig, axhist = plt.subplots(1, 1)
 rasterio.plot.show_hist(
@@ -441,13 +438,13 @@ fig, ax = plt.subplots()
 base=itotUtr.boundary.plot(color='green',ax=ax,alpha=.3);
 rasterio.plot.show((dataset4,3),cmap='Reds',ax=ax,alpha=0.5)
 rasterio.plot.show((dataset4,5),cmap='Blues',ax=ax,alpha=0.5)
-setaxhtn(ax)
+setaxreg(ax,'htn')
 
 fig, ax = plt.subplots()
 base=itotUtr.boundary.plot(color='green',ax=ax,alpha=.3);
 rasterio.plot.show((dataset4,4),cmap='Reds',ax=ax,alpha=0.5)
 rasterio.plot.show((dataset4,6),cmap='Blues',ax=ax,alpha=0.5)
-setaxhtn(ax)
+setaxreg(ax,'htn')
 
 #mogen we ook rekenen? -> NEE
 dwerk=dataset4.read(6)-dataset4.read(4)
@@ -455,7 +452,7 @@ dwerk=dataset4.read(6)-dataset4.read(4)
 fig, ax = plt.subplots()
 base=itotUtr.boundary.plot(color='green',ax=ax,alpha=.3);
 rasterio.plot.show(dwerk, cmap='OrRd',ax=ax)
-setaxhtn(ax)
+setaxreg(ax,'htn')
 
 fig, ax = plt.subplots()
 base=itotUtr.boundary.plot(color='green',ax=ax,alpha=.3);
@@ -504,6 +501,86 @@ dataset5 = rasterio.open(lasttifname)
 fig, ax = plt.subplots()
 #base=Rf_net_buurt.boundary.plot(color='green',ax=ax,alpha=.3);
 rasterio.plot.show((dataset5,4), cmap='OrRd',ax=ax)
+
+# +
+#in order to resolve issue 0003: write xypccoordpc4.xlsx
+#uses meta-analysis from fitparatab1-ogr01-tots.xlsx (from export from ODIN1KAFmo) : 
+#    after power-law correction of OW, #OT and OW contribute the same amount of movements
+
+# +
+#now, also write some statistics
+#code copied from ODIN1Kafmo, bus should be separate
+#to be run BEFORE ODINcatVN
+# -
+
+stryear='2020'
+cbspc4data =pd.read_pickle("../intermediate/CBS/pc4data_"+stryear+".pkl")
+cbspc4data= cbspc4data.sort_values(by=['postcode4']).reset_index()
+
+cbspc4data['oppervlak'] = cbspc4data.area
+cbspc4data['aantal_inwoners'] = np.where(cbspc4data['aantal_inwoners'] <0,0,
+                                         cbspc4data['aantal_inwoners'] )
+
+pc4tifname=calcgdir+'/cbs2020pc4-NL.tif'
+pc4excols= ['aantal_inwoners','aantal_mannen', 'aantal_vrouwen']
+pc4inwgrid= rasterio.open(pc4tifname)
+
+#rudifunset, heb originele data niet nodig, alleen grid
+#Rf_net_buurt=pd.read_pickle("../intermediate/rudifun_Netto_Buurt_o.pkl") 
+#Rf_net_buurt.reset_index(inplace=True,drop=True)
+#gemaakt in ROfietsbalans2
+rudifuntifname=calcgdir+'/oriTN2-NL.tif'
+rudifungrid= rasterio.open(rudifuntifname)
+
+
+def getcachedgrids(src):
+    clst={}
+    for i in src.indexes:
+        clst[i] = src.read(i) 
+    return clst
+pc4inwgcache = getcachedgrids(pc4inwgrid)
+rudifungcache = getcachedgrids(rudifungrid)
+
+expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0}
+
+
+def mkgeowgtxy (pc4data,pc4grid,rudigrid,rudifil,pu,res):
+    debug=False
+    #pc4lst=pc4grid.read(1)
+    pc4lst=pc4grid[1]
+    outdf=pc4data[['postcode4','aantal_inwoners','oppervlak']].rename(columns={'postcode4':'PC4'} )
+    outdfst= outdf.copy()
+    
+    R=dict()
+#    R_LW= rudifungrid.read(3)
+#    R_LT= rudifungrid.read(5)
+    R_LW= rudigrid[3]
+    R_LT= rudigrid[5]
+    R_LO =  R_LT- R_LW   
+    R_LW = np.power(R_LW,pu['LW'])
+    R_LO = np.where(R_LO <0,-np.power(-R_LO,pu['LO']), np.power(R_LO,pu['LO']) )
+    R_twg = R_LW + R_LO
+    twgvals = rasteruts1.sumpixarea(pc4lst,R_twg) 
+    #output corrgrid = np.zeros([grid.width, grid.height],dtype=np.int32) 
+    x = np.linspace(0,rudifil.width*res, rudifil.width)
+    y = np.linspace(rudifil.height*res+ 300000,300000, rudifil.height)
+    X, Y = np.meshgrid(x, y)
+    outdf['avgRfunX'] = rasteruts1.sumpixarea(pc4lst,X* R_twg) / twgvals
+    outdf['avgRfunY'] = rasteruts1.sumpixarea(pc4lst,Y* R_twg) / twgvals
+    reppts = cbspc4data.representative_point()
+    outdf['georepX'] =  reppts.x
+    outdf['georepY'] =  reppts.y
+    return(outdf)
+xypccoord= mkgeowgtxy(cbspc4data,pc4inwgcache,rudifungcache,rudifungrid,expdefs,100)
+xypccoord
+
+sns.scatterplot(data=xypccoord,x="avgRfunX",y="georepX")
+sns.scatterplot(data=xypccoord,x="avgRfunY",y="georepY")
+
+#for use in other calculations
+xypccoord.to_excel("../intermediate/xypccoordpc4.xlsx")
+
+
 
 print("Finished")
 

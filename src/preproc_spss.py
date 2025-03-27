@@ -14,6 +14,13 @@
 
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+import geopandas
+import contextily as cx
+import xyzservices.providers as xyz
+from scipy.optimize import nnls
 
 #import ODiN2pd
 import ODiN2readpkl
@@ -170,4 +177,252 @@ def chkKafstRvsAfstR(df):
     return grp
 chkKafstRvsAfstR(ODiN2readpkl.allodinyr)
 
+# +
+#code for issue 0003
+# -
 
+#start with birds-eye distances file written by ROfietsb_Utchk
+xypccoord=pd.read_excel("../intermediate/xypccoordpc4.xlsx")
+
+
+def addvogelvl(dfin,wgcoord):
+    c2 = wgcoord[['PC4','avgRfunX','avgRfunY']]
+    cvert = c2.copy(deep=False)
+    cvert.columns=['VertPC','VertPCDRSX','VertPCDRSY']
+    caank = c2.copy(deep=False)
+    caank.columns=['AankPC','AankPCDRSX','AankPCDRSY']
+#    print(cvert)    
+    df=dfin [(dfin ['Rit'] ==1) & (dfin ['AankPC'] !=0) & (dfin ['VertPC'] !=0)]
+#    df['AankPC'] = df['AankPC'].astype(int)
+#    df['VertPC'] = df['VertPC'].astype(int)
+#    print(df)
+    dfrds=df.merge(cvert,how='left').merge(caank,how='left')
+    dfrds['AfstVV'] = np.sqrt((dfrds['VertPCDRSX']-dfrds['AankPCDRSX'])**2 +
+                              (dfrds['VertPCDRSY']-dfrds['AankPCDRSY'])**2)
+    dfrds['AfstVVwg'] = dfrds['AfstVV'] * dfrds['FactorV'] 
+    dfrds['AfstRwg'] =  dfrds['AfstR'] * dfrds['FactorV'] 
+    rv = dfrds[['VertPC','AankPC','AfstRwg','AfstVVwg','FactorV']]. groupby(['VertPC','AankPC']).\
+           agg('sum') .reset_index()
+    rv ['AfstVVwg'] = rv['AfstVVwg'] / rv['FactorV'] /1000
+    rv ['AfstRwg'] = rv['AfstRwg'] / rv['FactorV'] /10
+    rv=rv.merge(cvert,how='left').merge(caank,how='left')
+    return (rv)
+allodvv = addvogelvl(ODiN2readpkl.allodinyr,xypccoord) 
+
+allodvv
+
+allvvlim=2e6
+def vvplt1(dfin,lim):
+    df= dfin[(dfin['FactorV']>lim) & (dfin['AankPC'] != dfin['VertPC'] )
+                                      & (dfin['AfstVVwg'] <15)].copy()
+    df['lim']=df['AfstVVwg']+3
+    fig, ax = plt.subplots(figsize=(6, 4))
+    sns.lineplot(data=df,y='AfstVVwg',x='AfstVVwg',ax=ax)
+    sns.lineplot(data=df,y='lim',x='AfstVVwg',ax=ax)
+    sns.scatterplot(data=df,y='AfstRwg',x='AfstVVwg',ax=ax)
+vvplt1(allodvv,allvvlim)    
+
+
+def setaxreg(ax,reg):
+    if reg=='htn':
+        ax.set_xlim(left=137000, right=143000)
+        ax.set_ylim(bottom=444000, top=452000)
+    elif reg=='utr':    
+        ax.set_xlim(left=113000, right=180000)
+        ax.set_ylim(bottom=480000, top=430000)
+
+
+def vvcplt1nb(dfin,lim):
+    df= dfin[(dfin['FactorV']>lim) & (dfin['AankPC'] != dfin['VertPC'] )
+                                      & (dfin['AfstVVwg'] <15)].copy()
+    
+    df['lim']=df['AfstVVwg']+3
+    fig, ax = plt.subplots(figsize=(12, 12))
+
+    cmaxed= df['AfstRwg']/ df['AfstVVwg']
+    cmaxed = np.minimum(cmaxed,2)
+    plt.quiver(df['VertPCDRSX'],df['VertPCDRSY'],
+               df['AankPCDRSX']- df['VertPCDRSX'],df['AankPCDRSY']-df['VertPCDRSY'],
+               cmaxed,cmap='jet',
+               angles='xy',scale_units='xy', scale=1.)
+    ax.set_aspect("equal")
+    setaxreg(ax,'htn')
+    plt.colorbar()
+#    cx.add_basemap(ax, source= prov0)
+vvcplt1nb(allodvv,allvvlim)  
+
+
+# +
+def setaxgreg(ax,reg):
+    if reg=='htn':
+        ax.set_xlim(left=572000, right=579000)
+        ax.set_ylim(bottom=6801000, top=6809000)
+    elif reg=='hgm':
+        ax.set_xlim(left=572000, right=583000)
+        ax.set_ylim(bottom=6795000, top=6812000)
+    elif reg=='utr':  
+        ax.set_xlim(left=520000, right=620000)
+        ax.set_ylim(bottom=6780000, top=6860000)
+    elif reg=='uog':  
+        ax.set_xlim(left=565000, right=576000)
+        ax.set_ylim(bottom=6810000, top=6825000)
+    elif reg=='u10':  
+        ax.set_xlim(left=555000, right=590000)
+        ax.set_ylim(bottom=6795000, top=6830000)
+        
+def vvcplt1(dfin,lim,reg):
+    df2= dfin[(dfin['FactorV']>lim) & (dfin['AankPC'] != dfin['VertPC'] )
+                                      & (dfin['AfstVVwg'] <15)].copy()
+    
+    df = geopandas.GeoDataFrame(
+       df2, geometry=geopandas.points_from_xy(df2['VertPCDRSX'],df2['VertPCDRSY'],
+                                              crs='EPSG:28992' ) ).to_crs(epsg=plot_crs)
+    df['lim']=df['AfstVVwg']+3
+#    fig, ax = plt.subplots(figsize=(12, 12))
+    ax = df.plot(
+    figsize= (12, 12),
+    alpha  = 0.1
+      )
+    cmaxed= df['AfstRwg']/ df['AfstVVwg']
+    cmaxed = np.minimum(cmaxed,2)
+    plt.quiver(df['geometry'].x,df['geometry'].y,
+               df['AankPCDRSX']- df['VertPCDRSX'],df['AankPCDRSY']-df['VertPCDRSY'],
+               cmaxed,cmap='jet',
+               angles='xy',scale_units='xy', scale=1.)
+    ax.set_aspect("equal")
+    plt.colorbar()
+    if reg in ['htn']:
+        base=itotUtr.boundary.plot(color='green',ax=ax,alpha=.3);
+    setaxgreg(ax,reg)
+    cx.add_basemap(ax, source= prov0)
+    
+
+vvcplt1(allodvv,allvvlim*.7,'u10')  
+
+
+# -
+
+def vvpltexcepy1(dfin,lim):
+    df= dfin[(dfin['FactorV']>lim) & (dfin['AankPC'] != dfin['VertPC'] )
+                                      & (dfin['AfstVVwg'] <5)& (dfin['AfstRwg'] > dfin['AfstVVwg']+3)]
+    rv = df
+    return rv
+vvpltexcepy1(allodvv,allvvlim)    
+
+prov0=cx.providers.nlmaps.grijs.copy()
+print( cbspc4data.crs)
+print (prov0)
+plot_crs=3857
+
+stryear='2020'
+cbspc4data =pd.read_pickle("../intermediate/CBS/pc4data_"+stryear+".pkl")
+cbspc4data= cbspc4data.sort_values(by=['postcode4']).reset_index()
+
+chkpckrt1 = cbspc4data[(np.isin (cbspc4data['postcode4'],(7553) ))]
+chkpckrt2 = cbspc4data[(np.isin (cbspc4data['postcode4'],(7556) ))]
+fig, ax = plt.subplots(figsize=(16, 12))
+pchkpckrt = chkpckrt1.to_crs(epsg=plot_crs).plot(alpha=.3,color='blue',ax=ax)
+pchkpckrt = chkpckrt2.to_crs(epsg=plot_crs).plot(alpha=.3,color='green',ax=ax)
+cx.add_basemap(pchkpckrt, source= prov0)
+
+
+# +
+def _regressgrp(indf, yvar, xvars,pcols):  
+#        reg_nnls = LinearRegression(fit_intercept=False )
+#        print(('o',len(indf)) )
+        y_train=indf[yvar]
+        X_train=indf[xvars]
+        if 1==1:
+            #smask = ~ (np.isnan(y_train) | np.isnan(np.sum(X_train)) )
+            smask =  (y_train >0) & (np.sum(X_train,axis=1) >0) 
+            indf= indf[smask]
+            y_train=indf[yvar]
+            X_train=indf[xvars]
+#            print(('f', len(indf)))
+        else:
+            y_train[np.isnan(y_train)]=0.1
+        if(len(indf)==0) :
+            rv=np.zeros(len(xvars))
+        else:
+            fit1 = nnls(X_train, y_train)    
+            rv=pd.DataFrame(fit1[0],index=pcols).T
+        return(rv)
+
+
+
+def fitAfstR(dfin,lim,fitmode):
+    df= dfin[(dfin['FactorV']>lim) & (dfin['AankPC'] != dfin['VertPC'] )
+                                      & (dfin['AfstVVwg'] <15)].copy()
+    if fitmode=='VGenlin':
+        df ['AfstVVwg'] = df['AfstVVwg'] * df['FactorV'] 
+        df ['AfstRwg'] = df['AfstRwg'] * df['FactorV'] 
+    if 1==1:
+        fcols=['FactorV','AfstVVwg']
+        pcols=['ParamCnst','ParamAfstVVwg']
+        rf= _regressgrp (df, 'AfstRwg', fcols, pcols)   
+        print (rf)
+        #fitdf.merge(rf,how='outer',on=[])
+        df['FitAfstRwg'] = df['FactorV'] * rf['ParamCnst'][0] +  df['AfstVVwg'] * rf['ParamAfstVVwg'][0]
+        dfin['FitAfstRwg'] = 1 * rf['ParamCnst'][0] +  dfin['AfstVVwg'] * rf['ParamAfstVVwg'][0]
+
+    diffs = df['FitAfstRwg'] - df['AfstRwg']    
+    chisq = np.sum(diffs*diffs) / np.sum(df['AfstRwg']* df['AfstRwg'])
+    print(chisq)
+    return (chisq,rf)
+
+#tofit=infotots2pcdiffng.copy(deep=False)
+#noot: VGensq mag er wel mooier uit zien, maar de chi^2 is een factor 4 slechter
+
+(chisq,rf)= fitAfstR(allodvv,allvvlim,'VGenlin')
+#r1=mkactpccmpfig(infotots2pcdiffng,'fitted VGenlin')
+# -
+
+def vvplt2(dfin,lim):
+    df= dfin[(dfin['FactorV']>lim) & (dfin['AankPC'] != dfin['VertPC'] )
+                                      & (dfin['AfstVVwg'] <15)].copy()
+    fig, ax = plt.subplots(figsize=(6, 4))
+    sns.lineplot(data=df,y='AfstVVwg',x='AfstVVwg',ax=ax)
+    sns.lineplot(data=df,y='FitAfstRwg',x='AfstVVwg',ax=ax)
+    sns.scatterplot(data=df,y='AfstRwg',x='AfstVVwg',ax=ax)
+vvplt2(allodvv,allvvlim) 
+
+fietsodvv = addvogelvl(ODiN2readpkl.allodinyr[ODiN2readpkl.allodinyr['KHvm'].isin([5,6])],xypccoord) 
+
+fietslim=1e6
+vvplt1(fietsodvv,fietslim)    
+
+(chisq,rf)= fitAfstR(fietsodvv,fietslim,'VGenlin')
+
+vvplt2(fietsodvv,fietslim) 
+
+
+def vvpltexcepy2(dfin,lim):
+    df= dfin[(dfin['FactorV']>lim) & (dfin['AankPC'] != dfin['VertPC'] )
+                                      & (dfin['AfstVVwg'] <1.5)& (dfin['AfstRwg'] > dfin['AfstVVwg']+1.0)]
+    rv = df
+    return rv
+vvpltexcepy2(fietsodvv,fietslim) 
+
+vvcplt1(fietsodvv,fietslim*.5,'htn') 
+
+loopodvv = addvogelvl(ODiN2readpkl.allodinyr[ODiN2readpkl.allodinyr['KHvm']==5],xypccoord) 
+
+looplim=1e6
+vvplt1(loopodvv,looplim)    
+
+# +
+#issue 0003 conclusies
+#Om goede statistiek te hebben zijn tientallen ritten nodig, die zijn er maar voor een beperkt
+#aantal PC4 combinaties
+#Over het algemeen zijn de ODIN afstanden daar iets langer dan vogelvlucht
+#Afwijkingen met ODIN > VV bij specifieke liggingen waarbij omrijden logisch is, 
+#of bij relatief uitgestrekte PC4 gebieden met veel kruisverbanden
+#maar te weinig PC4 combinaties om hier trends of kaarten uit te halen
+#Afwijkingen met ODIN < VV bij specifieke liggingen onderling populaire locaties
+#  dicht bij onderlinge grens liggen
+#lopen en fietsen lijken iets consistenter beeld te geven (minder omrijden via snellere wegen)
+#maar dan (door selectie) ook weer minder data punten
+#ofwel: de aanpak met vogelvlucht is niet geautomatiseerd structureel te verbeteren
+# -
+
+print("Finished")
