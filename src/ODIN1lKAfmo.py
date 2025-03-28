@@ -1819,9 +1819,8 @@ def grosumm(dfm,runname,lbl,myuseKAfstV,normfr):
     ddc_fitdat =  ODINcatVNuse.mkdatadiff(dfmu, ODINcatVNuse.fitgrpse,  ODINcatVNuse.infoflds,'mxigrp',ODINcatVNuse.landcod)
 
     # myodinverplflgs / myodindiffflginfo kunnen ook buiten loop worden berekend, maar dit borgt consisitente
-    # voor relatief weinig extra rekentijd
-    myodinverplflgs =ODINcatVNuse.odinverplflgs_o[np.isin(
-         ODINcatVNuse.odinverplflgs_o['KAfstCluCode'],mymaskKAfstV)].copy (deep=False)
+    # voor relatief weinig extra rekentijd   
+    myodinverplflgs =ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplflgs_o,mymaskKAfstV,MainUseSelFactorV)
     myodindiffflginfo= ODINcatVNuse.convert_diffgrpsidat(myodinverplflgs,
                 ODINcatVNuse.fitgrpse,[],ODINcatVNuse.kflgsflds, [],"_c",ODINcatVNuse.landcod,False)
     totinf_fitdat = ODINcatVNuse.mkinfosums(ddc_fitdat,myodindiffflginfo,                                            
@@ -1841,7 +1840,8 @@ gs00T
 
 rdf00PC4=predictnewdistr (cbspc4data,pc4inwgcache,rudifungcache,useKAfstVQ,xlatKAfstV,
                 skipPCMdf,fitgrps,expdefs,fitpara,'PC4')
-gs00PC4 = grosumm(rdf00,'Dbg01Q',"origPC4chk",useKAfstVQ,gs00)
+#print(rdf00PC4[0:2].T)
+gs00PC4 = grosumm(rdf00PC4,'Dbg01Q',"origPC4chk",useKAfstVQ,gs00)
 gs00PC4
 
 
@@ -1858,7 +1858,7 @@ def grosres (explst,incache0,mult,fitp,oridat,myuseKAfst,runname,setname,predgrp
     st.reset_index().to_excel("../output/fitrelres_"+runname+setname+".xlsx")
     return st
 stQ = grosres (elst[0:3],rudifungcache,1,fitpara, fitdatverplgr,
-               useKAfstVQ,'Dbg02Q-',globset,'mxigrp')
+               useKAfstVQ,'Dbg05Q-',globset,'PC4')
 stQ
 
 stQ
@@ -1871,6 +1871,8 @@ stQ
 #stQa
 # -
 print("Finished")
+
+
 
 
 

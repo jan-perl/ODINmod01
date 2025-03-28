@@ -23,10 +23,10 @@ elst = list(re.sub(".tif$",'',re.sub('^.*/','',f) ) for f in flst)
 elst
 
 stQ = ODIN1lKAfmo.grosres (elst,ODIN1lKAfmo.rudifungcache,1,ODIN1lKAfmo.fitpara,ODIN1lKAfmo.fitdatverplgr,
-                                ODIN1lKAfmo.useKAfstVQ,'Set04Q-',globset,'mxigrp') 
+                                ODIN1lKAfmo.useKAfstVQ,'Set05Q-',globset,'PC4') 
 
 stN = ODIN1lKAfmo.grosres (elst,ODIN1lKAfmo.rudifungcache,1,ODIN1lKAfmo.fitpara,ODIN1lKAfmo.fitdatverplgr,
-                                ODIN1lKAfmo.useKAfstV,'Set04N-',globset,'mxigrp')  
+                                ODIN1lKAfmo.useKAfstV,'Set05N-',globset,'PC4')  
 
 print ("Finished")
 

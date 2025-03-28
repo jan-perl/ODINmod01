@@ -332,8 +332,7 @@ def gropc4stats(dfm,runname,lbl,myuseKAfstV,normfr):
 
     # myodinverplflgs / myodindiffflginfo kunnen ook buiten loop worden berekend, maar dit borgt consisitente
     # voor relatief weinig extra rekentijd
-    myodinverplflgs =ODINcatVNuse.odinverplflgs_o[np.isin(
-         ODINcatVNuse.odinverplflgs_o['KAfstCluCode'],mymaskKAfstV)].copy (deep=False)
+    myodinverplflgs =ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplflgs_o,maskKAfstV,MainUseSelFactorV)
     myodindiffflginfo= ODINcatVNuse.convert_diffgrpsidat(myodinverplflgs,
                 ODINcatVNuse.fitgrpse,[],ODINcatVNuse.kflgsflds, [],"_c",ODINcatVNuse.landcod,False)
     totinf_fitdat = ODINcatVNuse.mkinfosums(ddc_fitdat,myodindiffflginfo,                                            
@@ -437,28 +436,44 @@ np.max(np.abs(rv))
 #check eens alles
 #stQa = grosres (elst,rudifungcache,1,fitpara, fitdatverplgr,useKAfstVQ,'DBgf01Q-'+globset)
 #stQa
+# -
+#einde van poging om fitdatres te herhalen
+#nu weer naar oorspronkelijke data en ative mode vergelijingken
+
+
 # +
 #allerlei active modes vergelijkingen
+
+# +
+MainUseSelFactorV='FactorVGen'
+def deffactorvin(rv,UseSelFactorV): 
+    if UseSelFactorV =='FactorVGen':
+        rv['FactorVInActive'] =rv['FactorVGenActive']            
+    elif UseSelFactorV =='FactorV':    
+        rv['FactorVInActive'] =rv['FactorVGenActive'] + rv['FactorVSpecActive']       
+    else:
+        assert(0)
+    rv= rv.reset_index().rename(columns={"FactorV":"FactorVin"})
+    return rv
+
+#ng zonder geoind: dan komt iedere PC precies een keer voor
+pc4orisumng = (odinverplgr[odinverplgr['KAfstCluCode'] == ODINcatVNuse.landcod] .groupby (
+    ['PC4'] ).agg('sum')*0.5).drop (columns=['index','MotiefV','isnaarhuis','KAfstCluCode'])
+pc4orisumng = deffactorvin(pc4orisumng,MainUseSelFactorV)
+pc4orisum =   (odinverplgr[odinverplgr['KAfstCluCode'] == ODINcatVNuse.landcod] .groupby (
+    ['PC4','GeoInd'] ).agg('sum')).drop(columns=['index','MotiefV','isnaarhuis','KAfstCluCode'])
+pc4orisum =   deffactorvin(pc4orisum,  MainUseSelFactorV)
+pc4orisum
 # -
 
-pc4orisumng = (odinverplgr[odinverplgr['KAfstCluCode'] == ODINcatVNuse.landcod] .groupby (
-    ['PC4'] ).agg('sum')*0.5).reset_index().rename(columns={"FactorV":"FactorVin"}).drop (
-     columns=['index','MotiefV','isnaarhuis','KAfstCluCode'])
-pc4orisumng
-pc4orisum = (odinverplgr[odinverplgr['KAfstCluCode'] == ODINcatVNuse.landcod] .groupby (
-    ['PC4','GeoInd'] ).agg('sum')).reset_index().rename(columns={"FactorV":"FactorVin"}).drop (
-     columns=['index','MotiefV','isnaarhuis','KAfstCluCode'])
-pc4orisum
-
-MainUseSelFactorV='FactorV'
-odinverplgrmspec= ODINcatVNuse.deffactorv(ODINcatVNuse.odinverplgr_o,maskKAfstV,MainUseSelFactorV )
-odinverplklinfomspec = ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplklinfo_o,maskKAfstV,MainUseSelFactorV)
-odinverplflgsmspec =ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplflgs_o,maskKAfstV,MainUseSelFactorV)
-
-MainUseSelFactorV='FactorVGen'
 odinverplgr= ODINcatVNuse.deffactorv(ODINcatVNuse.odinverplgr_o,maskKAfstV,MainUseSelFactorV )
 odinverplklinfo = ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplklinfo_o,maskKAfstV,MainUseSelFactorV)
 odinverplflgs =ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplflgs_o,maskKAfstV,MainUseSelFactorV)
+
+MainUseSelFactorVmspec='FactorV'
+odinverplgrmspec= ODINcatVNuse.deffactorv(ODINcatVNuse.odinverplgr_o,maskKAfstV,MainUseSelFactorVmspec )
+odinverplklinfomspec = ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplklinfo_o,maskKAfstV,MainUseSelFactorVmspec)
+odinverplflgsmspec =ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplflgs_o,maskKAfstV,MainUseSelFactorVmspec)
 
 datadiffcachemspec = ODINcatVNuse.mkdatadiff(odinverplgrmspec,ODINcatVNuse.fitgrpse,
                                         ODINcatVNuse.infoflds,'PC4',ODINcatVNuse.landcod)
@@ -492,20 +507,26 @@ calcFactVPC4(datadiffcache,False)
 calcFactVPC4(datadiffcache,True)
 
 
-def mrgpcdiffr(in2pc,inpc4ori):
+# +
+#OK:: Hier gebeurt de magic voor het vergelijken van de active modes per PC4
+#de output uit calcFactVPC4 (zie hierboven) wordt als verklarende variabele gebruikt.
+#deze wordt gemerged met pc4orisum die uit de oorspronkelijke data komt
+#Er zijn even minder naam conflicten omdat de oorspronkelijke data nog Gen en Spec kennen
+
+def mrgpcactdiffr(in2pc,inpc4ori):
     infotots2pcdiff=  in2pc.merge(inpc4ori,how='inner')
     infotots2pcdiff['FactorVChk'] =infotots2pcdiff['FactorV']- infotots2pcdiff['FactorVin']
-    infotots2pcdiff['FactorVInActive'] =infotots2pcdiff['FactorVGenActive']
-    #+ infotots2pcdiff['FactorVSpecActive']
     infotots2pcdiff['RatActiveVIn'] = infotots2pcdiff['FactorVInActive']/infotots2pcdiff['FactorVin']
     infotots2pcdiff['RatActiveV'] = infotots2pcdiff['FactorVActive']/infotots2pcdiff['FactorV']
     infotots2pcdiff['FitRatVActive'] = infotots2pcdiff['RatActiveV'] 
     infotots2pcdiff['FactorVChkActive'] =infotots2pcdiff['FactorVActive'] -infotots2pcdiff['FactorVInActive']
     #infotots2pcdiff[infotots2pcdiff['FactorVChk']  !=0]
     return(infotots2pcdiff)
-infotots2pcdiff=mrgpcdiffr(calcFactVPC4(datadiffcachemspec,True),pc4orisum)
-infotots2pcdiff.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief
+infotots2pcdiff=mrgpcactdiffr(calcFactVPC4(datadiffcache,True),pc4orisum)
+t2= infotots2pcdiff.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief
+t2.T
 #/totaalVgen
+# -
 
 infotots2pcdiffmspecng=mrgpcdiffr(calcFactVPC4(datadiffcachemspec,False),pc4orisumng)
 infotots2pcdiffmspecng.sum()/ODINcatVNuse.totaalmotief
@@ -593,23 +614,33 @@ def _regressgrp(indf, yvar, xvars,pcols):
             rv=pd.DataFrame(fit1[0],index=pcols).T
         return(rv)
 
-
+#fit op 'FactorVInActive': weeg naar indf['FactorVin']
 
 def fitactivem(indf,fitmode):
+    indf['EstActiveV'] = indf['FactorVin'] *indf['FactorVActive']/indf['FactorV']
+    indf['EstActiveVS'] = indf['FactorVActive']/indf['FactorV']
+    indf['EstActiveVS'] = indf['EstActiveVS'] * indf['EstActiveVS'] * indf['FactorVin']
     if fitmode=='VGenlin':
-        indf['EstActiveV'] = indf['FactorVin'] *indf['FactorVActive']/indf['FactorV']
-    elif fitmode=='VGensq':
-        indf['EstActiveV'] = indf['FactorVActive']/indf['FactorV']
-        indf['EstActiveV'] = indf['EstActiveV'] * indf['EstActiveV'] * indf['FactorVin'] 
-    if 1==1:
         fcols=['FactorVin','EstActiveV']
         pcols=['ParamV','ParamVActive']
-        rf= _regressgrp (indf, 'FactorVInActive', fcols, pcols)   
-        print (rf)
-        #fitdf.merge(rf,how='outer',on=[])
-        indf['FitVActive'] = indf['FactorVin'] * rf['ParamV'][0] +  indf['EstActiveV'] * rf['ParamVActive'][0]
-    diffs = indf['FitVActive'] - indf['FactorVActive']    
-    chisq = np.sum(diffs*diffs) / np.sum(indf['FactorVActive']* indf['FactorVActive'])
+    elif fitmode=='VGensq':
+        fcols=['FactorVin','EstActiveVS']
+        pcols=['ParamV','ParamVActiveS']
+    else:
+        fcols=['FactorVin','EstActiveV','EstActiveVS']
+        pcols=['ParamV','ParamVActive','ParamVActiveS']
+    rf= _regressgrp (indf, 'FactorVInActive', fcols, pcols)   
+    if fitmode=='VGenlin':
+        rf['ParamVActiveS']=0
+    elif fitmode=='VGensq':
+        rf['ParamVActive']=0        
+    print (rf)
+    #fitdf.merge(rf,how='outer',on=[])
+    indf['FitVActive'] = indf['FactorVin'] * rf['ParamV'][0] +  \
+            indf['EstActiveV'] * rf['ParamVActive'][0] +\
+            indf['EstActiveVS'] * rf['ParamVActiveS'][0]
+    diffs = indf['FitVActive'] - indf['FactorVInActive']    
+    chisq = np.sum(diffs*diffs) / np.sum(indf['FactorVInActive']* indf['FactorVInActive'])
     indf['FitRatVActive'] = indf['FitVActive'] /indf['FactorVin']
     print(chisq)
     return (chisq,rf)
@@ -620,7 +651,8 @@ def fitactivem(indf,fitmode):
 r1=mkactpccmpfig(infotots2pcdiffng,'fitted VGensq')
 (chisq,rf)= fitactivem(infotots2pcdiffng,'VGenlin')
 r1=mkactpccmpfig(infotots2pcdiffng,'fitted VGenlin')
-
+(chisq,rf)= fitactivem(infotots2pcdiffng,'VGenpara')
+r1=mkactpccmpfig(infotots2pcdiffng,'fitted VGenpara')
 # -
 
 infotots2pcdiffng [(infotots2pcdiffng ['RatActiveVIn']>.8 )& (infotots2pcdiffng['FactorV']>minFactorVplot ) ]
@@ -651,7 +683,7 @@ def make1stgridgeorel (tifname,indf,usecols,nanval):
 
 act1tifcols= ['RatActiveVIn','FitRatVActive']
 act1grid= make1stgridgeorel (act1tifname,cbspc4data.merge(infotots2pcdiffng,how='left',
-                                                         left_on=['postcode4'],right_on='PC4'),act1tifcols,999)
+                                left_on=['postcode4'],right_on='PC4'),act1tifcols,999)
 # -
 
 #common code with Mkaddgrids
@@ -814,6 +846,51 @@ pltactsdb(KafstActiveVori,'orisel','DIN data Gen - afstanden > 15 geclusterd')
 odinverplAsftsumspec=mkverplAsftsu(odinverplflgsmspec)
 KafstActiveVorimspec = prepactsdb(odinverplAsftsumspec,useKAfstV)
 pltactsdb(KafstActiveVorimspec,'orisel','Originele ODIN data (incl Spec) - afstanden > 15 geclusterd')  
+
+# +
+#OK , we weten nu dat we 
+#a fitdatres2- kunnen maken, gelijk aan fitdatres-
+#b geo vergelijkingen active modes kunnen maken
+#nu op de manier van 
+# -
+
+flst = glob.glob ("../intermediate/addgrds/"+globset+"*base_00*.tif")
+bname = list(re.sub(".tif$",'',re.sub('^.*/','',f) ) for f in flst) [0]
+bname
+
+
+#vergelijkbaar met origineel; gebruikt gelezen data
+def getddcInAct(dfmdummy,runname,lbl,myuseKAfstV,normfr):
+    dfm=pd.read_pickle("../output/fitdf_"+runname+"_"+lbl+".pd")
+    mymaskKAfstV= list(myuseKAfstV['KAfstCluCode'])
+    if lbl=='brondat':
+        dfmu=dfm[np.isin(dfm['KAfstCluCode'],mymaskKAfstV)].copy (deep=False)
+    else:
+        dfmu=dfm.rename (columns={'FactorV':'FactorOrig', 'FactorEst':'FactorV' ,'mxigrp':'PC4'})
+    ddc_fitdat =  mkdatadiff2(dfmu, ODINcatVNuse.fitgrpse,  ODINcatVNuse.infoflds,'PC4',ODINcatVNuse.landcod)    
+    return ddc_fitdat
+#ddc base will be used in several aggregates
+ddc_base = getddcInAct("dummy2","Set05N-",bname,useKAfstV ,[]) 
+
+
+# +
+#PC4 data active modes in zelfde format als pc4orisum
+def getPC4InAct(ddc_fitdat):
+    cfact=calcFactVPC4(ddc_fitdat,True)
+    rv = cfact[['PC4','GeoInd','FactorV','FactorVActive']].rename(
+        columns={"FactorV":"FactorVin",'FactorVActive':'FactorVInActive'})         
+    return rv 
+
+basePC4act = getPC4InAct(ddc_base ) 
+#basePC4act = getPC4InAct("dummy2","Dbg01Q","origPC4chk",useKAfstV ,[]) 
+baseactpcdiff=mrgpcactdiffr(calcFactVPC4(datadiffcache,True),basePC4act)
+t2= baseactpcdiff.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief
+t2.T
+#/totaalVgen
+# -
+
+(chisq,rf)= fitactivem(baseactpcdiff,'VGenpara')
+r1b=mkactpccmpfig(baseactpcdiff,'Base fit RUDIDUN geo')
 
 print("Finished")
 
