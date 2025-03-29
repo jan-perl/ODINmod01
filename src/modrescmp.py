@@ -34,6 +34,7 @@ import geopandas
 import contextily as cx
 import xyzservices.providers as xyz
 import matplotlib.pyplot as plt
+from matplotlib import colors 
 
 import rasteruts1
 import rasterio
@@ -456,14 +457,21 @@ def deffactorvin(rv,UseSelFactorV):
     rv= rv.reset_index().rename(columns={"FactorV":"FactorVin"})
     return rv
 
-#ng zonder geoind: dan komt iedere PC precies een keer voor
-pc4orisumng = (odinverplgr[odinverplgr['KAfstCluCode'] == ODINcatVNuse.landcod] .groupby (
-    ['PC4'] ).agg('sum')*0.5).drop (columns=['index','MotiefV','isnaarhuis','KAfstCluCode'])
-pc4orisumng = deffactorvin(pc4orisumng,MainUseSelFactorV)
 pc4orisum =   (odinverplgr[odinverplgr['KAfstCluCode'] == ODINcatVNuse.landcod] .groupby (
     ['PC4','GeoInd'] ).agg('sum')).drop(columns=['index','MotiefV','isnaarhuis','KAfstCluCode'])
 pc4orisum =   deffactorvin(pc4orisum,  MainUseSelFactorV)
 pc4orisum
+
+# +
+#ng zonder geoind: dan komt iedere PC precies een keer voor
+pc4orisumng = (odinverplgr[odinverplgr['KAfstCluCode'] == ODINcatVNuse.landcod] .groupby (
+    ['PC4'] ).agg('sum')*0.5).drop (columns=['index','MotiefV','isnaarhuis','KAfstCluCode'])
+pc4orisumng = deffactorvin(pc4orisumng,MainUseSelFactorV)
+def avgpc4geoind(df):
+    return df.drop(columns=['GeoInd']).groupby(['PC4']).agg('mean').reset_index()
+
+pc4orisumngtst= pc4orisumng- avgpc4geoind(pc4orisum)
+pc4orisumngtst.abs().max()
 # -
 
 odinverplgr= ODINcatVNuse.deffactorv(ODINcatVNuse.odinverplgr_o,maskKAfstV,MainUseSelFactorV )
@@ -484,7 +492,8 @@ o2=datadiffcachemspec.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief
 #ODINcatVNuse.chkvalues(o2[['FactorV_v','FactorKm_v']],1.0, "datadiffcache FactorV_v")
 o2
 
-totaalVgen=69115694090
+#was 69115694090
+totaalVgen=ODINcatVNuse.totaalmotief 
 datadiffcache.groupby(['GeoInd']).sum()/totaalVgen
 
 datadiffcache.groupby(['KAfstCluCode','GeoInd']).sum()
@@ -513,7 +522,7 @@ calcFactVPC4(datadiffcache,True)
 #deze wordt gemerged met pc4orisum die uit de oorspronkelijke data komt
 #Er zijn even minder naam conflicten omdat de oorspronkelijke data nog Gen en Spec kennen
 
-def mrgpcactdiffr(in2pc,inpc4ori):
+def mrgpcdiffr(in2pc,inpc4ori):
     infotots2pcdiff=  in2pc.merge(inpc4ori,how='inner')
     infotots2pcdiff['FactorVChk'] =infotots2pcdiff['FactorV']- infotots2pcdiff['FactorVin']
     infotots2pcdiff['RatActiveVIn'] = infotots2pcdiff['FactorVInActive']/infotots2pcdiff['FactorVin']
@@ -522,14 +531,16 @@ def mrgpcactdiffr(in2pc,inpc4ori):
     infotots2pcdiff['FactorVChkActive'] =infotots2pcdiff['FactorVActive'] -infotots2pcdiff['FactorVInActive']
     #infotots2pcdiff[infotots2pcdiff['FactorVChk']  !=0]
     return(infotots2pcdiff)
-infotots2pcdiff=mrgpcactdiffr(calcFactVPC4(datadiffcache,True),pc4orisum)
+infotots2pcdiff=mrgpcdiffr(calcFactVPC4(datadiffcache,True),pc4orisum)
 t2= infotots2pcdiff.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief
 t2.T
 #/totaalVgen
 # -
 
-infotots2pcdiffmspecng=mrgpcdiffr(calcFactVPC4(datadiffcachemspec,False),pc4orisumng)
-infotots2pcdiffmspecng.sum()/ODINcatVNuse.totaalmotief
+infotots2pcdiffmspec=mrgpcdiffr(calcFactVPC4(datadiffcachemspec,True),pc4orisum )
+t2= infotots2pcdiffmspec.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief
+t2.T
+#/totaalVgen
 
 infotots2pcdiffng=mrgpcdiffr(calcFactVPC4(datadiffcache,False),pc4orisumng)
 infotots2pcdiffng.sum()/totaalVgen
@@ -574,7 +585,8 @@ def mkactpccmpfig(indf0,title):
     c2=sns.lineplot(data=indf, x='RatActiveV',y='FitRatVActive',ax=ax)
     indf['sizsers'] = (indf['sizser']) 
     c1=plt.hist2d(indf['RatActiveV'],indf['RatActiveVIn'],bins=100,weights=indf['sizsers'],
-                 cmap="rocket_r" ,alpha=0.3)
+                cmap = "RdYlGn_r", 
+           norm = colors.LogNorm() ,alpha=0.3)
     
 #    c1=sns.heatmap(data=indflev, ax=ax,cmap="rocket_r" ,cbar=True,alpha=0.3)
 #    ax.invert_yaxis()
@@ -657,11 +669,6 @@ r1=mkactpccmpfig(infotots2pcdiffng,'fitted VGenpara')
 
 infotots2pcdiffng [(infotots2pcdiffng ['RatActiveVIn']>.8 )& (infotots2pcdiffng['FactorV']>minFactorVplot ) ]
 
-(chisq,rf)= fitactivem(infotots2pcdiffmspecng,'VGensq')
-r1=mkactpccmpfig(infotots2pcdiffmspecng,'All ODIN data incl center functions')
-(chisq,rf)= fitactivem(infotots2pcdiffmspecng,'VGenlin')
-r1=mkactpccmpfig(infotots2pcdiffmspecng,'All ODIN data incl center functions')
-
 # +
 showgdir="../intermediate/showgrids"
 act1tifname=showgdir+'/actmo01.tif'
@@ -675,7 +682,7 @@ def make1stgridgeorel (tifname,indf,usecols,nanval):
     indf['area_geo'] = indf.area
     missptdf= rasteruts1.findmiss(indf,dfrefs)
     for col in usecols:
-        indf[col]=np.where((indf[col] == nanval ) | (indf['FactorV'] < minFactorVplot),0,indf[col])
+        indf[col]=np.where((indf[col] == nanval ) | (indf['FactorV'] < minFactorVplot),0,1+indf[col])
     imagelst=rasteruts1.mkimgpixavgs(grid,dfrefs,False,False, indf[usecols],False)  
     grid.close()
     grid = rasterio.open(tifname)
@@ -707,31 +714,43 @@ act1grid= rasterio.open(act1tifname)
 actcache={}
 actcache[3]= act1grid.read(3) 
 actcache[5]= act1grid.read(4) 
+act1grid.close()
 
 # +
 #code modified from Mkaddgrids
 nlextent=[0,280000,300000, 625000]
-def actpltland(ecache,fld,selextent,fname,txt):
-    minv=1e-7
-    mos=np.log(minv)/ np.log(10)
+def actpltland(ecache,fld,selextent,fname,txt,im1tit,im2tit,im3tit):
     image1= ecache[3]
-    image1[0][0]=1
-    image1[0][1]=0
+    image1= np.where(image1<1, np.nan,image1-1)
     image2= ecache[5]
-    image2[0][0]=1
-    image2[0][1]=0
+    image2= np.where(image2<1, np.nan,image2-1)
     nv = ecache[3] - ecache[5]    
     image3= nv
+    minmin=0
+    maxmax=1
 
-    lststr =  'Values for {}, min1 log10 W {}, max log10 W {}, min O {} , max log10 O {}  , max log10 negs {}'. format (txt, np
-                    .min(image1)-mos,np.max(image1)-mos , np.min(image2)-mos,np.max(image2)-mos,np.max(image3)-mos)
+    lststr =  'Values for {},'. format (txt, np)
     print (lststr)
-    fig, (ax1, ax2,ax3) = plt.subplots(nrows=1, ncols=3, figsize=(50, 20))
+    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(50, 20))
+    (ax1, ax2,ax3) = axes
     #image = np.isnan(image)
-    ax1.imshow(image1,cmap='jet',alpha=.6,extent=selextent)
-    ax2.imshow(image2,cmap='jet',alpha=.6,extent=selextent)
-    ax3.imshow(np.where(image3>=0, image3,np.nan),cmap='Reds',alpha=.6,extent=selextent)
-    ax3.imshow(np.where(image3<=0, -image3,np.nan),cmap='Blues',alpha=.6,extent=selextent)
+    im1= ax1.imshow(image1,cmap='jet',alpha=.6,extent=selextent, vmin=minmin, vmax=maxmax)
+    ax1.set_title(im1tit)
+    im2= ax2.imshow(image2,cmap='jet',alpha=.6,extent=selextent, vmin=minmin, vmax=maxmax)
+    ax2.set_title(im2tit)
+    im3=ax3.imshow(np.where(image3>=0, image3,np.nan),cmap='Reds',alpha=.6,extent=selextent)
+    im4=ax3.imshow(np.where(image3<=0, image3,np.nan),cmap='Blues_r',alpha=.6,extent=selextent)
+    # add space for colour bar
+    fig.subplots_adjust(right=0.85)
+    cbar_axbase = fig.add_axes([0.86, 0.2, 0.01, 0.6])
+    cbar_axlo  = fig.add_axes([0.88, 0.2, 0.01, 0.3])
+    cbar_axhi  = fig.add_axes([0.88, 0.5, 0.01, 0.3])
+    fig.colorbar(im2,cax=cbar_axbase)
+    fig.colorbar(im3,cax=cbar_axhi )
+    fig.colorbar(im4,cax=cbar_axlo)
+    ax3.set_title(im3tit)    
+#    ax3.subtitle.set_text("Verschil: rood: links hoger, midden: rechts hoger")
+#    ax3.colorbar()
 #    ax3.imshow(image3,cmap='Greens',alpha=.6,extent=selextent)
     grgem.boundary.plot(color='green',ax=ax1,alpha=.8)
     grgem.boundary.plot(color='green',ax=ax2,alpha=.8)
@@ -743,17 +762,15 @@ def actpltland(ecache,fld,selextent,fname,txt):
         ax2.invert_yaxis()
         setaxreg(ax3,'utr')
         ax3.invert_yaxis()
-#   ax1.colorbar()
-#    ax2.colorbar()
-#    axes[0].plot(x1, y1)
-#    axes[1].plot(x2, y2)
-    ax2.set_title(lststr)
-    fig.tight_layout()
-    figname = "../intermediate/addgrds/fig_"+fname+'.png';
+#    fig.tight_layout()
+    figname = "../output/showgrids/fig_"+fname+'.png';
     fig.savefig(figname) 
     return fig
 
-r1=actpltland(actcache,3,nlextent,'actexample','actexample')
+r1=actpltland(actcache,3,nlextent,'act-afstcmp-nl','actafstcmp-nl',
+              'Aandeel actieve modes in ODIN',
+              'Aandeel actieve modes obv ODIN afstanden',
+              'Rood: verder gefietst dan gemiddeld, Blauw: minder gefietst dan gemiddeld')
 # -
 
 #common code with Mkaddgrids
@@ -778,7 +795,10 @@ def mkloccach(ecache,selextent,oriextent):
         ocache[imgidx]= sli
     return ocache
 actcacheutr=mkloccach(actcache,utrextent,nlextent)
-r1=actpltland(actcacheutr,3,utrextent,'actexampleut','actexampleut')
+r1=actpltland(actcacheutr,3,utrextent,'actafstcmp-ut','actafstcmp-ut',
+              'Aandeel actieve modes in ODIN',
+              'Aandeel actieve modes obv ODIN afstanden',
+              'Rood: verder gefietst dan gemiddeld, Blauw: minder gefietst dan gemiddeld')
 
 #goede check, maar geen actieve mode info:
 datadiffcache.groupby(['KAfstCluCode','GeoInd']).sum().rename(columns= {"FactorV_v":"FactorV" })
@@ -875,22 +895,58 @@ ddc_base = getddcInAct("dummy2","Set05N-",bname,useKAfstV ,[])
 
 # +
 #PC4 data active modes in zelfde format als pc4orisum
-def getPC4InAct(ddc_fitdat):
-    cfact=calcFactVPC4(ddc_fitdat,True)
-    rv = cfact[['PC4','GeoInd','FactorV','FactorVActive']].rename(
+def getPC4InAct(ddc_dat,perGeoInd):
+    cfact=calcFactVPC4(ddc_dat,perGeoInd)
+    keepcols=['PC4','FactorV','FactorVActive']
+    if perGeoInd:
+        keepcols=keepcols+['GeoInd']
+    rv = cfact[keepcols].rename(
         columns={"FactorV":"FactorVin",'FactorVActive':'FactorVInActive'})         
     return rv 
 
-basePC4act = getPC4InAct(ddc_base ) 
+basePC4act = getPC4InAct(ddc_base ,False) 
 #basePC4act = getPC4InAct("dummy2","Dbg01Q","origPC4chk",useKAfstV ,[]) 
-baseactpcdiff=mrgpcactdiffr(calcFactVPC4(datadiffcache,True),basePC4act)
-t2= baseactpcdiff.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief
+baseactpcdiffng=mrgpcdiffr(calcFactVPC4(datadiffcache,False),basePC4act)
+baseactpcdiffng.sum()/totaalVgen
 t2.T
-#/totaalVgen
+#
 # -
 
-(chisq,rf)= fitactivem(baseactpcdiff,'VGenpara')
-r1b=mkactpccmpfig(baseactpcdiff,'Base fit RUDIDUN geo')
+(chisq,rf)= fitactivem(baseactpcdiffng,'VGenpara')
+r1b=mkactpccmpfig(baseactpcdiffng,'Base fit RUDIDUN geo tov afstandsklasse resultaat')
+
+base1tifname=showgdir+'/basemo01.tif'
+def mkgeofig1(mytifname,mytots2pcdiffng,figbase,im1tit,im2tit,im3tit):
+    act1grid= make1stgridgeorel (mytifname,cbspc4data.merge(mytots2pcdiffng,how='left',
+                                left_on=['postcode4'],right_on='PC4'),act1tifcols,999)
+    act1grid= rasterio.open(mytifname)
+    actcache={}
+    actcache[3]= act1grid.read(3) 
+    actcache[5]= act1grid.read(4) 
+    act1grid.close()
+    r1=actpltland(actcache,3,nlextent,figbase+"-nl",figbase+"-nl",im1tit,im2tit,im3tit)
+    actcacheutr=mkloccach(actcache,utrextent,nlextent)
+    r1=actpltland(actcacheutr,3,utrextent,figbase+"-ut",figbase+"-ut",im1tit,im2tit,im3tit)
+    return r1
+r1=mkgeofig1(base1tifname,baseactpcdiffng,'actcmp-base0-dcls',
+              'Aandeel actieve modes obv RUDIFUN dichtheden',
+              'Aandeel actieve modes obv ODIN afstanden',
+              'Rood: reizen voor meer keuze, Blauw: minder keuze vanwege reizen')
+
+baseactrawmpcdiffng=mrgpcdiffr( basePC4act.rename(
+        columns={"FactorV":"FactorVOrig"}).rename(columns={"FactorVin":"FactorV",
+                 'FactorVInActive':'FactorVActive'}) ,pc4orisumng)
+#baseactrawmpcdiffng
+t2=baseactrawmpcdiffng.sum()/totaalVgen
+t2.T
+
+(chisq,rf)= fitactivem(baseactrawmpcdiffng,'VGenlin')
+r1b=mkactpccmpfig(baseactrawmpcdiffng,'Base fit RUDIDUN geo tov ODIN metingen')
+
+r1=mkgeofig1(base1tifname,baseactrawmpcdiffng,'actcmp-base0-raw',
+              'Aandeel actieve modes in ODIN',
+              'Aandeel actieve modes obv RUDIFUN dichtheden',
+              'Rood: verder gefietst dan gemiddeld, Blauw: minder gefietst dan gemiddeld')
 
 print("Finished")
 
