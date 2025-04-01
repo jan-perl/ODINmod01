@@ -35,6 +35,7 @@ import contextily as cx
 import xyzservices.providers as xyz
 import matplotlib.pyplot as plt
 from matplotlib import colors 
+import matplotlib.ticker as ticker
 
 import rasteruts1
 import rasterio
@@ -68,7 +69,7 @@ prov0=cx.providers.nlmaps.grijs.copy()
 print( cbspc4data.crs)
 print (prov0)
 plot_crs=3857
-#plot_crs=28992
+#data_crs="epsg:28992"
 if 1==1:
 #    prov0['url']='https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/{variant}/EPSG:28992/{z}/{x}/{y}.png'
     prov0['url']='https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/{variant}/EPSG:3857/{z}/{x}/{y}.png'    
@@ -78,16 +79,34 @@ if 1==1:
     prov0['max_zoom'] =12
     print (prov0)
 
-pland= cbspc4data.to_crs(epsg=plot_crs).plot()
-cx.add_basemap(pland, source= prov0)
+pland= cbspc4data.plot(alpha=0.4)
+cx.add_basemap(pland, source= prov0,crs=cbspc4data.crs)
 
+#alternatief: gebruik webcoordinaten in plot
 cbspc4datahtn = cbspc4data[(cbspc4data['postcode4']>3990) & (cbspc4data['postcode4']<3999)]
-phtn = cbspc4datahtn.to_crs(epsg=plot_crs).plot()
+phtn = cbspc4datahtn.to_crs(epsg=plot_crs).plot(alpha=0.4)
 cx.add_basemap(phtn, source= prov0)
+
+
+# +
+#en nu netjes, met schaal in km
+def plaxkm(x, pos=None):
+      return '%.0f'%(x/1000.)
+
+def addbasemkmsch(ax,mapsrc):
+    cx.add_basemap(ax,source= mapsrc,crs="epsg:28992")
+    ax.xaxis.set_major_formatter(ticker.FuncFormatter(plaxkm))
+    ax.yaxis.set_major_formatter(ticker.FuncFormatter(plaxkm))
+    
+fig, ax = plt.subplots(figsize=(6, 4))
+cbspc4datahtn = cbspc4data[(cbspc4data['postcode4']>3990) & (cbspc4data['postcode4']<3999)]
+phtn = cbspc4datahtn.plot(ax=ax,alpha=0.4)
+addbasemkmsch(ax,prov0)
+# -
 
 cbspc4datahtn = cbspc4data[(cbspc4data['postcode4']==3995)]
-phtn = cbspc4datahtn.to_crs(epsg=plot_crs).plot()
-cx.add_basemap(phtn, source= prov0)
+phtn = cbspc4datahtn.plot()
+cx.add_basemap(phtn, source= prov0,crs=cbspc4data.crs)
 
 pc4tifname=calcgdir+'/cbs2020pc4-NL.tif'
 pc4excols= ['aantal_inwoners','aantal_mannen', 'aantal_vrouwen']
@@ -316,7 +335,7 @@ rdf00=fitdatverplgr
 #eerste proging: bouw elst precies zo op als in ODIN1KAfmo
 #eigenlijk goede manier van regressie
 globset="e0904a"
-flst = glob.glob ("../intermediate/addgrds/"+globset+"*[a-z]_00*.tif")
+flst = glob.glob ("../intermediate/addgrds/"+globset+"*[a-z0-9]_00*.tif")
 elst = list(re.sub(".tif$",'',re.sub('^.*/','',f) ) for f in flst) 
 elst
 
@@ -383,6 +402,13 @@ gs00=grosumm(rdf00,"Dbg01","orig",useKAfstV,[])
 gs00T = grosumm(rdf00,"Dbg01","origchk",useKAfstV,gs00)
 gs00T
 
+#eerste proging: bouw elst precies zo op als in ODIN1KAfmo
+#eigenlijk goede manier van regressie
+globset="e0904a"
+flst = glob.glob ("../output/fitdf_Dbg02Q-_"+globset+"*.pd")
+elstDbg02Q = list(re.sub(".pd$",'',re.sub('^.*Dbg02Q-_','',f) ) for f in flst) 
+elstDbg02Q
+
 
 #vergelijkbaar met origineel; gebruikt gelezen data
 def grosres (explst,incache0dummy,mult,fitpdummy,oridat,myuseKAfst,runname,setname):
@@ -395,7 +421,7 @@ def grosres (explst,incache0dummy,mult,fitpdummy,oridat,myuseKAfst,runname,setna
     st=st.append(dto)
     st.reset_index().to_excel("../output/fitrelres2-"+runname+setname+".xlsx")
     return st
-stQ = grosres (elst[0:3],'rudifungcachedummy',1,"fitparadummy", 'fitdatverplgr',useKAfstVQ,'Dbg02Q-',globset)
+stQ = grosres (elstDbg02Q,'rudifungcachedummy',1,"fitparadummy", 'fitdatverplgr',useKAfstVQ,'Dbg02Q-',globset)
 stQ
 
 
@@ -707,7 +733,7 @@ def setaxreg(ax,reg):
         ax.set_ylim(bottom=444000, top=452000)
     elif reg=='utr':    
         ax.set_xlim(left=113000, right=180000)
-        ax.set_ylim(bottom=480000, top=430000)
+        ax.set_ylim(bottom=430000, top=480000)
 
 
 act1grid= rasterio.open(act1tifname)
@@ -729,17 +755,26 @@ def actpltland(ecache,fld,selextent,fname,txt,im1tit,im2tit,im3tit):
     minmin=0
     maxmax=1
 
-    lststr =  'Values for {},'. format (txt, np)
-    print (lststr)
-    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(50, 20))
+    a4=(11.69,8.27)
+    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(20,8),dpi=150)
     (ax1, ax2,ax3) = axes
     #image = np.isnan(image)
-    im1= ax1.imshow(image1,cmap='jet',alpha=.6,extent=selextent, vmin=minmin, vmax=maxmax)
+    im1= ax1.imshow(image1,cmap='jet',alpha=.6,extent=selextent,
+                    vmin=minmin, vmax=maxmax,zorder=3)
     ax1.set_title(im1tit)
-    im2= ax2.imshow(image2,cmap='jet',alpha=.6,extent=selextent, vmin=minmin, vmax=maxmax)
+    addbasemkmsch(ax1,prov0)
+
+    im2= ax2.imshow(image2,cmap='jet',alpha=.6,extent=selextent, 
+                    vmin=minmin, vmax=maxmax,zorder=3)
     ax2.set_title(im2tit)
-    im3=ax3.imshow(np.where(image3>=0, image3,np.nan),cmap='Reds',alpha=.6,extent=selextent)
-    im4=ax3.imshow(np.where(image3<=0, image3,np.nan),cmap='Blues_r',alpha=.6,extent=selextent)
+    addbasemkmsch(ax2,prov0)
+
+    im3=ax3.imshow(np.where(image3>=0, image3,np.nan),cmap='Reds',alpha=.6,
+                   extent=selextent,zorder=3)
+    im4=ax3.imshow(np.where(image3<=0, image3,np.nan),cmap='Blues_r',alpha=.6,
+                   extent=selextent,zorder=3)
+    addbasemkmsch(ax3,prov0)
+
     # add space for colour bar
     fig.subplots_adjust(right=0.85)
     cbar_axbase = fig.add_axes([0.86, 0.2, 0.01, 0.6])
@@ -755,16 +790,8 @@ def actpltland(ecache,fld,selextent,fname,txt,im1tit,im2tit,im3tit):
     grgem.boundary.plot(color='green',ax=ax1,alpha=.8)
     grgem.boundary.plot(color='green',ax=ax2,alpha=.8)
     grgem.boundary.plot(color='green',ax=ax3,alpha=.8)
-    if (selextent[0] == 113000):
-        setaxreg(ax1,'utr')
-        ax1.invert_yaxis()
-        setaxreg(ax2,'utr')
-        ax2.invert_yaxis()
-        setaxreg(ax3,'utr')
-        ax3.invert_yaxis()
-#    fig.tight_layout()
     figname = "../output/showgrids/fig_"+fname+'.png';
-    fig.savefig(figname) 
+    fig.savefig(figname,dpi=300) 
     return fig
 
 r1=actpltland(actcache,3,nlextent,'act-afstcmp-nl','actafstcmp-nl',
@@ -933,9 +960,10 @@ r1=mkgeofig1(base1tifname,baseactpcdiffng,'actcmp-base0-dcls',
               'Aandeel actieve modes obv ODIN afstanden',
               'Rood: reizen voor meer keuze, Blauw: minder keuze vanwege reizen')
 
-baseactrawmpcdiffng=mrgpcdiffr( basePC4act.rename(
+basePC4actright= basePC4act.rename(
         columns={"FactorV":"FactorVOrig"}).rename(columns={"FactorVin":"FactorV",
-                 'FactorVInActive':'FactorVActive'}) ,pc4orisumng)
+                 'FactorVInActive':'FactorVActive'})
+baseactrawmpcdiffng=mrgpcdiffr(basePC4actright ,pc4orisumng)
 #baseactrawmpcdiffng
 t2=baseactrawmpcdiffng.sum()/totaalVgen
 t2.T
@@ -947,6 +975,24 @@ r1=mkgeofig1(base1tifname,baseactrawmpcdiffng,'actcmp-base0-raw',
               'Aandeel actieve modes in ODIN',
               'Aandeel actieve modes obv RUDIFUN dichtheden',
               'Rood: verder gefietst dan gemiddeld, Blauw: minder gefietst dan gemiddeld')
+
+
+# +
+def geoactch(explst,basedatright):
+    for exp in explst:
+        chg_base = getddcInAct("dummy2","Set05N-",exp,useKAfstV ,[]) 
+        chgPC4act = getPC4InAct(chg_base ,False) 
+        chgactrawmpcdiffng=mrgpcdiffr(basedatright , chgPC4act)
+        t2=chgactrawmpcdiffng.sum()/totaalVgen
+        print (t2.T)
+        r1=mkgeofig1(base1tifname,chgactrawmpcdiffng,'actcmp-base0-'+exp,
+              'Aandeel actieve modes experiment '+exp,
+              'Aandeel actieve modes obv RUDIFUN dichtheden',
+              'Rood: verder gefietst dan gemiddeld, Blauw: minder gefietst dan gemiddeld')
+    return 1
+    
+geoactch(elst, basePC4actright)   
+# -
 
 print("Finished")
 

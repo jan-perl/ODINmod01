@@ -109,17 +109,21 @@ def makerasterpts (df,col,grid):
 #example imageMXIp= makerasterpts(itotUtr,'MXI_22',gridNL100b)
 
 
-# +
-def setaxhtn(ax):
-    ax.set_xlim(left=137000, right=143000)
-    ax.set_ylim(bottom=444000, top=452000)
-    
-def setaxutr(ax):
-    ax.set_xlim(left=113000, right=180000)
-    ax.set_ylim(bottom=480000, top=430000)
+#common code with Mkaddgrids
+def setaxreg(ax,reg):
+    if reg=='htn':
+        ax.set_xlim(left=137000, right=143000)
+        ax.set_ylim(bottom=444000, top=452000)
+    elif reg=='utr':    
+        ax.set_xlim(left=113000, right=180000)
+        ax.set_ylim(bottom=430000, top=480000)
+    elif reg=='u10':    
+        ax.set_xlim(left=125000, right=152000)
+        ax.set_ylim(bottom=442000, top=468000)
+    elif reg=='ust':    
+        ax.set_xlim(left=133000, right=142000)
+        ax.set_ylim(bottom=452000, top=462000)    
 
-
-# -
 
 def misstats (c1,c2,itotUtri):
     itotUtri["griddif"]= abs(itotUtri[c1] - itotUtri[c2])

@@ -86,7 +86,7 @@ cbspc4data.dtypes
 prov0=cx.providers.nlmaps.grijs.copy()
 print( cbspc4data.crs)
 print (prov0)
-plot_crs=3857
+#plot_crs=3857
 #plot_crs=28992
 if 1==1:
 #    prov0['url']='https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/{variant}/EPSG:28992/{z}/{x}/{y}.png'
@@ -97,8 +97,8 @@ if 1==1:
     prov0['max_zoom'] =12
     print (prov0)
 
-pland= cbspc4data.to_crs(epsg=plot_crs).plot()
-cx.add_basemap(pland, source= prov0)
+pland= cbspc4data.plot(alpha=0.4)
+cx.add_basemap(pland, source= prov0,crs=cbspc4data.crs)
 
 cbspc4datahtn = cbspc4data[(cbspc4data['postcode4']>3990) & (cbspc4data['postcode4']<3999)]
 phtn = cbspc4datahtn.to_crs(epsg=plot_crs).plot()

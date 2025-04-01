@@ -81,6 +81,8 @@ import geopandas
 import contextily as cx
 import xyzservices.providers as xyz
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+from  matplotlib import colors
 
 import rasteruts1
 import rasterio
@@ -128,8 +130,22 @@ if 1==1:
     prov0['max_zoom'] =12
     print (prov0)
 
-pland= cbspc4data.to_crs(epsg=plot_crs).plot()
-cx.add_basemap(pland, source= prov0)
+
+# +
+#en nu netjes, met schaal in km
+def plaxkm(x, pos=None):
+      return '%.0f'%(x/1000.)
+
+def addbasemkmsch(ax,mapsrc):
+    cx.add_basemap(ax,source= mapsrc,crs="epsg:28992")
+    ax.xaxis.set_major_formatter(ticker.FuncFormatter(plaxkm))
+    ax.yaxis.set_major_formatter(ticker.FuncFormatter(plaxkm))
+
+
+# -
+
+pland= cbspc4data.plot()
+addbasemkmsch(pland,prov0)
 
 pc4tifname=calcgdir+'/cbs2020pc4-NL.tif'
 pc4excols= ['aantal_inwoners','aantal_mannen', 'aantal_vrouwen']
@@ -143,13 +159,20 @@ rudifuntifname=calcgdir+'/oriTN2-NL.tif'
 rudifungrid= rasterio.open(rudifuntifname)
 
 
+#common code with Mkaddgrids
 def setaxreg(ax,reg):
     if reg=='htn':
         ax.set_xlim(left=137000, right=143000)
         ax.set_ylim(bottom=444000, top=452000)
     elif reg=='utr':    
         ax.set_xlim(left=113000, right=180000)
-        ax.set_ylim(bottom=480000, top=430000)
+        ax.set_ylim(bottom=430000, top=480000)
+    elif reg=='u10':    
+        ax.set_xlim(left=125000, right=152000)
+        ax.set_ylim(bottom=442000, top=468000)
+    elif reg=='ust':    
+        ax.set_xlim(left=133000, right=142000)
+        ax.set_ylim(bottom=452000, top=462000)    
 
 
 def getcachedgrids(src):
@@ -330,67 +353,85 @@ oset03, fname03, mycache03=writeexperiment('fmx1',rudifungcache,10,2500,'tst')
 oset03, fname03, mycache03=writeexperiment('atm1',rudifungcache,10,2500,'txt') 
 
 
-def showaddutr(dataset3):
+# +
+def showaddreg(dataset3,reg):
     fig, ax = plt.subplots()
-#   dataset3=dataset2.to_crs(epsg=plot_crs)
-#    base=grgem.boundary.plot(color='green',ax=ax,alpha=.2);
-    base=gemeentendata.boundary.plot(color='green',ax=ax,alpha=.2);
+    base=gemeentendata.boundary.plot(color='green',ax=ax,alpha=.1);
     
     rasterio.plot.show((dataset3,3),cmap='Reds',ax=ax,alpha=0.1)
     rasterio.plot.show((dataset3,5),cmap='Blues',ax=ax,alpha=0.5)
-    setaxreg(ax,'utr')
-#    cx.add_basemap(pland, source= prov0)
-showaddutr(oset03)    
+    setaxreg(ax,reg)
+    #addbasemkmsch(ax,prov0)
+
+showaddreg(oset03,'utr')    
+# -
 
 oset04l, fnamel, mycachel=writeexperiment('atm1',rudifungcache,10,2500,'tst0904b') 
 
 
-def showlogs(dataset3):
+# +
+def showlogs(dataset3,reg):
     fig, ax = plt.subplots()
 #   dataset3=dataset2.to_crs(epsg=plot_crs)
     base=grgem.boundary.plot(color='green',ax=ax,alpha=.2);
     rasterio.plot.show((dataset3,3),cmap='Reds',ax=ax,alpha=0.1)
     rasterio.plot.show((dataset3,5),cmap='Blues',ax=ax,alpha=0.5)
-    setaxreg(ax,'utr')
-#    cx.add_basemap(pland, source= prov0)
-showlogs(oset03) 
+    
+    setaxreg(ax,reg)
+    #addbasemkmsch(ax,prov0)
 
-showaddutr(oset03)
+showlogs(oset03,'utr') 
+# -
+
+showaddreg(oset03,'utr')
 
 # +
 nlextent=[0,280000,300000, 625000]
-def logpltland(ecache,fld,selextent,fname,txt):
-    minv=1
+def logpltland(ecache,fld,selextent,fname,reg,txt):
+    minv=0.1
     mos=np.log(minv)/ np.log(10)
-    image1= np.log(np.where(ecache[3]<minv,1,ecache[3]/minv)) /np.log(10)
-    image2= np.log(np.where(ecache[5]<minv,1,ecache[5]/minv)) /np.log(10)
+#    image1= np.log(np.where(ecache[3]<minv,np.nan,ecache[3]/minv)) /np.log(10)
+#    image2= np.log(np.where(ecache[5]<minv,np.nan,ecache[5]/minv)) /np.log(10)
+    image1= np.where(ecache[3]<minv,np.nan,ecache[3])
+    image2= np.where(ecache[5]<minv,np.nan,ecache[5])
     nv = - ecache[3] - ecache[5]
-    image3= np.log(np.where(nv<minv,1,nv/minv)) /np.log(10)
-    lststr =  'Values for {}, min1 log10 W {}, max log10 W {}, min O {} , max log10 O {}  , max log10 negs {}'. format (txt, np
-                    .min(image1)-mos,np.max(image1)-mos , np.min(image2)-mos,np.max(image2)-mos,np.max(image3)-mos)
-    print (lststr)
-    fig, (ax1, ax2,ax3) = plt.subplots(nrows=1, ncols=3, figsize=(50, 20))
+    image3= np.log(np.where(nv<minv,np.nan,nv/minv)) /np.log(10)
+    
+    fig, (ax1, ax2,ax3) = plt.subplots(nrows=1, ncols=3, figsize=(20,8),dpi=150)
     #image = np.isnan(image)
-    ax1.imshow(image1,cmap='jet',alpha=.6,extent=selextent)
-    ax2.imshow(image2,cmap='jet',alpha=.6,extent=selextent)
-    ax3.imshow(image1,cmap='Reds',alpha=.6,extent=selextent)
-    ax3.imshow(image2,cmap='Blues',alpha=.6,extent=selextent)
-    ax3.imshow(image3,cmap='Greens',alpha=.6,extent=selextent)
+    im1=ax1.imshow(image1,cmap='jet',alpha=.6,extent=selextent,zorder=3, norm=colors.LogNorm())
+    im2=ax2.imshow(image2,cmap='jet',alpha=.6,extent=selextent,zorder=3, norm=colors.LogNorm())
+    addbasemkmsch(ax1,prov0)
+    addbasemkmsch(ax2,prov0)
+    
+    im3=ax3.imshow(image1,cmap='Reds',alpha=.6,extent=selextent,zorder=3, norm=colors.LogNorm())
+    im4=ax3.imshow(image2,cmap='Blues',alpha=.6,extent=selextent,zorder=3, norm=colors.LogNorm())
+    im5=ax3.imshow(image3,cmap='Greens',alpha=.6,extent=selextent,zorder=3)
     grgem.boundary.plot(color='green',ax=ax3,alpha=.2)
-    if (selextent[0] == 113000):
-        setaxreg(ax3,'utr')
-        ax3.invert_yaxis()
-#   ax1.colorbar()
-#    ax2.colorbar()
-#    axes[0].plot(x1, y1)
-#    axes[1].plot(x2, y2)
-    ax2.set_title(lststr)
-    fig.tight_layout()
-    figname = "../intermediate/addgrds/fig_"+fname+'.png';
-    fig.savefig(figname) 
+    setaxreg(ax3,reg)
+    addbasemkmsch(ax3,prov0)
+
+    fig.subplots_adjust(right=0.80)
+    cbar_axbas1 = fig.add_axes([0.82, 0.2, 0.01, 0.6])
+    cbar_axbas2 = fig.add_axes([0.85, 0.2, 0.01, 0.6])
+    cbar_axlo  = fig.add_axes([0.88, 0.2, 0.01, 0.2])
+    cbar_axmi  = fig.add_axes([0.88, 0.35, 0.01, 0.2])
+    cbar_axhi  = fig.add_axes([0.88, 0.5, 0.01, 0.2])
+    fig.colorbar(im1,cax=cbar_axbas1)
+    fig.colorbar(im2,cax=cbar_axbas2)
+    fig.colorbar(im3,cax=cbar_axhi )
+    fig.colorbar(im4,cax=cbar_axmi)
+    fig.colorbar(im5,cax=cbar_axlo)
+    ax3.set_title("Red: +woning, Blue: +anders Green: woon-werk")    
+    
+    ax1.set_title("+woning")
+    ax2.set_title("+anders")
+#    fig.tight_layout()
+    figname = "../intermediate/addgrds/fig_"+fname+"-"+reg+'.png';
+    fig.savefig(figname,dpi=300) 
     return fig
     
-logpltland(mycache03,3,nlextent,'tstexample','tstexample')
+t1=logpltland(mycache03,3,nlextent,'tstexample','nl','tstexample')
 # -
 
 utrextent=[113000,180000,430000,480000 ]
@@ -414,7 +455,7 @@ def mkloccach(ecache,selextent,oriextent):
         ocache[imgidx]= sli
     return ocache
 utrcache03=mkloccach(mycache03,utrextent,nlextent)
-logpltland(utrcache03,3,utrextent,'tstexampleut','tstexampleut')    
+t1=logpltland(utrcache03,3,utrextent,'tstexample','utr','tstexample')    
 
 expcach=dict()
 gset=dict()
@@ -422,18 +463,18 @@ fnamec=dict()
 for exp in exprrun :
     for dist in exprdists:
         gset[exp], fnamec[exp], expcach[exp]=writeexperiment(exp,rudifungcache,10,dist,'e1121a') 
-        logpltland(expcach[exp],3,nlextent,fnamec[exp],exp)
+        logpltland(expcach[exp],3,nlextent,fnamec[exp],'nl',exp)
         utrcache03=mkloccach(expcach[exp],utrextent,nlextent)
-        logpltland(utrcache03,3,utrextent,fnamec[exp]+'_utr',exp+'_utr')   
+        logpltland(utrcache03,3,utrextent,fnamec[exp],'utr',exp)   
 #    print (showaddhtn(oset04)   )
 
 #expposs2
 for exp in [expposs2]  :
     print(exp)
-    print (showaddutr(gset[exp] )) 
+    print (showaddreg(gset[exp],'utr' )) 
 
 #expposs2 
 for exp in [] :
-    print( logpltland(expcach[exp],3,nlextent,fnamec[exp],exp) )
+    print( logpltland(expcach[exp],3,nlextent,fnamec[exp],'nl',exp) )
 
 

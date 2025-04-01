@@ -15,6 +15,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import seaborn as sns
 
 import geopandas
@@ -222,82 +223,91 @@ def vvplt1(dfin,lim):
     sns.scatterplot(data=df,y='AfstRwg',x='AfstVVwg',ax=ax)
 vvplt1(allodvv,allvvlim)    
 
+stryear='2020'
+cbspc4data =pd.read_pickle("../intermediate/CBS/pc4data_"+stryear+".pkl")
+cbspc4data= cbspc4data.sort_values(by=['postcode4']).reset_index()
 
-def setaxreg(ax,reg):
-    if reg=='htn':
-        ax.set_xlim(left=137000, right=143000)
-        ax.set_ylim(bottom=444000, top=452000)
-    elif reg=='utr':    
-        ax.set_xlim(left=113000, right=180000)
-        ax.set_ylim(bottom=480000, top=430000)
+# +
+prov0=cx.providers.nlmaps.grijs.copy()
+print( cbspc4data.crs)
+print (prov0)
+
+#en nu netjes, met schaal in km
+def plaxkm(x, pos=None):
+      return '%.0f'%(x/1000.)
+
+def addbasemkmsch(ax,mapsrc):
+    cx.add_basemap(ax,source= mapsrc,crs="epsg:28992")
+    ax.xaxis.set_major_formatter(ticker.FuncFormatter(plaxkm))
+    ax.yaxis.set_major_formatter(ticker.FuncFormatter(plaxkm))
 
 
-def vvcplt1nb(dfin,lim):
-    df= dfin[(dfin['FactorV']>lim) & (dfin['AankPC'] != dfin['VertPC'] )
-                                      & (dfin['AfstVVwg'] <15)].copy()
-    
-    df['lim']=df['AfstVVwg']+3
-    fig, ax = plt.subplots(figsize=(12, 12))
+# -
 
-    cmaxed= df['AfstRwg']/ df['AfstVVwg']
-    cmaxed = np.minimum(cmaxed,2)
-    plt.quiver(df['VertPCDRSX'],df['VertPCDRSY'],
-               df['AankPCDRSX']- df['VertPCDRSX'],df['AankPCDRSY']-df['VertPCDRSY'],
-               cmaxed,cmap='jet',
-               angles='xy',scale_units='xy', scale=1.)
-    ax.set_aspect("equal")
-    setaxreg(ax,'htn')
-    plt.colorbar()
-#    cx.add_basemap(ax, source= prov0)
-vvcplt1nb(allodvv,allvvlim)  
+chkpckrt1 = cbspc4data[(np.isin (cbspc4data['postcode4'],(7553) ))]
+chkpckrt2 = cbspc4data[(np.isin (cbspc4data['postcode4'],(7556) ))]
+fig, ax = plt.subplots(figsize=(16, 12))
+pchkpckrt = chkpckrt1.plot(alpha=.3,color='blue',ax=ax)
+pchkpckrt = chkpckrt2.plot(alpha=.3,color='green',ax=ax)
+addbasemkmsch(ax,prov0)
 
 
 # +
-def setaxgreg(ax,reg):
-    if reg=='htn':
-        ax.set_xlim(left=572000, right=579000)
-        ax.set_ylim(bottom=6801000, top=6809000)
-    elif reg=='hgm':
-        ax.set_xlim(left=572000, right=583000)
-        ax.set_ylim(bottom=6795000, top=6812000)
-    elif reg=='utr':  
-        ax.set_xlim(left=520000, right=620000)
-        ax.set_ylim(bottom=6780000, top=6860000)
-    elif reg=='uog':  
-        ax.set_xlim(left=565000, right=576000)
-        ax.set_ylim(bottom=6810000, top=6825000)
-    elif reg=='u10':  
-        ax.set_xlim(left=555000, right=590000)
-        ax.set_ylim(bottom=6795000, top=6830000)
-        
-def vvcplt1(dfin,lim,reg):
+       
+def vvcplt1(dfin,lim,reg,minomr,fname,tit):    
     df2= dfin[(dfin['FactorV']>lim) & (dfin['AankPC'] != dfin['VertPC'] )
                                       & (dfin['AfstVVwg'] <15)].copy()
     
-    df = geopandas.GeoDataFrame(
-       df2, geometry=geopandas.points_from_xy(df2['VertPCDRSX'],df2['VertPCDRSY'],
-                                              crs='EPSG:28992' ) ).to_crs(epsg=plot_crs)
+    df=df2
+    fig, ax = plt.subplots(figsize=(12, 12))
+
+    df2['cmaxed']= df2['AfstRwg']/ df2['AfstVVwg']
+    if minomr==0:
+        df2['cmaxed'] = np.minimum(df2['cmaxed'],2)
+        df=df2
+    else:
+        df=df2[df2['cmaxed']>minomr]
+    
+    chkpckrt2 = cbspc4data[(np.isin (cbspc4data['postcode4'], list(df['AankPC'])))]        
+    pchkpckrt = chkpckrt2.plot(alpha=.2,color='green',ax=ax)
+    chkpckrt1 = cbspc4data[(np.isin (cbspc4data['postcode4'], list(df['VertPC'])))]        
+    pchkpckrt = chkpckrt1.plot(alpha=.2,color='red',ax=ax)
+        
+        
     df['lim']=df['AfstVVwg']+3
-#    fig, ax = plt.subplots(figsize=(12, 12))
-    ax = df.plot(
-    figsize= (12, 12),
-    alpha  = 0.1
-      )
-    cmaxed= df['AfstRwg']/ df['AfstVVwg']
-    cmaxed = np.minimum(cmaxed,2)
-    plt.quiver(df['geometry'].x,df['geometry'].y,
+#    ax = df.plot(    figsize= (12, 12),    alpha  = 0.1      )
+    plt.quiver(df['VertPCDRSX'],df['VertPCDRSY'],
                df['AankPCDRSX']- df['VertPCDRSX'],df['AankPCDRSY']-df['VertPCDRSY'],
-               cmaxed,cmap='jet',
+               df['cmaxed'],cmap='jet',
                angles='xy',scale_units='xy', scale=1.)
+    ax.set_title(tit)    
+
+    df['AankPCs']=df['AankPC'].astype(int).astype(str)
+    aanks = df[['VertPC','AankPCs']].groupby(['VertPC'], as_index=False).agg(', '.join)
+    vgrp = df.groupby(['VertPC']).agg('mean').reset_index().merge(aanks)
+    
+    if minomr!=0:        
+        xmin, xmax, ymin, ymax = plt.axis()
+        #label each point in scatter plot
+        for idx, row in vgrp.iterrows():
+            if ( row['VertPCDRSX']> xmin and
+               row['VertPCDRSX'] <xmax and row['VertPCDRSY']> ymin and
+               row['VertPCDRSY'] <ymax  ):
+                ax.annotate("%.0f-%s"%(row['VertPC'],row['AankPCs']), 
+                        (row['VertPCDRSX'],row['VertPCDRSY']),size="small")
+
     ax.set_aspect("equal")
     plt.colorbar()
-    if reg in ['htn']:
-        base=itotUtr.boundary.plot(color='green',ax=ax,alpha=.3);
-    setaxgreg(ax,reg)
-    cx.add_basemap(ax, source= prov0)
+    setaxreg(ax,reg)
+    addbasemkmsch(ax,prov0)
+    figname = "../output/showgrids/fig_"+fname+'-'+reg+'.png';
+    fig.savefig(figname,dpi=300) 
     
 
-vvcplt1(allodvv,allvvlim*.7,'u10')  
+#vvcplt1(allodvv,allvvlim*.7,'u10',0,"omrgem",
+#       "Ratio reisafst vs volgevl zwaartept voor > %.1f mln ritten, < 15 km"%(allvvlim*.7/1e6))  
+vvcplt1(allodvv,allvvlim*.7,'u10',1.9,"omruitsch",
+       "Uitschieters reisafst vs volgevl zwaartept voor > %.1f mln ritten, < 15 km"%(allvvlim*.7/1e6))  
 
 
 # -
@@ -308,22 +318,6 @@ def vvpltexcepy1(dfin,lim):
     rv = df
     return rv
 vvpltexcepy1(allodvv,allvvlim)    
-
-prov0=cx.providers.nlmaps.grijs.copy()
-print( cbspc4data.crs)
-print (prov0)
-plot_crs=3857
-
-stryear='2020'
-cbspc4data =pd.read_pickle("../intermediate/CBS/pc4data_"+stryear+".pkl")
-cbspc4data= cbspc4data.sort_values(by=['postcode4']).reset_index()
-
-chkpckrt1 = cbspc4data[(np.isin (cbspc4data['postcode4'],(7553) ))]
-chkpckrt2 = cbspc4data[(np.isin (cbspc4data['postcode4'],(7556) ))]
-fig, ax = plt.subplots(figsize=(16, 12))
-pchkpckrt = chkpckrt1.to_crs(epsg=plot_crs).plot(alpha=.3,color='blue',ax=ax)
-pchkpckrt = chkpckrt2.to_crs(epsg=plot_crs).plot(alpha=.3,color='green',ax=ax)
-cx.add_basemap(pchkpckrt, source= prov0)
 
 
 # +
