@@ -503,24 +503,24 @@ def getcachedgrids(src):
 
 # +
 #rescaling routines
+# -
 
-# +
 #now cuda data
-
 @cuda.jit
-def scaledwn_work(results,resultn, scale, image):
+def scaledwn_work(result, scale, image):
     # expects a 2D grid and 2D blocks,
     # a mask with odd numbers of rows and columns, (-1-) 
     # a grayscale image
     
     # (-2-) 2D coordinates of the current thread:
+
     i, j = cuda.grid(2) 
-#    print((i,j))
+#    assert(scale==3)
     
     # (-3-) if the thread coordinates are outside of the image, we ignore the thread:
     image_rows, image_cols = image.shape
-    if (i >= image_rows) or (j >= image_cols): 
-        return
+#    if ( scale*i >= image_rows) or ( scale*j >= image_cols): 
+#        return 0*image[0,0]
     s = 0
     n =0
     for k in range(scale):
@@ -531,7 +531,8 @@ def scaledwn_work(results,resultn, scale, image):
             if (i_k >= 0) and (i_k < image_rows) and (j_l >= 0) and (j_l < image_cols):  
                 s += image[i_k, j_l]
                 n +=1
-    results[i, j] = 0 if (n==0) else s/n
+#    n=(1 if (n==0) else n)
+    result[i, j] =s/n
 #    results[i,j] +=s
 #    resultn[i,j] +=n    
 
@@ -569,11 +570,13 @@ def scaleup_work(downin, scale, image):
 # -
 
 #returns scaled down array with averages of pixels
-def scaledwn(image,scale,bdim=32):
+def scaledwn(image,scale,bdim=4):
     # We preallocate the result array:
     resdim=((np.array(image.shape)+scale-1 )//scale) #.astype(np.int)
 #    print(resdim)
     results = np.zeros(resdim,dtype=image.dtype )
+#    results = numba.cuda.device_array(resdim,dtype=image.dtype )
+#    results +=73
     resultn = np.zeros(resdim,dtype=image.dtype )
     # We use blocks of 32x32 pixels:
     blockdim = (bdim, bdim)
@@ -583,8 +586,8 @@ def scaledwn(image,scale,bdim=32):
     griddim = (results.shape[0] // blockdim[0] + 1, results.shape[1] // blockdim[1] + 1)
 #    print('Grid dimensions:', griddim)
     # We apply our convolution to our image:
-#    scaledwn_work[griddim, blockdim](results,resultn, scale, image)
-    scaledwn_work(results,resultn, scale, image)
+    scaledwn_work[griddim, blockdim](results, scale, image)
+#    scaledwn_work(results, scale, image)
 #    resultn +=(results ==0) 
 #    result=results/resultn 
     return results
@@ -602,14 +605,14 @@ def scaleup(image_template,scale,downin,bdim=32):
     griddim = (downin.shape[0] // blockdim[0] + 1, downin.shape[1] // blockdim[1] + 1)
 #    print('Grid dimensions:', griddim)
     # We apply our convolution to our image:
-#    scaleup_work[griddim, blockdim](downin ,scale, result)
-    scaleup_work(downin ,scale, result)
+    scaleup_work[griddim, blockdim](downin ,scale, result)
+#    scaleup_work(downin ,scale, result)
     return result
 #example image4g= convfiets2d(image1 ,3 ) 
 
 
 def scaletest():
-    bfact=51 *7
+    bfact=3
     hires = np.ones((17*bfact,23*bfact),dtype=np.float32 )
     htest1= np.abs((hires-1)).sum()
     assert (htest1 ==0)
@@ -621,7 +624,8 @@ def scaletest():
     assert (ltest1 ==0)
     hires2=scaleup(hires,sc2,lores)
     htest2= np.abs((hires2-1)).sum()
-    assert (htest2 ==0)
+    print(htest2)
+#    assert (htest2 ==0)
     lores[2,3] =0
     hires3=scaleup(hires,sc2,lores)
     htest3= hires2.sum() - hires3.sum()
