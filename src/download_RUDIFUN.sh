@@ -3,9 +3,9 @@
 #get the 2 RUDIFUN dataasets from PBL
 #description of data at https://www.pbl.nl/publicaties/rudifun-2024
 cd ../data
-for od in RUDIFUN2 RUDIFUN_2024
+for od in RUDIFUN1 RUDIFUN2 RUDIFUN_2024
 do
-l1=https://dataportaal.pbl.nl/$od
+l1=https://dataportaal.pbl.nl/RUDIFUN/$od
 mkdir $od
 cd $od
 wget -q -O index.html $l1
