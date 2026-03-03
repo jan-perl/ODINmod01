@@ -531,9 +531,9 @@ def scaledwn_work(results,resultn, scale, image):
             if (i_k >= 0) and (i_k < image_rows) and (j_l >= 0) and (j_l < image_cols):  
                 s += image[i_k, j_l]
                 n +=1
-    #result[i, j] = 0 if (n==0) else s/n
-    results[i,j] +=s
-    resultn[i,j] +=n    
+    results[i, j] = 0 if (n==0) else s/n
+#    results[i,j] +=s
+#    resultn[i,j] +=n    
 
 
 # +
@@ -569,10 +569,10 @@ def scaleup_work(downin, scale, image):
 # -
 
 #returns scaled down array with averages of pixels
-def scaledwn(image,scale,bdim=8):
+def scaledwn(image,scale,bdim=32):
     # We preallocate the result array:
     resdim=((np.array(image.shape)+scale-1 )//scale) #.astype(np.int)
-    print(resdim)
+#    print(resdim)
     results = np.zeros(resdim,dtype=image.dtype )
     resultn = np.zeros(resdim,dtype=image.dtype )
     # We use blocks of 32x32 pixels:
@@ -583,13 +583,15 @@ def scaledwn(image,scale,bdim=8):
     griddim = (results.shape[0] // blockdim[0] + 1, results.shape[1] // blockdim[1] + 1)
 #    print('Grid dimensions:', griddim)
     # We apply our convolution to our image:
-    scaledwn_work[griddim, blockdim](results,resultn, scale, image)
-    result=results/resultn 
-    return result
+#    scaledwn_work[griddim, blockdim](results,resultn, scale, image)
+    scaledwn_work(results,resultn, scale, image)
+#    resultn +=(results ==0) 
+#    result=results/resultn 
+    return results
 #example image4g= convfiets2d(image1 ,3 ) 
 
 
-def scaleup(image_template,scale,downin,bdim=8):
+def scaleup(image_template,scale,downin,bdim=32):
     # We preallocate the result array:
     result = np.empty_like(image_template)
     # We use blocks of 32x32 pixels:
@@ -600,13 +602,14 @@ def scaleup(image_template,scale,downin,bdim=8):
     griddim = (downin.shape[0] // blockdim[0] + 1, downin.shape[1] // blockdim[1] + 1)
 #    print('Grid dimensions:', griddim)
     # We apply our convolution to our image:
-    scaleup_work[griddim, blockdim](downin ,scale, result)
+#    scaleup_work[griddim, blockdim](downin ,scale, result)
+    scaleup_work(downin ,scale, result)
     return result
 #example image4g= convfiets2d(image1 ,3 ) 
 
 
 def scaletest():
-    bfact=51
+    bfact=51 *7
     hires = np.ones((17*bfact,23*bfact),dtype=np.float32 )
     htest1= np.abs((hires-1)).sum()
     assert (htest1 ==0)
@@ -615,15 +618,31 @@ def scaletest():
     print(lores)
     ltest1= np.abs((lores-1)).sum()
     print(ltest1)
-#    assert (ltest1 ==0)
+    assert (ltest1 ==0)
     hires2=scaleup(hires,sc2,lores)
     htest2= np.abs((hires2-1)).sum()
     assert (htest2 ==0)
     lores[2,3] =0
     hires3=scaleup(hires,sc2,lores)
     htest3= hires2.sum() - hires3.sum()
+    print(htest3)
     assert (htest3 == sc2*sc2  )
     print ("scaling tested")
 scaletest()   
+
+
+def convfiets2dsc(image,kern1,scale,kernnorm,bdimi):
+    if (scale==1):
+        return convfiets2d(image,kern1,bdim=bdimi)
+    else:
+        imagelo=scaledwn(image,scale)
+        kern1lo=scaledwn(kern1,scale)
+        if kernnorm:
+            kern1lo *= kern1.sum()/kern1lo.sum() 
+        convlo=convfiets2d(imagelo,kern1lo,bdim=bdimi)
+#        print(imagelo.sum())
+        rv=scaleup(image,scale,convlo)
+#        print(rv.sum())
+        return rv  
 
 

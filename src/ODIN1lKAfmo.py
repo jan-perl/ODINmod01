@@ -159,7 +159,8 @@ rudifungcache = getcachedgrids(rudifungrid)
 
 useKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01uKA.pkl")
 xlatKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01xKA.pkl")
-useKAfstV  = useKAfstVa [useKAfstVa ["MaxAfst"] <20].copy()
+#was<20
+useKAfstV  = useKAfstVa [useKAfstVa ["MaxAfst"] <80].copy()
 maxcuse= np.max(useKAfstV[useKAfstV ["MaxAfst"] !=0] ['KAfstCluCode'])
 xlatKAfstV  = xlatKAfstVa [(xlatKAfstVa['KAfstCluCode']<=maxcuse ) |
                            (xlatKAfstVa['KAfstCluCode']==np.max(useKAfstV[ 'KAfstCluCode']) )].copy()
@@ -258,6 +259,24 @@ def filtgridprecalc_unused (rudigrid,myKAfstV,pu):
 #precgrids1=filtgridprecalc(rudifungcache,useKAfstVQ,expdefs)
 
 
+# -
+
+def convfiets2dsc(image,kern1,scale,kernnorm,bdimi):
+    if (scale==1):
+        return  rasteruts1.convfiets2d(image,kern1,bdim=bdimi)
+    else:
+        imagelo= rasteruts1.scaledwn(image,scale)
+        kern1lo= rasteruts1.scaledwn(kern1,scale)
+        print(kern1lo.shape)
+        if kernnorm:
+            kern1lo *= kern1.sum()/kern1lo.sum() 
+        convlo= rasteruts1.convfiets2d(imagelo,kern1lo,bdim=bdimi)
+#        print(imagelo.sum())
+        rv= rasteruts1.scaleup(image,scale,convlo)
+#        print(rv.sum())
+        return rv 
+
+
 # +
 #eerst een dataframe dat
 #2) per lengteschaal, en PC variabelen eerst geografisch sommeert dan waarde ophaalt per punt
@@ -307,6 +326,7 @@ def mkgeoschparafr (pc4data,pc4grid,rudigrid,myKAfstV,pu):
             outdf[colnam] = 0*lvals            
     R_LW_land= np.sum(R_LW)
     R_LO_land= np.sum(R_LO)
+    bdim=8
     
     for index, row in myKAfstV[myKAfstV['MaxAfst']!=0].iterrows():        
         outdfadd=outdfst.copy()
@@ -315,11 +335,12 @@ def mkgeoschparafr (pc4data,pc4grid,rudigrid,myKAfstV,pu):
 #        print(row["KAfstCluCode"], row["MaxAfst"])
         filt=rasteruts1.roundfilt(100,1000*row["MaxAfst"])
         filtarea = np.power(np.sum(filt)*1e-6,pu['OA'])
-
+        cscale=1 if (row["MaxAfst"] <4.9) else (3 if (row["MaxAfst"] <14.0) else (5 if (row["MaxAfst"] <39.0) else 9))
+        
         F=dict()
         tstart= time.perf_counter()
-        F_OW = rasteruts1.convfiets2d(R_LW, filt ,bdim=8) /R_LW_land
-        F_OT = rasteruts1.convfiets2d(R_LT, filt ,bdim=8) /R_LO_land
+        F_OW = convfiets2dsc(R_LW, filt,cscale, False,bdim) /R_LW_land
+        F_OT = convfiets2dsc(R_LT, filt,cscale, False ,bdim) /R_LO_land
         tend= time.perf_counter()
         F['OW'] =  F_OW  
         F_OO =  F_OT- F_OW        
@@ -1871,6 +1892,8 @@ stQ
 #stQa
 # -
 print("Finished")
+
+
 
 
 

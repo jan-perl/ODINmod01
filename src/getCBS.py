@@ -182,5 +182,7 @@ if  fetchweb:
 # +
 #wijkendata.fields
 # -
+os.system("./download_RUDIFUN.sh")
+
 
 

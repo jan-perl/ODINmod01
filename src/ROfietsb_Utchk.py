@@ -245,6 +245,7 @@ image4g= rasteruts1.convfiets2d(image1,fietskern1['Z'] )
 print('Maximum relative error:', np.max( np.abs(image4g- image4) ) / np.max(np.abs(image4)) )
 from scipy.ndimage.filters import convolve as scipy_convolve
 
+
 #scipy_result vermoedelijk te traag voor landelijk
 # %timeit scipy_result = scipy_convolve(image1, fietskern1['Z'],  mode='constant', cval=0.0, origin=0)
 
@@ -252,6 +253,22 @@ from scipy.ndimage.filters import convolve as scipy_convolve
 # %timeit image4g= rasteruts1.convfiets2d(image1 ,fietskern1['Z'] )      
 
 # %timeit image4= rasteruts1.convfietsimg(image1,fietskern1 ) 
+
+# +
+#kijk naar snellere convolutie op andere schaal
+# -
+
+def chk_conv2dsc():
+    figcmbw, axcmbw = plt.subplots(nrows=1, ncols=3,figsize=(10, 8))
+    figcmbw.tight_layout(pad=4)
+    for sc in range(1,4):
+        print(sc)
+        #was rasteruts1.
+#        %timeit image4gs=convfiets2dsc(image1 ,fietskern1['Z'],sc )
+        image4gs= rasteruts1.convfiets2dsc(image1 ,fietskern1['Z'],sc,True,32 )
+        axcmbw[sc-1].imshow(image4gs, cmap='pink',origin='lower')
+        print('Maximum relative error:', np.max( np.abs(image4gs- image4) ) / np.max(np.abs(image4)) )
+chk_conv2dsc()
 
 # +
 #nu wat analyses
@@ -457,12 +474,12 @@ setaxreg(ax,'htn')
 fig, ax = plt.subplots()
 base=itotUtr.boundary.plot(color='green',ax=ax,alpha=.3);
 rasterio.plot.show((dataset4,7), cmap='OrRd',ax=ax)
-setaxutr(ax)
+setaxreg(ax,'utr')
 
 fig, ax = plt.subplots()
 base=itotUtr.boundary.plot(color='green',ax=ax,alpha=.3);
 rasterio.plot.show((dataset4,8), cmap='OrRd',ax=ax)
-setaxutr(ax)
+setaxreg(ax,'utr')
 
 # +
 #en maak landelijk
