@@ -29,8 +29,9 @@ fetchweb=True
 
 #Kerncijfers per postcode
 #https://www.cbs.nl/nl-nl/dossier/nederland-regionaal/geografische-data/gegevens-per-postcode
-pc4lnks = ["https://download.cbs.nl/postcode/2024-cbs_pc4_2023_v1.zip",
-           "https://download.cbs.nl/postcode/2024-cbs_pc4_2022_v2.zip",
+pc4lnks = ["https://download.cbs.nl/postcode/2025-cbs_pc4_2024_v1.zip",
+           "https://download.cbs.nl/postcode/2025-cbs_pc4_2023_v2.zip",
+           "https://download.cbs.nl/postcode/2025-cbs_pc4_2022_vol.zip",
            "https://download.cbs.nl/postcode/2024-cbs_pc4_2021_vol.zip",
            "https://download.cbs.nl/postcode/2023-cbs_pc4_2020_vol.zip",
            "https://download.cbs.nl/postcode/2023-cbs_pc4_2019_vol.zip",
@@ -43,8 +44,9 @@ print(pc4lnks[1:3])
 
 #Kerncijfers per postcode
 #https://www.cbs.nl/nl-nl/dossier/nederland-regionaal/geografische-data/gegevens-per-postcode
-pc6lnks = ["https://download.cbs.nl/postcode/2024-cbs_pc6_2023_v1.zip",
-           "https://download.cbs.nl/postcode/2024-cbs_pc6_2022_v2.zip",
+pc6lnks = ["https://download.cbs.nl/postcode/2025-cbs_pc6_2024_v1.zip",
+           "https://download.cbs.nl/postcode/2025-cbs_pc6_2023_v2.zip",
+           "https://download.cbs.nl/postcode/2025-cbs_pc6_2022_vol.zip",
            "https://download.cbs.nl/postcode/2024-cbs_pc6_2021_vol.zip",
            "https://download.cbs.nl/postcode/2023-cbs_pc6_2020_vol.zip",
            "https://download.cbs.nl/postcode/2023-cbs_pc6_2019_vol.zip",
@@ -136,12 +138,15 @@ geolst = [
 #    'https://www.cbs.nl/-/media/cbs/dossiers/nederland-regionaal/wijk-en-buurtstatistieken/wijkbuurtkaart_2020_v3.zip',
     'https://download.cbs.nl/regionale-kaarten/wijkbuurtkaart_2021_v3.zip',
     'https://download.cbs.nl/regionale-kaarten/wijkbuurtkaart_2022_v2.zip',
-    'https://download.cbs.nl/regionale-kaarten/wijkbuurtkaart_2023_v1.zip'
+    'https://geodata.cbs.nl/files/Wijkenbuurtkaart/WijkBuurtkaart_2023_v3.zip',
+    'https://geodata.cbs.nl/files/Wijkenbuurtkaart/WijkBuurtkaart_2024_v2.zip',
+    'https://geodata.cbs.nl/files/Wijkenbuurtkaart/WijkBuurtkaart_2025_v1.zip'    
 ]
 if fetchweb:
     for link in geolst:
         getcbspc4(link,'wijkbuurt')
 
+# +
 #https://www.cbs.nl/nl-nl/maatwerk/2018/36/buurt-wijk-en-gemeente-2018-voor-postcode-huisnummer
 # https://www.cbs.nl/nl-nl/maatwerk/2019/42/buurt-wijk-en-gemeente-2019-voor-postcode-huisnummer
 #https://www.cbs.nl/nl-nl/maatwerk/2020/39/buurt-wijk-en-gemeente-2020-voor-postcode-huisnummer
@@ -154,7 +159,11 @@ adrwijkpclst = [
  'https://www.cbs.nl/-/media/_excel/2020/39/2020-cbs-pc6huisnr20200801-buurt.zip',
  'https://www.cbs.nl/-/media/_excel/2021/36/2021-cbs-pc6huisnr20200801_buurt.zip',
  'https://www.cbs.nl/-/media/_excel/2022/37/2022-cbs-pc6huisnr20210801_buurt.zip',
- 'https://www.cbs.nl/-/media/_excel/2023/35/2023-cbs-pc6huisnr20230801_buurt.zip' ]
+ 'https://download.cbs.nl/postcode/2023-cbs-pc6huisnr20230801_buurt_20250225.zip',
+ 'https://download.cbs.nl/postcode/2024-cbs-pc6huisnr20240801_buurt_20250218.zip',
+ 'https://download.cbs.nl/postcode/2025-cbs-pc6huisnr20250801_buurt.zip']
+
+
 if  fetchweb:
     for link in adrwijkpclst:
         getcbspc4(link,'PC6HNR')

@@ -39,7 +39,16 @@ import rasterio.plot
 from rasterio.transform import Affine  
 from rasterio import features
 
+os.system("pip install rasterstats")
+
 import rasterstats
+
+from numba import cuda
+import numpy as np
+
+import numba
+#from numba.utils import IS_PY3
+from numba.decorators import jit
 
 calcgdir="../intermediate/calcgrids"
 
@@ -167,8 +176,7 @@ def kernelfietspara():
 
 
 # +
-from numba import cuda
-import numpy as np
+#now cuda data
 
 @cuda.jit
 def convolve2d(result, mask, image):
@@ -283,10 +291,6 @@ def addmakegridcorr (df,grid):
 
 
 # +
-import numba
-#from numba.utils import IS_PY3
-from numba.decorators import jit
-
 @jit
 def _docountpixarea(img,hival,retval):
     for hh in range(img.shape[0]):
@@ -341,7 +345,6 @@ import seaborn
 #example seaborn.scatterplot(data=itotUtr,x='area_geo',y='area_pix')
 
 # +
-
 @jit
 def fillmiss(imgori,imgmiss):
     for hh in range(imgmiss.shape[0]):
@@ -490,7 +493,6 @@ def cartesian_product_multi(*dfs):
     return rv
 
 
-
 # -
 def getcachedgrids(src):
     clst={}
@@ -498,5 +500,130 @@ def getcachedgrids(src):
         clst[i] = src.read(i) 
     return clst
 
+
+# +
+#rescaling routines
+
+# +
+#now cuda data
+
+@cuda.jit
+def scaledwn_work(results,resultn, scale, image):
+    # expects a 2D grid and 2D blocks,
+    # a mask with odd numbers of rows and columns, (-1-) 
+    # a grayscale image
+    
+    # (-2-) 2D coordinates of the current thread:
+    i, j = cuda.grid(2) 
+#    print((i,j))
+    
+    # (-3-) if the thread coordinates are outside of the image, we ignore the thread:
+    image_rows, image_cols = image.shape
+    if (i >= image_rows) or (j >= image_cols): 
+        return
+    s = 0
+    n =0
+    for k in range(scale):
+        for l in range(scale):
+            i_k = scale*i + k
+            j_l = scale*j + l 
+            # (-4-) Check if (i_k, j_k) coordinates are inside the image: 
+            if (i_k >= 0) and (i_k < image_rows) and (j_l >= 0) and (j_l < image_cols):  
+                s += image[i_k, j_l]
+                n +=1
+    #result[i, j] = 0 if (n==0) else s/n
+    results[i,j] +=s
+    resultn[i,j] +=n    
+
+
+# +
+#now cuda data
+
+@cuda.jit
+def scaleup_work(downin, scale, image):
+    # expects a 2D grid and 2D blocks,
+    # a mask with odd numbers of rows and columns, (-1-) 
+    # a grayscale image
+    
+    # (-2-) 2D coordinates of the current thread:
+    i, j = cuda.grid(2) 
+    
+    # (-3-) if the thread coordinates are outside of the image, we ignore the thread:
+    image_rows, image_cols = image.shape
+    if (i >= image_rows) or (j >= image_cols): 
+        return
+    
+    # The result at coordinates (i, j) is equal to 
+    # sum_{k, l} mask[k, l] * image[i - k + delta_rows, j - l + delta_cols]
+    # with k and l going through the whole mask array:
+    s = downin[i, j]
+    for k in range(scale):
+        for l in range(scale):
+            i_k = scale*i + k
+            j_l = scale*j + l 
+            # (-4-) Check if (i_k, j_k) coordinates are inside the image: 
+            if (i_k >= 0) and (i_k < image_rows) and (j_l >= 0) and (j_l < image_cols):  
+                 image[i_k, j_l] =s
+
+
+# -
+
+#returns scaled down array with averages of pixels
+def scaledwn(image,scale,bdim=8):
+    # We preallocate the result array:
+    resdim=((np.array(image.shape)+scale-1 )//scale) #.astype(np.int)
+    print(resdim)
+    results = np.zeros(resdim,dtype=image.dtype )
+    resultn = np.zeros(resdim,dtype=image.dtype )
+    # We use blocks of 32x32 pixels:
+    blockdim = (bdim, bdim)
+#    print('Blocks dimensions:', blockdim)
+
+    # We compute grid dimensions big enough to cover the whole image:
+    griddim = (results.shape[0] // blockdim[0] + 1, results.shape[1] // blockdim[1] + 1)
+#    print('Grid dimensions:', griddim)
+    # We apply our convolution to our image:
+    scaledwn_work[griddim, blockdim](results,resultn, scale, image)
+    result=results/resultn 
+    return result
+#example image4g= convfiets2d(image1 ,3 ) 
+
+
+def scaleup(image_template,scale,downin,bdim=8):
+    # We preallocate the result array:
+    result = np.empty_like(image_template)
+    # We use blocks of 32x32 pixels:
+    blockdim = (bdim, bdim)
+#    print('Blocks dimensions:', blockdim)
+
+    # We compute grid dimensions big enough to cover the whole image:
+    griddim = (downin.shape[0] // blockdim[0] + 1, downin.shape[1] // blockdim[1] + 1)
+#    print('Grid dimensions:', griddim)
+    # We apply our convolution to our image:
+    scaleup_work[griddim, blockdim](downin ,scale, result)
+    return result
+#example image4g= convfiets2d(image1 ,3 ) 
+
+
+def scaletest():
+    bfact=51
+    hires = np.ones((17*bfact,23*bfact),dtype=np.float32 )
+    htest1= np.abs((hires-1)).sum()
+    assert (htest1 ==0)
+    sc2=3
+    lores=scaledwn(hires,sc2)
+    print(lores)
+    ltest1= np.abs((lores-1)).sum()
+    print(ltest1)
+#    assert (ltest1 ==0)
+    hires2=scaleup(hires,sc2,lores)
+    htest2= np.abs((hires2-1)).sum()
+    assert (htest2 ==0)
+    lores[2,3] =0
+    hires3=scaleup(hires,sc2,lores)
+    htest3= hires2.sum() - hires3.sum()
+    assert (htest3 == sc2*sc2  )
+    print ("scaling tested")
+scaletest()   
 
 
