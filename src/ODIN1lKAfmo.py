@@ -895,7 +895,7 @@ seaborn.scatterplot(data=fitdatverplgrx,x="x_LM_AL",y="DiffEst",hue="GeoInd")
 
 seaborn.scatterplot(data=fitdatverplgrx,x="M_LO_AL",y="DiffEst",hue="GeoInd")
 
-pointspertype(cut3)
+estsatmod.pointspertype(cut3)
 
 gr5km=fitdatverplgr[(fitdatverplgr['MaxAfst']==5) & (fitdatverplgr['MotiefV']==1)].copy()
 gr5km['linpmax']=gr5km['FactorEstNAL']/ gr5km['FactorEstAL']
@@ -944,11 +944,11 @@ estsatmod.getmaxafstadmax(ODINcatVNuse. odindiffflginfo, ODINcatVNuse.landcod,us
 ov=estsatmod.pltmotdistgrp(fitdatverplgr,'MaxAfst','FactorEst',False)
 # -
 
-ov=pltmotdistgrp(fitdatverplgr[fitdatverplgr['MotiefV']==1],'MaxAfst','FactorEst',True)
+ov=estsatmod.pltmotdistgrp(fitdatverplgr[fitdatverplgr['MotiefV']==1],'MaxAfst','FactorEst',True)
 
-ov=pltmotdistgrp(fitdatverplgr,'linpmax','linpch',False)
+ov=estsatmod.pltmotdistgrp(fitdatverplgr,'linpmax','linpch',False)
 
-ov=pltmotdistgrp(fitdatverplgr,'MaxAfst','linpch',False)
+ov=estsatmod.pltmotdistgrp(fitdatverplgr,'MaxAfst','linpch',False)
 
 estsatmod.calcchidgrp(fitdatverplgr)
 
@@ -969,17 +969,17 @@ def trypowerland (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,myskipPCMdf,plt
     mydatverplgr = mkdfverplxypc4 (myodinverplmxigr ,fitgrps,'Motief en isnaarhuis',
                                 myKAfstV,xlatKAfstV,mygeoschmixpMotief,2.0).merge(myKAfstV,how='left')
     
-    cut2i=  choose_cutoff(mydatverplgr,pltgrps,False,0,'mxigrp',pu)  
-    myfitpara= fit_cat_parameters(cut2i,mydatverplgr,pltgrps,pu)
-    myfitverplgr = predict_values(cut2i,mydatverplgr,pltgrps,myfitpara,pu,False)
+    cut2i=  estsatmod.choose_cutoff(mydatverplgr,pltgrps,False,0,'mxigrp',pu)  
+    myfitpara= estsatmod.fit_cat_parameters(cut2i,mydatverplgr,pltgrps,pu)
+    myfitverplgr = estsatmod.predict_values(cut2i,mydatverplgr,pltgrps,myfitpara,pu,False)
 
 #    myfitverplgr = dofitdatverplgr(cut2i,mydatverplgr,pltgrps,pu)
     for r in range(2):
-        cut3i=  choose_cutoff(mydatverplgr,pltgrps,True,myfitverplgr,'mxigrp',pu) 
-        myfitpara= fit_cat_parameters(cut2i,mydatverplgr,pltgrps,pu)
-        myfitverplgr = predict_values(cut2i,mydatverplgr,pltgrps,myfitpara,pu,False)
+        cut3i=  estsatmod.choose_cutoff(mydatverplgr,pltgrps,True,myfitverplgr,'mxigrp',pu) 
+        myfitpara= estsatmod.fit_cat_parameters(cut2i,mydatverplgr,pltgrps,pu)
+        myfitverplgr = estsatmod.predict_values(cut2i,mydatverplgr,pltgrps,myfitpara,pu,False)
 #        myfitverplgr = dofitdatverplgr(cut3i,mydatverplgr,pltgrps,pu)
-    rdf=calcchidgrp(myfitverplgr)
+    rdf=estsatmod.calcchidgrp(myfitverplgr)
     chisq= np.sum(rdf['chisq'].reset_index().iloc[:,1])
     return([chisq,myfitpara,rdf])
     
@@ -1031,7 +1031,7 @@ if False:
 
 seaborn.scatterplot(data=fitdatverplgr[fitdatverplgr['MaxAfst']==0],x="FactorEst",y="DiffEst",hue="GeoInd")
 
-fitdatverplpc4gr = predict_values(cut3,indatverplpc4gr,fitgrps,fitpara,expdefs,False)
+fitdatverplpc4gr = estsatmod.predict_values(cut3,indatverplpc4gr,fitgrps,fitpara,expdefs,False)
 
 fitdatverplpc4gr[fitdatverplpc4gr['FactorEst']>1e7][['PC4', 'GrpExpl','GeoInd',
           'FactorEst', 'DiffEst','FactorV','FactorVSpec']].sort_values(
@@ -1452,11 +1452,11 @@ def predictnewdistr(pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,myskipPCMdf,p
     mydatverplgr = mkdfverplxypc4 (myodinverplmxigr ,fitgrps,'Motief en isnaarhuis',
                                 myKAfstV,xlatKAfstV,mygeoschmixpMotief,2.0).merge(myKAfstV,how='left')
     
-    cut2i=  choose_cutoff(mydatverplgr,pltgrps,False,0,'mxigrp',pu)  
+    cut2i=  estsatmod.choose_cutoff(mydatverplgr,pltgrps,False,0,'mxigrp',pu)  
 #deze dus niet    myfitpara= fit_cat_parameters(cut2i,mydatverplgr,pltgrps,pu)
-    myfitverplgr = predict_values(cut2i,mydatverplgr,pltgrps,myfitpara,pu,False)
+    myfitverplgr = estsatmod.predict_values(cut2i,mydatverplgr,pltgrps,myfitpara,pu,False)
 
-    rdf=calcchidgrp(myfitverplgr)
+    rdf=estsatmod.calcchidgrp(myfitverplgr)
     chisq= np.sum(rdf['chisq'].reset_index().iloc[:,1])
     return(myfitverplgr)
 

@@ -89,18 +89,20 @@ import numba
 #from numba.utils import IS_PY3
 from numba.decorators import jit
 
+# +
 #het inlezen van odinverplgr loopt in deze versie via ODINcatVNuse
 #ODINcatVNuse zorgt ook voor defaults
-import ODINcatVNuse
+#import ODINcatVNuse
 
 # +
 #gebruik wat globale waarden, zoals in ODIN1lKAfmo.py
 # -
 
-useKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01uKA.pkl")
-xlatKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01xKA.pkl")
-#was<20
-useKAfstV  = useKAfstVa [useKAfstVa ["MaxAfst"] <180].copy()
+if False:
+    useKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01uKA.pkl")
+    xlatKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01xKA.pkl")
+    #was<20
+    useKAfstV  = useKAfstVa [useKAfstVa ["MaxAfst"] <180].copy()
 
 fitgrps=['MotiefV','isnaarhuis']
 expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0}
@@ -514,7 +516,8 @@ fitdatverplgr.groupby (['MotiefV','isnaarhuis','GeoInd','MaxAfst']).agg('mean')
 
 
 # +
-def getmaxafstadmax( dd, landcod,myKAfstV):
+#deze routine wordt niet meer gebruikt
+def getmaxafstadmax_old( dd, landcod,myKAfstV):
     rf = dd[dd['KAfstCluCode'] == landcod ] 
     binst= myKAfstV.iloc[-2,1]
     print(binst)
@@ -523,8 +526,7 @@ def getmaxafstadmax( dd, landcod,myKAfstV):
     rf['MaxShStat'] =  rf['FactorV_c'] 
     rf = rf[ODINcatVNuse.fitgrpse +['MaxShow','MaxShStat']]
     return rf
-#maxvals = 
-getmaxafstadmax(ODINcatVNuse. odindiffflginfo, ODINcatVNuse.landcod,useKAfstV)
+#maxvals = getmaxafstadmax(ODINcatVNuse. odindiffflginfo, ODINcatVNuse.landcod,useKAfstV)
 
 # hier komen waarden uit ONDER binstm. Dat is niet goed.
 
