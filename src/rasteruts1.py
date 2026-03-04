@@ -507,20 +507,14 @@ def getcachedgrids(src):
 
 #now cuda data
 @cuda.jit
-def scaledwn_work(result, scale, image):
-    # expects a 2D grid and 2D blocks,
-    # a mask with odd numbers of rows and columns, (-1-) 
-    # a grayscale image
-    
+def scaledwn_work(image, result, scale):
+    #scale image to result
     # (-2-) 2D coordinates of the current thread:
-
-    i, j = cuda.grid(2) 
-#    assert(scale==3)
-    
+    i, j = cuda.grid(2)     
     # (-3-) if the thread coordinates are outside of the image, we ignore the thread:
     image_rows, image_cols = image.shape
-#    if ( scale*i >= image_rows) or ( scale*j >= image_cols): 
-#        return 0*image[0,0]
+    if ( scale*i >= image_rows) or ( scale*j >= image_cols): 
+        return 
     s = 0
     n =0
     for k in range(scale):
@@ -531,17 +525,12 @@ def scaledwn_work(result, scale, image):
             if (i_k >= 0) and (i_k < image_rows) and (j_l >= 0) and (j_l < image_cols):  
                 s += image[i_k, j_l]
                 n +=1
-#    n=(1 if (n==0) else n)
     result[i, j] =s/n
-#    results[i,j] +=s
-#    resultn[i,j] +=n    
 
 
-# +
 #now cuda data
-
 @cuda.jit
-def scaleup_work(downin, scale, image):
+def scaleup_work(downin,image ,scale ):
     # expects a 2D grid and 2D blocks,
     # a mask with odd numbers of rows and columns, (-1-) 
     # a grayscale image
@@ -551,8 +540,8 @@ def scaleup_work(downin, scale, image):
     
     # (-3-) if the thread coordinates are outside of the image, we ignore the thread:
     image_rows, image_cols = image.shape
-    if (i >= image_rows) or (j >= image_cols): 
-        return
+    if ( scale*i >= image_rows) or ( scale*j >= image_cols): 
+        return 
     
     # The result at coordinates (i, j) is equal to 
     # sum_{k, l} mask[k, l] * image[i - k + delta_rows, j - l + delta_cols]
@@ -567,10 +556,8 @@ def scaleup_work(downin, scale, image):
                  image[i_k, j_l] =s
 
 
-# -
-
 #returns scaled down array with averages of pixels
-def scaledwn(image,scale,bdim=4):
+def scaledwn(image,scale,bdim=32):
     # We preallocate the result array:
     resdim=((np.array(image.shape)+scale-1 )//scale) #.astype(np.int)
 #    print(resdim)
@@ -586,10 +573,8 @@ def scaledwn(image,scale,bdim=4):
     griddim = (results.shape[0] // blockdim[0] + 1, results.shape[1] // blockdim[1] + 1)
 #    print('Grid dimensions:', griddim)
     # We apply our convolution to our image:
-    scaledwn_work[griddim, blockdim](results, scale, image)
-#    scaledwn_work(results, scale, image)
-#    resultn +=(results ==0) 
-#    result=results/resultn 
+    scaledwn_work[griddim, blockdim](image, results, scale )
+
     return results
 #example image4g= convfiets2d(image1 ,3 ) 
 
@@ -605,34 +590,49 @@ def scaleup(image_template,scale,downin,bdim=32):
     griddim = (downin.shape[0] // blockdim[0] + 1, downin.shape[1] // blockdim[1] + 1)
 #    print('Grid dimensions:', griddim)
     # We apply our convolution to our image:
-    scaleup_work[griddim, blockdim](downin ,scale, result)
+    scaleup_work[griddim, blockdim](downin , result,scale)
 #    scaleup_work(downin ,scale, result)
     return result
-#example image4g= convfiets2d(image1 ,3 ) 
 
 
-def scaletest():
-    bfact=3
-    hires = np.ones((17*bfact,23*bfact),dtype=np.float32 )
-    htest1= np.abs((hires-1)).sum()
+
+# +
+def assertdbg(val,ref,txt):
+#    print(val.sum())
+    htest1= np.abs((val-ref)).sum()
+    if (htest1 !=0):
+        print ("Error in %s : %g" %(txt,htest1))
+        print (val)
     assert (htest1 ==0)
-    sc2=3
+    
+def scaletest(bfact,sc2):
+    hires = np.ones((17*bfact,23*bfact),dtype=np.float32 )
+    assertdbg(hires,1,"initial ones")
     lores=scaledwn(hires,sc2)
-    print(lores)
-    ltest1= np.abs((lores-1)).sum()
-    print(ltest1)
-    assert (ltest1 ==0)
+    assertdbg(lores,1,"lores ones")
+
     hires2=scaleup(hires,sc2,lores)
-    htest2= np.abs((hires2-1)).sum()
-    print(htest2)
-#    assert (htest2 ==0)
+    assertdbg(hires2,1,"rescaled ones")
     lores[2,3] =0
     hires3=scaleup(hires,sc2,lores)
-    htest3= hires2.sum() - hires3.sum()
-    print(htest3)
-    assert (htest3 == sc2*sc2  )
-    print ("scaling tested")
-scaletest()   
+    hr3part0=np.argwhere((hires3==0))
+#    print (hr3part    ,hr3part.shape      )
+    assertdbg(hr3part0.shape[0],sc2*sc2,"elements zero hires")
+    hr3part1=np.argwhere((hires3!=1))
+#    print (hr3part    ,hr3part.shape      )
+    assertdbg(hr3part1.shape[0],sc2*sc2,"elements changed hires")
+    lores2=scaledwn(hires3,sc2)
+    assertdbg(lores2,lores,"lores with zero")
+    htest3= (hires2.sum() ) - ( hires3.sum() )
+#strange errors:    assertdbg(htest3,sc2*sc2,"rescaled except one sums")
+#    print ("scaling tested")
+scaletest(1,3)   
+# -
+
+scaletest(13,3)   
+#errors for higher values
+scaletest(13*19,3)  
+scaletest(31*19,3)  
 
 
 def convfiets2dsc(image,kern1,scale,kernnorm,bdimi):
