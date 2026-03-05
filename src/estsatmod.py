@@ -31,32 +31,6 @@
 #gewicht: w= l/ (l-p) -> aparte kolom
 
 # +
-#visualiseer relaties getallen, bijv. het 50 % punt(beide componenten gelijk groot) in km
-#ook: bijdrage per ring / oppervlak -> multipliers per ring visualiseren
-#omdat additief model _. som van componenten is ook terug te rekenen
-#uitgaande van 1 PC : som model daar =1
-#ga uit ven centrum punt postcode
-#-maak grid met grootste ring
-#-trek bijdrages vorige ring er helemaal van af (die komen later)
-#bepaal coefficienten voor  'OW','OO','OM','OA' als som van alle groepen in ring
-#tel op zodat een relatie plaatje op buurt/wijk niveau ontstaat
-#valdeer dat de sommen voor die PC kloppen met model uitkomst
-
-# +
-#splits code op
-#- analyse top PC4 per Motief voor 2 ritten op dag en niet woon kant
-#- t.o.v. gebieds oppervlak
-#- bij top PC4 maak annotatie naar 1 of meerdere PC6 mogelijk
-# maak ook afstandsklassen tabel (met index per indeling naam) en schrijf naar pkl
-
-#
-#- maak grid met die toewijzing op 1 pixel & visualiseer met 5 km smooth
-#- maak gridder routines in apart werkboek en save de output pkl
-#- selecteer alleen grootste naarhuis - motief combinaties , rest: houdt van/naar, motief rest
-#      *van/ naar samen selecteren !
-#- 
-
-# +
 #beschrijf kenmerken
 #volledig additief
 # binnen cirkels
@@ -105,10 +79,12 @@ if False:
     useKAfstV  = useKAfstVa [useKAfstVa ["MaxAfst"] <180].copy()
 
 fitgrps=['MotiefV','isnaarhuis']
-expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0}
+expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0,'SP' :1.0}
 
 indatverplmxigr=pd.read_pickle("../intermediate/indatverplmxigr_ini.pkl") 
 #MLlen(indatverplmxigr)
+indatverplmxigr['PC4'] =0
+indatverplmxigr.dtypes
 
 # indatverplmxigr is een excel baar overzicht met afstands overzichten per motief, gesommeerd over het land
 # en niet gefilterd
@@ -133,18 +109,24 @@ showtotmot(indatverplmxigr,True)
 
 indatverplmxigr [(indatverplmxigr ['FactorV']>0 ) ==False]
 
-
 # +
 #no data showtotmot(indatverplpc4gr,True)  
 
 # +
 #alleen eerste kolom vergelijken. de M_ velden zitten niet in deze database
 #no data showtotmot(odinverplgr,False)
+# -
+
+#global version for consustency
+#version 1: cutoff old
+#version 3: cutoff new
+esmalgversion=5
 
 # +
 #daarom verder met kolommen met een F_ (filtered)
 
 #oude versie: ieder record fit naar ofwel ALsafe of naar osafe, of nergens heen
+esmalgversionscoold=[1,2]
 
 def choose_cutoffold(indat,pltgrps,hasfitted,prevrres,grpind,pu):
     outframe=indat[[grpind,'GrpExpl','MaxAfst','KAfstCluCode','GeoInd' ] +pltgrps].copy(deep=False)
@@ -230,12 +212,9 @@ pointspertype(cut2)
 
 
 # +
-#originele code had copy. Kost veel geheugen en tijd
-#daarom verder met kolommen met een F_ (filtered)
-
-def choose_cutoffnw(indat,pltgrps,hasfitted,prevrres,grpind,pu):
+def choose_cutoffv5(indat,pltgrps,hasfitted,prevrres,grpind,pu):
     curvpwr = pu['CP']
-    outframe=indat[['PC4','GrpExpl','MaxAfst','KAfstCluCode','GeoInd' ] +pltgrps].copy(deep=False)
+    outframe=indat[[grpind,'GrpExpl','MaxAfst','KAfstCluCode','GeoInd' ] +pltgrps].copy(deep=False)
     minwgt=.5
     recisAL=indat['MaxAfst']==0
     if hasfitted:
@@ -245,12 +224,13 @@ def choose_cutoffnw(indat,pltgrps,hasfitted,prevrres,grpind,pu):
         outframe['EstVPo']   =np.power(prevrres['FactorEstNAL'],curvpwr)
         outframe['EstVP']    =np.power(prevrres['FactorEst'],curvpwr)
     else: 
-        wval1= indat[recisAL] [['FactorV','PC4','GeoInd'] +pltgrps].copy(deep=False)
+        wval1= indat[recisAL] [['FactorV',grpind,'GeoInd'] +pltgrps].copy(deep=False)
         wval1= wval1.rename(columns={'FactorV':'EstVPAL'})
         wval1['EstVPAL'] =np.power(wval1['EstVPAL'],curvpwr)
         outframe=outframe.merge(wval1,how='left')
         outframe['EstVP']  =np.power(indat['FactorV'],curvpwr)
-        outframe['EstVPo'] =np.where (recisAL,1e20,1e-9 )    
+        outframe['EstVPo'] =1.0
+        outframe['EstVPo'] =np.where (recisAL,1e20*outframe['EstVPo'],1e-9 *outframe['EstVPo'])        
     if 1==1:
         outframe['FactorVP'] =np.power(indat['FactorV'],curvpwr)
         denomo=  (1/outframe['EstVP']- 1/outframe['EstVPAL'])
@@ -301,11 +281,174 @@ def choose_cutoffnw(indat,pltgrps,hasfitted,prevrres,grpind,pu):
                  np.max(outframe['ALsafe']),np.max(outframe['osafe'])) )
     return outframe
 
-def choose_cutoff(indat,pltgrps,hasfitted,prevrres,grpind,curvpwr):
-    if False:
-        return choose_cutoffnw(indat,pltgrps,hasfitted,prevrres,grpind,curvpwr)
+
+#cut2=  choose_cutoff(indatverplgr,fitgrps,False,0,'PC4',expdefs)   
+cut2=  choose_cutoffv5(indatverplmxigr,fitgrps,False,0,'mxigrp',expdefs)   
+#cut2
+
+# +
+#originele code had copy. Kost veel geheugen en tijd
+#daarom verder met kolommen met een F_ (filtered)
+
+def choose_cutoffv6(indat,pltgrps,hasfitted,prevrres,grpind,pu):
+    curvpwr = pu['CP']
+    outframe=indat[[grpind,'GrpExpl','MaxAfst','KAfstCluCode','GeoInd' ] +pltgrps].copy(deep=False)
+    minwgt=.5
+    recisAL=indat['MaxAfst']==0
+    estAL2=(esmalgversion==7)    
+    if hasfitted:
+#        outframe['ALsafe'] = (prevrres['FactorEstNAL'] > 5.0 * prevrres['FactorEstAL'] ) | (outframe['MaxAfst']==0) 
+#        outframe['osafe']  = (prevrres['FactorEstNAL'] < 0.2 * prevrres['FactorEstAL'] ) & (outframe['MaxAfst']!=0)
+        outframe['EstVPAL']  =np.power(prevrres['FactorEstAL'],curvpwr)
+        outframe['EstVPo']   =np.power(prevrres['FactorEstNAL'],curvpwr)
+        outframe['EstVP']    =np.power(prevrres['FactorEst'],curvpwr)
+    else: 
+        wval1= indat[recisAL] [['FactorV',grpind,'GeoInd'] +pltgrps].copy(deep=False)
+        wval1= wval1.rename(columns={'FactorV':'EstVPAL'})
+        wval1['EstVPAL'] =np.power(wval1['EstVPAL'],curvpwr)
+        print (outframe.shape)
+        outframe=outframe.merge(wval1,how='left')
+        print (outframe.shape)
+        outframe['EstVP']  =np.power(indat['FactorV'],curvpwr)
+#        outframe['EstVPo'] =np.where (recisAL,1e20,1e-9 )    
+        outframe['EstVPo'] =1.0
+        outframe['EstVPo'] =np.where (recisAL,1e20*outframe['EstVPo'],1e-9 *outframe['EstVPo']) 
+    if 1==1:
+        outframe['FactorVP'] =np.power(indat['FactorV'],curvpwr)
+        denomo=  (1/outframe['EstVP']- 1/outframe['EstVPAL'])
+        outframe['osafe'] = np.where( outframe['EstVP'] * denomo <=0,0, np.power(
+                             outframe['EstVP']*denomo,  curvpwr+1) )  
+        outframe['osafe'] =np.where (outframe['osafe'] <minwgt,0,outframe['osafe'] )       
+        outframe['FactorVFo'] = np.where(outframe['EstVP']* denomo <=0,0, 
+                            np.power(denomo ,-1/curvpwr))
+        outframe['FactorVFo'] = indat['FactorV'] *outframe['FactorVFo'] /outframe['EstVP'] 
+    if hasfitted:
+        denomAL= (1/outframe['EstVP']- 1/outframe['EstVPo'])
     else:
+        denomAL= (1/outframe['EstVP']- np.power(outframe['FactorVFo'],- curvpwr ) ) 
+    if 1==1:
+        outframe['FactorVFAL'] = np.where(outframe['EstVP']* denomAL <=0,0, 
+                            np.power(denomAL ,-1/curvpwr))
+        outframe['FactorVFAL'] = indat['FactorV'] *outframe['FactorVFAL'] /outframe['EstVP'] 
+        outframe['FactorVFAL'] = np.where (recisAL,indat['FactorV'],
+                            outframe['FactorVFAL'] )               
+    if hasfitted & estAL2:
+        outframe['ALsafe'] = np.where( outframe['EstVP'] * denomAL <=0,0, np.power(
+                             outframe['EstVP']*denomAL,  curvpwr+1) )  
+        outframe['ALsafe'] = np.where (outframe['ALsafe'] <minwgt,0,outframe['ALsafe'] )  
+        outframe['ALsafe'] = np.where (recisAL,1.0,outframe['ALsafe'] )                             
+
+        chooseAL=np.where( (outframe['ALsafe'] > outframe['osafe'] )| recisAL ,1,0)
+        outframe['ALsafe'] = outframe['ALsafe'] *chooseAL
+        outframe['osafe'] = outframe['osafe'] *(1-chooseAL)
+    else:                
+        outframe['ALsafe'] = np.where (recisAL,1,0)
+    if 1==1:
+        if np.sum(outframe['osafe'] * outframe['ALsafe']) !=0:
+            raise ("Error: overlapping fits")
+        outframe['FactorVF'] = (outframe['FactorVFo']*outframe['osafe'] +
+                                outframe['FactorVFAL'] * outframe['ALsafe'] )
+        for lkey in ('LW','LO'):
+            colnamAL ="M_"+ lkey +"_AL"
+            colnamALo="F_"+ lkey +"_AL"
+            outframe[colnamALo] = indat[colnamAL] * outframe['ALsafe']
+            for okey in ('OW','OO','OM','OA'):
+                colnam ="M_"+ lkey +"_" + okey
+                colnamo="F_"+ lkey +"_" + okey
+#                print(colnam,(lvals[np.isnan(lvals)]))
+                outframe[colnamo] = indat[colnam] * outframe['osafe']
+#        outframe['osafe2'] =outframe['osafe']
+#        outframe['ALsafe2'] =outframe['ALsafe']
+        print( ( np.sum(outframe['ALsafe']),np.sum(outframe['osafe']),
+                 np.max(outframe['ALsafe']),np.max(outframe['osafe'])) )
+    return outframe
+cut2=  choose_cutoffv6(indatverplmxigr,fitgrps,False,0,'mxigrp',expdefs)   
+
+
+# +
+#fit AL alleen op indat['MaxAfst']==0. Deze waarde blijft gelijk voor asymptoot
+#gebruik asymptoot in ronde 2 voor correcties
+
+def choose_cutoffv8(indat,pltgrps,hasfitted,prevrres,grpind,pu):
+    curvpwr = pu['CP']
+    satpwr = pu['SP']
+    outframe=indat[[grpind,'GrpExpl','MaxAfst','KAfstCluCode','GeoInd' ] +pltgrps].copy(deep=False)
+    minwgt=.5
+    recisAL=indat['MaxAfst']==0
+
+
+    if 1==1:
+        wval1= indat[recisAL] [['FactorV',grpind,'GeoInd'] +pltgrps].copy(deep=False)
+        wval1= wval1.rename(columns={'FactorV':'EstVPAL'})
+        wval1['EstVPAL'] =np.power(wval1['EstVPAL'],curvpwr)
+        outframe=outframe.merge(wval1,how='left')
+        outframe['EstVP']  =np.power(indat['FactorV'],curvpwr)
+        outframe['ALsafe'] = np.where (recisAL,1,0)      
+        outframe['FactorVFAL'] = np.where (recisAL,indat['FactorV'],  0 )               
+
+    if hasfitted:
+#        outframe['ALsafe'] = (prevrres['FactorEstNAL'] > 5.0 * prevrres['FactorEstAL'] ) | (outframe['MaxAfst']==0) 
+#        outframe['osafe']  = (prevrres['FactorEstNAL'] < 0.2 * prevrres['FactorEstAL'] ) & (outframe['MaxAfst']!=0)
+        outframe['EstVPAL']  =np.power(prevrres['FactorEstAL'],curvpwr)
+        outframe['EstVPo']   =np.power(prevrres['FactorEstNAL'],curvpwr)
+        outframe['EstVP']    =np.power(prevrres['FactorEst'],curvpwr)
+        s2al = outframe['EstVPAL'] 
+        
+        outframe['ValS2'] = np.where(indat['FactorV']>0, 
+            np.power( (np.power(indat['FactorV'] ,-satpwr ) -  np.power(s2al,-satpwr) ),
+                       -1/satpwr ) ,0)
+
+    else: 
+#        outframe['EstVPo'] =np.where (recisAL,1e20,1e-9 )    
+        outframe['EstVPo'] =1.0
+        outframe['EstVPo'] =np.where (recisAL,1e20*outframe['EstVPo'],1e-9 *outframe['EstVPo']) 
+    if 1==1:
+        outframe['FactorVP'] =np.power(indat['FactorV'],curvpwr)
+        denomo= np.where (outframe['EstVPAL'] >0,1/outframe['EstVPAL'],0)
+        outframe['EstVP'] = outframe['FactorVP']
+        outframe['osafe'] = np.where( outframe['EstVP'] * denomo <=0,0, np.power(
+                             outframe['EstVP']*denomo,  curvpwr+1) )  
+        valfact = indat['FactorV']>0
+        outframe['osafe'] =np.where (outframe['FactorVP']  *denomo <minwgt,0,valfact )       
+#        outframe['FactorVFo'] = np.where(outframe['EstVP']* denomo <=0,0, 
+#                            np.power(denomo ,-1/curvpwr))
+        if hasfitted&0:
+            outframe['FactorVFo'] = outframe['ValS2'] 
+        else:
+            outframe['FactorVFo'] = indat['FactorV'] 
+#    *outframe['FactorVFo'] /outframe['EstVP'] 
+           
+        outframe['osafe'] = (outframe['osafe'] !=0) *(1-recisAL)
+
+    if 1==1:
+        if np.sum(outframe['osafe'] * outframe['ALsafe']) !=0:
+            raise ("Error: overlapping fits")
+        outframe['FactorVF'] = (outframe['FactorVFo']*outframe['osafe'] +
+                                outframe['FactorVFAL'] * outframe['ALsafe'] )
+        for lkey in ('LW','LO'):
+            colnamAL ="M_"+ lkey +"_AL"
+            colnamALo="F_"+ lkey +"_AL"
+            outframe[colnamALo] = indat[colnamAL] * outframe['ALsafe']
+            for okey in ('OW','OO','OM','OA'):
+                colnam ="M_"+ lkey +"_" + okey
+                colnamo="F_"+ lkey +"_" + okey
+#                print(colnam,(lvals[np.isnan(lvals)]))
+                outframe[colnamo] = indat[colnam] * outframe['osafe']
+#        outframe['osafe2'] =outframe['osafe']
+#        outframe['ALsafe2'] =outframe['ALsafe']
+        print( ( np.sum(outframe['ALsafe']),np.sum(outframe['osafe']),
+                 np.max(outframe['ALsafe']),np.max(outframe['osafe'])) )
+    return outframe
+
+def choose_cutoff(indat,pltgrps,hasfitted,prevrres,grpind,curvpwr):
+    if esmalgversion in esmalgversionscoold:
         return choose_cutoffold(indat,pltgrps,hasfitted,prevrres,grpind,curvpwr)
+    elif esmalgversion in [5]:
+        return choose_cutoffv5(indat,pltgrps,hasfitted,prevrres,grpind,curvpwr)
+    elif esmalgversion in [6,7]:
+        return choose_cutoffv6(indat,pltgrps,hasfitted,prevrres,grpind,curvpwr)
+    else:
+        return choose_cutoffv8(indat,pltgrps,hasfitted,prevrres,grpind,curvpwr)
 
 
 #cut2=  choose_cutoff(indatverplgr,fitgrps,False,0,'PC4',expdefs)   
@@ -389,49 +532,80 @@ def fit_cat_parameters(indf,topreddf,pltgrp,pu):
     rf= _fitsub(indf,fitgrp,_regressgrp,  colvacols2, colpacols2).reset_index()
     return rf
 
+def setlandcols(outdf,colvacols2,pu ):
+    okmults= {'OA':1,'OW':1,'OO':1,'OM':1+1e-10}
+    landdf=outdf.copy()
+    for lkey in ['LW','LO']:
+        colin="M_"+ lkey +"_" + "AL"
+        indat= landdf[colin]
+        for okey in okmults.keys():
+            colnam="M_"+ lkey +"_" + okey
+            landdf[colnam]= indat * okmults[okey]
+    return landdf    
+
+#neem de parameters , en voorspel
+#neem ook landelijke normalisatie mee
 def predict_values(indf,topreddf,pltgrp,rf,pu,stobijdr):
-    curvpwr = pu['CP']
+    satpwr = pu['SP']
 #    indf = indf[(indf['MaxAfst']!=95.0) & (indf[pltgrp]<3) ]
     debug=False
+    outdf = topreddf.merge(rf,how='left')
+
     colvacols = indf.columns
     colpacols = np.array( list ( (re.sub(r'F_','P_',s) for s in list(colvacols) ) ) )
     colvacols2 = colvacols[colvacols != colpacols]
     colpacols2 = colpacols[colvacols != colpacols]
     
-    outdf = topreddf.merge(rf,how='left')
     #let op: voorspel uit M kolommen
     colvacols2 = np.array( list ( (re.sub(r'P_','M_',s) for s in list(colpacols2) ) ) )
-    
-    colpacols2alch = np.array( list ( (re.sub(r'_AL','_xx',s) for s in list(colvacols2) ) ) )
-    colpacols2alchisAL = (colpacols2alch !=colvacols2)
-    if (debug):
-        print(colpacols2alchisAL)
-    blk1=outdf[colvacols2 ] * ((colpacols2alchisAL ==False ).astype(int))
-    blk2=outdf[colpacols2 ] * ((colpacols2alchisAL ==False ).astype(int))
+    oldALmode=True
+
+    if oldALmode:
+        colpacols2alch = np.array( list ( (re.sub(r'_AL','_xx',s) for s in list(colvacols2) ) ) )
+        colpacols2alchisAL = (colpacols2alch !=colvacols2)
+        if (debug):
+            print(colpacols2alchisAL)
+        blk1=outdf[colvacols2 ] * ((colpacols2alchisAL ==False ).astype(int))
+        blk2=outdf[colpacols2 ] * ((colpacols2alchisAL ==False ).astype(int))
+    else:
+        blk1=outdf[colvacols2 ] 
+        blk2=outdf[colpacols2 ] 
 #    print(blk1)
     s2= np.sum(np.array(blk1)*np.array(blk2),axis=1).astype(float)
-
-    blk1al=outdf[colvacols2 ] * (colpacols2alchisAL.astype(int))
-    blk2al=outdf[colpacols2 ] * (colpacols2alchisAL.astype(int))
-#    print(blk1)
-    s2al= np.sum(np.array(blk1al)*np.array(blk2al),axis=1).astype(float)    
+    outdf['FactorEstNAL'] =s2
+    if oldALmode:
+        blk1al=outdf[colvacols2 ] * (colpacols2alchisAL.astype(int))
+        blk2al=outdf[colpacols2 ] * (colpacols2alchisAL.astype(int))
+    #    print(blk1)
+        s2al= np.sum(np.array(blk1al)*np.array(blk2al),axis=1).astype(float)    
+    else:
+        outdfland=setlandcols(outdf,colvacols2,pu )
+        blk1al=outdfland[colvacols2 ] 
+        blk2al=outdfland[colpacols2 ] 
+    #    print(blk1)
+        s2al= np.sum(np.array(blk1al)*np.array(blk2al),axis=1).astype(float)
     outdf['FactorEstAL']  =s2al
+        
 #todo: als s2al 0 is, opzoeken waar MaxAfst ==0 en de s2al daarvan invullen als default
 #dat levert dan min of meer consistente kantelpunten op
-    outdf['FactorEstNAL'] =s2
-    if (debug):
-        print ((s2al, s2))
+    if (debug ):
+        print (outdf[['FactorEstAL','FactorEstNAL']])
     #s2ch= np.min( (np.where((s2==0),s2al,s2 ), np.where((s2al==0),s2,s2al ) ) ,axis=0)
     s2ch= np.where((s2<=0),np.where(outdf['MaxAfst']==0, s2al,0), 
                            np.where((s2al==0),s2,
-                           np.power (np.power(s2,-curvpwr) + np.power(s2al,-curvpwr), -curvpwr )) )
-    if (debug):
-        print (s2ch)
+                           np.power ((np.power(s2,-satpwr) + np.power(s2al,-satpwr)), 
+                                     -1/satpwr )) )
     outdf['FactorEst'] = s2ch
     outdf['DiffEst'] = np.where(outdf['FactorV']>0, outdf['FactorV']-s2ch,np.nan)
+    outdf['DiffS2'] = np.where(outdf['FactorV']>0, 
+            np.power( (np.power(outdf['FactorV'] ,-satpwr ) -  np.power(s2al,-satpwr) ),
+                       -1/satpwr )-s2 ,np.nan)
+    if (debug):
+        print (outdf[['FactorEstAL','FactorEstNAL','FactorEst','DiffS2']])
     if stobijdr:
         outdf[colvacols2 ] = np.array(blk1al)*np.array(blk2al)
     return(outdf)
+
 
 def _dofitdatverplgr(indf,topreddf,pltgrp,pu):
     rf = fit_cat_parameters(indf,topreddf,pltgrp,pu)
@@ -448,6 +622,8 @@ seaborn.scatterplot(data=fitdatverplgrx,x="FactorEst",y="DiffEst",hue="GeoInd")
 cut3=  choose_cutoff(indatverplmxigr,fitgrps,True,fitdatverplgr,'mxigrp',expdefs)  
 #cut3=  choose_cutoff(indatverplgr,fitgrps,True,fitdatverplgr,expdefs)  
 #cut3
+
+cut3[cut3[ 'FactorVFo']>1][[ 'FactorVFo']]
 
 # +
 #fitinddiag(cut3,10,5,'VertPC',p_CP)    
@@ -509,8 +685,12 @@ mxitotdiagpl(ds,'mxigrp')
 fitdatverplgr[fitdatverplgr['MaxAfst']==0]
 
 paratab=fitdatverplgr[fitdatverplgr['MaxAfst']==0].groupby (['MotiefV','isnaarhuis','GeoInd']).agg('mean')
-paratab.to_excel("../output/fitparatab1.xlsx")
+paratab.reset_index().to_excel("../output/fitparatab1.xlsx")
 paratab
+
+parahitab=fitdatverplgr[fitdatverplgr['KAfstCluCode']>12].groupby (['KAfstCluCode','mxigrp','MotiefV','isnaarhuis','GeoInd']).agg('mean')
+parahitab.reset_index().to_excel("../output/fitparatab1hi.xlsx")
+parahitab
 
 fitdatverplgr.groupby (['MotiefV','isnaarhuis','GeoInd','MaxAfst']).agg('mean')
 
@@ -530,16 +710,17 @@ def getmaxafstadmax_old( dd, landcod,myKAfstV):
 
 # hier komen waarden uit ONDER binstm. Dat is niet goed.
 
+
 # +
 #mogelijk: maxafst joinen uit diifdata
 
-
 def pltmotdistgrp (mydati,horax,vertax,vnsep):
+    stelafst =195.0 # afstand waar maxbin wordt geplaatst
     mydat=pd.DataFrame(mydati)    
     opdel=['MaxAfst','GeoInd','MotiefV','GrpExpl']
 #    mydat['FactorEst2'] = np.where(mydat['FactorEstNAL']==0,0, 
 #                                 1/ (1/mydat['FactorEstAL'] + 1  /mydat['FactorEstNAL'] ) )
-    fsel=['FactorEst','FactorV', 'FactorEstNAL','FactorEstAL']
+    fsel=['FactorEst','FactorV', 'FactorEstNAL','FactorEstAL','DiffS2']
 
     rv2= mydat.groupby (opdel)[fsel].agg(['sum']).reset_index()
 #    print ( rv2[ (rv2['MotiefV']==1) & (rv2['MaxAfst']==0) ] ) 
@@ -551,15 +732,16 @@ def pltmotdistgrp (mydati,horax,vertax,vnsep):
     bigmotd= rv2[(rv2['MaxAfst']==0) & (rv2['FactorV']>limcat)  ].groupby('GrpExpl').agg(['count']).reset_index()
     bigmotl = list( bigmotd['GrpExpl'])
 #    print(bigmotl)
-    stelafst =100.0
+    
     rv2['MaxAfst']=np.where(rv2['MaxAfst']==0 ,stelafst ,rv2['MaxAfst'])
 #    rv2['MaxAfst']=rv2['MaxAfst'] * np.where(rv2['GeoInd']=='AankPC',1,1.02)
     rv2['Qafst']=1/(1/(rv2['MaxAfst']  *0+1e10) +1/ (np.power(rv2['MaxAfst'] ,1.8) *2e8 ))
     rv2['linpmax'] = rv2['FactorEstNAL']/ rv2['FactorEstAL']
     rv2['linpch']= rv2['FactorEst']/ rv2['FactorEstAL']
     rv2['drat']= rv2['FactorV']/ rv2['FactorEstAL']
+    rv2['DiffS2']= np.where(rv2['DiffS2']< rv2['FactorEstNAL']/100 ,np.nan,  rv2['DiffS2'])
 
-    rvs = rv2[np.isin(rv2['GrpExpl'],bigmotl)]
+    rvs = rv2[np.isin(rv2['GrpExpl'],bigmotl)].copy()
 #    rv2['MotiefV']=rv2['MotiefV'].astype(int).astype(str)
     fig, ax = plt.subplots(figsize=(12, 6))
     
@@ -575,8 +757,16 @@ def pltmotdistgrp (mydati,horax,vertax,vnsep):
 #        seaborn.lineplot(data=rvs,x=horax,   y='Qafst',ax=ax)
     elif(vertax=='linpch'):
         seaborn.scatterplot(data=rvs,x=horax,y='drat',hue='huecol',ax=ax)
-        ax.axhline(0.5)
+        ax.axhline(0.5,alpha=0.3)
         seaborn.lineplot(data=rvs,x=horax,   y='linpch',hue='huecol',ax=ax)
+    elif(vertax=='DiffS2'):
+#        ax.axhline(0.0)
+        seaborn.scatterplot(data=rvs,x=horax,   y=vertax,hue='huecol',ax=ax)
+        seaborn.lineplot(data=rvs,x=horax,   y=horax,hue='huecol',ax=ax,alpha=0.3)
+        ax.set_yscale('log')
+    else:
+        seaborn.scatterplot(data=rvs,x=horax,   y=vertax,hue='huecol',ax=ax)
+        
     ax.set_xscale('log')
 #    ax.set_yscale('log')
     # Put a legend to the right of the current axis
@@ -591,15 +781,22 @@ ov=pltmotdistgrp(fitdatverplgr[fitdatverplgr['MotiefV']==1],'MaxAfst','FactorEst
 
 ov=pltmotdistgrp(fitdatverplgr,'linpmax','linpch',False)
 
+ov=pltmotdistgrp(fitdatverplgr[fitdatverplgr['MotiefV']==7],'linpmax','linpch',True)
+
+ov=pltmotdistgrp(fitdatverplgr[fitdatverplgr['MotiefV']==8],'linpmax','linpch',True)
+
+ov=pltmotdistgrp(fitdatverplgr[fitdatverplgr['MotiefV']==8],'FactorEstNAL','DiffS2',True)
+
 ov=pltmotdistgrp(fitdatverplgr,'MaxAfst','linpch',False)
 
+ov=pltmotdistgrp(fitdatverplgr,'linpmax','DiffS2',False)
 
-def calcchidgrp (mydati):
+
+def calcchidgrp (mydati,opdel):
     mydat=pd.DataFrame(mydati)
     mydat['chisq'] = mydat['DiffEst'] ** 2
     mydat['insq'] = mydat['FactorV'] ** 2
     csel=['chisq','insq']
-    opdel=['MaxAfst','GeoInd']
     rv= mydat.groupby (opdel)[csel].agg(['sum']).reset_index()
     rv.columns=opdel+csel
     rv['ChiRat'] = rv['chisq']/ rv['insq']
@@ -612,8 +809,8 @@ def calcchidgrp (mydati):
     rv2['EstRat'] = rv2['FactorEst']/ rv2['FactorV']
     rv=rv.merge(rv2,how='left')
     return rv
-calcchidgrp(fitdatverplgr)
+calcchidgrp(fitdatverplgr,['MaxAfst','GeoInd'])
 
-
+calcchidgrp(fitdatverplgr,['MotiefV','GeoInd']).sort_values(['ChiRat'])
 
 

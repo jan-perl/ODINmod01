@@ -160,7 +160,7 @@ rudifungcache = getcachedgrids(rudifungrid)
 useKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01uKA.pkl")
 xlatKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01xKA.pkl")
 #was<20
-useKAfstV  = useKAfstVa [useKAfstVa ["MaxAfst"] <180].copy()
+useKAfstV  = useKAfstVa [useKAfstVa ["MaxAfst"] <80].copy()
 maxcuse= np.max(useKAfstV[useKAfstV ["MaxAfst"] !=0] ['KAfstCluCode'])
 xlatKAfstV  = xlatKAfstVa [(xlatKAfstVa['KAfstCluCode']<=maxcuse ) |
                            (xlatKAfstVa['KAfstCluCode']==np.max(useKAfstV[ 'KAfstCluCode']) )].copy()
@@ -277,6 +277,16 @@ def convfiets2dsc(image,kern1,scale,kernnorm,bdimi):
         return rv 
 
 
+# +
+def calccombiloop(R,F,outdfadd,filtarea,pc4lst):
+        for lkey in R.keys():
+            outdfadd["M_"+ lkey +"_" + "OA" ] = outdfadd["M_"+ lkey +"_" + "AL" ] * filtarea
+            for okey in ('OW','OO','OM'):
+                lvals = rasteruts1.sumpixarea(pc4lst,np.multiply(R[lkey],F[okey]))
+                colnam="M_"+ lkey +"_" + okey
+#                print(colnam,(lvals[np.isnan(lvals)]))
+                outdfadd[colnam] = lvals   
+    
 #eerst een dataframe dat
 #2) per lengteschaal, en PC variabelen eerst geografisch sommeert dan waarde ophaalt per punt
 #   bijv BAM BAT of  (BAM*BAT)/(BAM+BAT)
@@ -297,6 +307,7 @@ def mkgeoschparafr (pc4data,pc4grid,rudigrid,myKAfstV,pu,ss):
     outdfst= outdf.copy()
     
     R=dict()
+    F=dict()
 #    R_LW= rudifungrid.read(3)
 #    R_LT= rudifungrid.read(5)
     R_LW= rudigrid[3]
@@ -308,6 +319,17 @@ def mkgeoschparafr (pc4data,pc4grid,rudigrid,myKAfstV,pu,ss):
     R['LO'] =  R_LO
 #    R['LM'] =  (R_LO* R_LW) / (R_LO + R_LW+1e-10)
 
+#    filtarea = np.power(np.sum((R_LW + R_LO)!=0)*1e-6,pu['OA'])
+    #deze grootte past bij ca 80 km
+#    print (('filtarea dist used ',np.sqrt(filtarea)))
+    maxkm=200
+    filtarealand = np.power(maxkm* maxkm*1e-4,pu['OA'])
+#    print (('filtarea dist maxc ',np.sqrt(filtarea)))
+    filtarea = filtarealand 
+    
+    R_LW_land= np.sum(R_LW)
+    R_LO_land= np.sum(R_LO)
+
     for lkey in R.keys():
         lvals = rasteruts1.sumpixarea(pc4lst,R[lkey])
         colnam="M_"+ lkey +"_AL"
@@ -318,13 +340,11 @@ def mkgeoschparafr (pc4data,pc4grid,rudigrid,myKAfstV,pu,ss):
         outdf[colnam] = 0
 #                print(colnam,(lvals[np.isnan(lvals)]))
 
+        F['OW'] =  R[lkey]*0+1
+        F['OO'] =  F['OW']  
+        F['OM'] =  F['OW'] / (1+1e-10)
+    calccombiloop(R,F,outdf,filtarea/filtarealand,pc4lst)
         
-        for okey in ('OW','OO','OM'):
-            colnam="M_"+ lkey +"_" + okey
-#            print(colnam)
-            outdf[colnam] = 0*lvals            
-    R_LW_land= np.sum(R_LW)
-    R_LO_land= np.sum(R_LO)
     bdim=8
     lastscale=1
     R_LW_s = R_LW.copy()
@@ -344,7 +364,6 @@ def mkgeoschparafr (pc4data,pc4grid,rudigrid,myKAfstV,pu,ss):
         filt=rasteruts1.roundfilt(100*cscale,1000*row["MaxAfst"])
         filtarea = np.power(cscale*cscale*np.sum(filt)*1e-6,pu['OA'])
         
-        F=dict()
         tstart= time.perf_counter()
         F_OW_s = rasteruts1.convfiets2d(R_LW_s, filt,bdim) /R_LW_land
         F_OT_s = rasteruts1.convfiets2d(R_LT_s, filt,bdim) /R_LO_land
@@ -358,16 +377,9 @@ def mkgeoschparafr (pc4data,pc4grid,rudigrid,myKAfstV,pu,ss):
         F['OW'] =  F_OW  
         F_OO =  F_OT- F_OW        
         F['OO'] =  F_OO 
-        F['OM'] =  (F_OO* F_OW) / (F_OO + F_OW+1e-10)
+        F['OM'] =  (F_OO* F_OW) / ((F_OO + F_OW)*0.5+1e-10)
         print ((row["KAfstCluCode"], row["MaxAfst"], filt.shape , tend-tstart, " seconds") ) 
-        
-        for lkey in R.keys():
-            outdfadd["M_"+ lkey +"_" + "OA" ] = outdfadd["M_"+ lkey +"_" + "AL" ] * filtarea
-            for okey in ('OW','OO','OM'):
-                lvals = rasteruts1.sumpixarea(pc4lst,np.multiply(R[lkey],F[okey]))
-                colnam="M_"+ lkey +"_" + okey
-#                print(colnam,(lvals[np.isnan(lvals)]))
-                outdfadd[colnam] = lvals            
+        calccombiloop(R,F,outdfadd,filtarea/filtarealand,pc4lst)
         
         outdf=outdf.append(outdfadd)
     if debug:
@@ -379,6 +391,7 @@ geoschpc4allQQ=mkgeoschparafr(cbspc4data,pc4inwgcache,rudifungcache,useKAfstVQ,e
 #en inspecteer voorbeeld
 geoschpc4allQQ[geoschpc4allQQ['PC4']==3991]
 
+# -
 
 sstepsd=np.array([[3.5,2],[14.0,4], [39.0,8]])
 print(sstepsd)
@@ -390,6 +403,8 @@ geoschpc4allQ[geoschpc4allQ['PC4']==3991]
 geoschpc4allQQ[geoschpc4allQQ['PC4']==3991]/ geoschpc4allQ[geoschpc4allQ['PC4']==3991]
 
 geoschpc4all=mkgeoschparafr(cbspc4data,pc4inwgcache,rudifungcache,useKAfstV,expdefs,sstepsd)
+
+geoschpc4all[geoschpc4all['PC4']==3991]
 
 
 # +
@@ -443,8 +458,6 @@ if False:
 
 #het inlezen van odinverplgr loopt in deze versie via ODINcatVNuse
 import ODINcatVNuse
-
-import estsatmod
 
 print(useKAfstV) 
 maskKAfstV= list(useKAfstV['KAfstCluCode'])
@@ -816,6 +829,7 @@ len(indatverplpc4gr)
 indatverplmxigr = mkdfverplxypc4 (odinverplmxigr ,fitgrps,'Motief en isnaarhuis',
                                 useKAfstV,xlatKAfstV,geoschmixpMotief,2.0).merge(useKAfstV,how='left')
 indatverplmxigr.to_pickle("../intermediate/indatverplmxigr_ini.pkl") 
+indatverplmxigr.dtypes
 #MLlen(indatverplmxigr)
 
 #indatverplmxigr is een excel baar overzicht met afstands overzichten per motief, gesommeerd over het land
@@ -825,6 +839,9 @@ indatverplmxigr.to_pickle("../intermediate/indatverplmxigr_ini.pkl")
 #en run het daarna apart op gefilterde data
 #indatverplmxigr
 
+
+#only import after writing intermediate file -> avoid deadlocks
+import estsatmod
 
 #M_LW_AL, M_LO_AL zou uiteindelijk voor landelijke schatting alleen afhankelijk moeten zijn van excluded PCs
 #Voor vergelijking met de data moet je aannemen dat als een PC mist in de oorspronkelijke data
