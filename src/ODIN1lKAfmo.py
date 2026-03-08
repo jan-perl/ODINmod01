@@ -203,7 +203,7 @@ def mkfietswijk3pc4(pc4data,pc4grid,rudigrid):
 fietswijk3pc4=mkfietswijk3pc4(cbspc4data,pc4inwgcache,rudifungcache)
 bd=fietswijk3pc4 [abs(fietswijk3pc4['aantal_inwoners_d2'] ) > 1 ]
 
-expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0}
+expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0,'SP':1.0}
 
 
 # +
@@ -832,12 +832,12 @@ indatverplmxigr.to_pickle("../intermediate/indatverplmxigr_ini.pkl")
 indatverplmxigr.dtypes
 #MLlen(indatverplmxigr)
 
-#indatverplmxigr is een excel baar overzicht met afstands overzichten per motief, gesommeerd over het land
+# indatverplmxigr is een excel baar overzicht met afstands overzichten per motief, gesommeerd over het land
 # en niet gefilterd
-#daarmee is dit formaat de basis voor gedrags schatters
-#maak apart klein werkboek dat deze optmaliseert en parameters extract
-#en run het daarna apart op gefilterde data
-#indatverplmxigr
+# daarmee is dit formaat de basis voor gedrags schatters
+# maak apart klein werkboek dat deze optmaliseert en parameters extract
+# en run het daarna apart op gefilterde data
+# indatverplmxigr
 
 
 #only import after writing intermediate file -> avoid deadlocks
@@ -950,7 +950,8 @@ paratab
 fitdatverplgr.groupby (['MotiefV','isnaarhuis','GeoInd','MaxAfst']).agg('mean')
 
 # +
-estsatmod.getmaxafstadmax(ODINcatVNuse. odindiffflginfo, ODINcatVNuse.landcod,useKAfstV)
+##deze routine wordt niet meer gebruikt
+#estsatmod.getmaxafstadmax_old(ODINcatVNuse. odindiffflginfo, ODINcatVNuse.landcod,useKAfstV)
 
 # hier komen waarden uit ONDER binstm. Dat is niet goed.
 
@@ -1574,6 +1575,8 @@ stQ
 #stQa
 # -
 print("Finished")
+
+
 
 
 

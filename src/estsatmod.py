@@ -67,6 +67,12 @@ from numba.decorators import jit
 #het inlezen van odinverplgr loopt in deze versie via ODINcatVNuse
 #ODINcatVNuse zorgt ook voor defaults
 #import ODINcatVNuse
+# -
+
+#global version for consistency
+#version 1: cutoff old
+#version 3: cutoff new
+esmalgversion=8
 
 # +
 #gebruik wat globale waarden, zoals in ODIN1lKAfmo.py
@@ -79,6 +85,7 @@ if False:
     useKAfstV  = useKAfstVa [useKAfstVa ["MaxAfst"] <180].copy()
 
 fitgrps=['MotiefV','isnaarhuis']
+#SP tussen 0.3 en 1 per motief
 expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0,'SP' :1.0}
 
 indatverplmxigr=pd.read_pickle("../intermediate/indatverplmxigr_ini.pkl") 
@@ -115,12 +122,6 @@ indatverplmxigr [(indatverplmxigr ['FactorV']>0 ) ==False]
 # +
 #alleen eerste kolom vergelijken. de M_ velden zitten niet in deze database
 #no data showtotmot(odinverplgr,False)
-# -
-
-#global version for consustency
-#version 1: cutoff old
-#version 3: cutoff new
-esmalgversion=5
 
 # +
 #daarom verder met kolommen met een F_ (filtered)
@@ -366,60 +367,72 @@ cut2=  choose_cutoffv6(indatverplmxigr,fitgrps,False,0,'mxigrp',expdefs)
 
 
 # +
+def satfunc(v_AL,v_in,pu):
+        satpwr = pu['SP']
+        val=  np.power( (np.power(v_in ,-satpwr ) +  np.power(v_AL ,-satpwr) ), -1/satpwr )  
+        return val
+
+def satinvfunc(v_AL,val,pu):
+        satpwr = pu['SP']
+        badval=val > v_AL
+        wgt= np.where (badval,0,np.power((v_AL-val)/v_AL,satpwr+1) )
+        v_in=np.where (badval,0,
+            np.power( (np.power(val ,-satpwr ) -  np.power(v_AL ,-satpwr) ), -1/satpwr )  )
+        return(wgt,v_in)
+
+#while this is still symmetric    
+def satinvfuncAL(v_in,val,pu):
+        return satinvfunc(v_in,val,pu)    
+
+
+# +
 #fit AL alleen op indat['MaxAfst']==0. Deze waarde blijft gelijk voor asymptoot
 #gebruik asymptoot in ronde 2 voor correcties
 
 def choose_cutoffv8(indat,pltgrps,hasfitted,prevrres,grpind,pu):
-    curvpwr = pu['CP']
-    satpwr = pu['SP']
+    curvpwr = pu['CP']    
     outframe=indat[[grpind,'GrpExpl','MaxAfst','KAfstCluCode','GeoInd' ] +pltgrps].copy(deep=False)
-    minwgt=.5
+    minwgt=.25   
+
     recisAL=indat['MaxAfst']==0
-
-
     if 1==1:
+        outframe['FactorVP'] =np.power(indat['FactorV'],curvpwr)
         wval1= indat[recisAL] [['FactorV',grpind,'GeoInd'] +pltgrps].copy(deep=False)
-        wval1= wval1.rename(columns={'FactorV':'EstVPAL'})
-        wval1['EstVPAL'] =np.power(wval1['EstVPAL'],curvpwr)
+        wval1= wval1.rename(columns={'FactorV':'LimVPAL'})
+        wval1['LimVPAL'] =np.power(wval1['LimVPAL'],curvpwr)
         outframe=outframe.merge(wval1,how='left')
-        outframe['EstVP']  =np.power(indat['FactorV'],curvpwr)
-        outframe['ALsafe'] = np.where (recisAL,1,0)      
-        outframe['FactorVFAL'] = np.where (recisAL,indat['FactorV'],  0 )               
-
     if hasfitted:
 #        outframe['ALsafe'] = (prevrres['FactorEstNAL'] > 5.0 * prevrres['FactorEstAL'] ) | (outframe['MaxAfst']==0) 
 #        outframe['osafe']  = (prevrres['FactorEstNAL'] < 0.2 * prevrres['FactorEstAL'] ) & (outframe['MaxAfst']!=0)
         outframe['EstVPAL']  =np.power(prevrres['FactorEstAL'],curvpwr)
         outframe['EstVPo']   =np.power(prevrres['FactorEstNAL'],curvpwr)
         outframe['EstVP']    =np.power(prevrres['FactorEst'],curvpwr)
-        s2al = outframe['EstVPAL'] 
-        
-        outframe['ValS2'] = np.where(indat['FactorV']>0, 
-            np.power( (np.power(indat['FactorV'] ,-satpwr ) -  np.power(s2al,-satpwr) ),
-                       -1/satpwr ) ,0)
-
+        (wgt_est,v_in_est) = satinvfunc (outframe['EstVPAL'] , outframe['FactorVP'] ,pu)
+        (wgt_lim,v_in_lim) = satinvfunc (outframe['LimVPAL'] , outframe['FactorVP'] ,pu)
+        (wgt_al,v_al_est) =  satinvfunc (outframe['EstVPo'] , outframe['FactorVP'] ,pu)
+#voor diagnostiek      
+        outframe['NormS2'] = v_in_est
     else: 
-#        outframe['EstVPo'] =np.where (recisAL,1e20,1e-9 )    
+#bootstrap by selecting smaller FactorVs within the grpind        
+        outframe['EstVP']  =np.power(indat['FactorV'],curvpwr)
+        outframe['EstVPAL']  =outframe['LimVPAL'] 
         outframe['EstVPo'] =1.0
-        outframe['EstVPo'] =np.where (recisAL,1e20*outframe['EstVPo'],1e-9 *outframe['EstVPo']) 
+        outframe['EstVPo'] =np.where (recisAL,1e20*outframe['EstVPo'],1e-9 *outframe['EstVPo'])        
+    if hasfitted:
+        wgt_est = wgt_est*wgt_lim
+        outframe['osafe'] = np.where(wgt_est>minwgt*minwgt, wgt_est,0)
+        outframe['FactorVFo'] = np.where(outframe['osafe'] >0, v_in_est,0)        
+        outframe['FactorVFAL'] = v_al_est
+        outframe['ALsafe'] = np.where(recisAL,wgt_al ,0)
+    else:
+        (wgt_est,v_in_est) = satinvfunc (outframe['EstVPAL'] , outframe['FactorVP'] ,pu)
+        outframe['osafe'] = np.where(wgt_est>minwgt, wgt_est,0)
+        outframe['FactorVFo'] = np.where(outframe['osafe'] >0, v_in_est,0)        
+        outframe['FactorVFAL'] = outframe['FactorVP'] 
+        outframe['ALsafe'] = np.where(recisAL,np.where( (outframe['FactorVFAL'] !=0),1,1e-3),0)
     if 1==1:
-        outframe['FactorVP'] =np.power(indat['FactorV'],curvpwr)
-        denomo= np.where (outframe['EstVPAL'] >0,1/outframe['EstVPAL'],0)
-        outframe['EstVP'] = outframe['FactorVP']
-        outframe['osafe'] = np.where( outframe['EstVP'] * denomo <=0,0, np.power(
-                             outframe['EstVP']*denomo,  curvpwr+1) )  
-        valfact = indat['FactorV']>0
-        outframe['osafe'] =np.where (outframe['FactorVP']  *denomo <minwgt,0,valfact )       
-#        outframe['FactorVFo'] = np.where(outframe['EstVP']* denomo <=0,0, 
-#                            np.power(denomo ,-1/curvpwr))
-        if hasfitted&0:
-            outframe['FactorVFo'] = outframe['ValS2'] 
-        else:
-            outframe['FactorVFo'] = indat['FactorV'] 
-#    *outframe['FactorVFo'] /outframe['EstVP'] 
-           
-        outframe['osafe'] = (outframe['osafe'] !=0) *(1-recisAL)
-
+        outframe['osafe'] = np.where((outframe['FactorVFo'] < (minwgt * outframe['EstVPAL'] )) & \
+                                 (outframe['FactorVFo'] !=0) &  outframe['osafe'] ,1,0) *(1-recisAL)
     if 1==1:
         if np.sum(outframe['osafe'] * outframe['ALsafe']) !=0:
             raise ("Error: overlapping fits")
@@ -439,6 +452,7 @@ def choose_cutoffv8(indat,pltgrps,hasfitted,prevrres,grpind,pu):
         print( ( np.sum(outframe['ALsafe']),np.sum(outframe['osafe']),
                  np.max(outframe['ALsafe']),np.max(outframe['osafe'])) )
     return outframe
+
 
 def choose_cutoff(indat,pltgrps,hasfitted,prevrres,grpind,curvpwr):
     if esmalgversion in esmalgversionscoold:
@@ -468,7 +482,7 @@ def fitinddiag(fitdf,motiefc,naarhuisc,geoindex,grpind,pu):
     pldf=    seldf[['osafe','ALsafe']].copy()
     pldf['FactorVPrel'] =    seldf['FactorVP'] /  seldf['EstVPAL']  
     sumchk = np.power (np.power(seldf['FactorVFo'],-curvpwr) + 
-                       np.power(seldf['FactorVFAL'] ,-curvpwr) , -curvpwr )
+                       np.power(seldf['FactorVFAL'] ,-curvpwr) , -1/curvpwr )
     pldf['FactorVSrel'] = sumchk /  seldf['FactorVP']
     pldf['FactorVFoCor'] =   np.where(seldf['osafe']==0,-.1,
                                       seldf['FactorVFo'] /  seldf['FactorVP']  )
@@ -545,8 +559,7 @@ def setlandcols(outdf,colvacols2,pu ):
 
 #neem de parameters , en voorspel
 #neem ook landelijke normalisatie mee
-def predict_values(indf,topreddf,pltgrp,rf,pu,stobijdr):
-    satpwr = pu['SP']
+def predict_values(indf,topreddf,pltgrp,rf,pu,stobijdr):    
 #    indf = indf[(indf['MaxAfst']!=95.0) & (indf[pltgrp]<3) ]
     debug=False
     outdf = topreddf.merge(rf,how='left')
@@ -591,15 +604,12 @@ def predict_values(indf,topreddf,pltgrp,rf,pu,stobijdr):
     if (debug ):
         print (outdf[['FactorEstAL','FactorEstNAL']])
     #s2ch= np.min( (np.where((s2==0),s2al,s2 ), np.where((s2al==0),s2,s2al ) ) ,axis=0)
-    s2ch= np.where((s2<=0),np.where(outdf['MaxAfst']==0, s2al,0), 
-                           np.where((s2al==0),s2,
-                           np.power ((np.power(s2,-satpwr) + np.power(s2al,-satpwr)), 
-                                     -1/satpwr )) )
+    #was s2ch= np.where(outdf['MaxAfst']==0, s2al,  np.where((s2<=0),0,  satfunc(s2al,s2,pu) ) )
+    s2ch=  np.where((s2<=0),0,  satfunc(s2al,s2,pu) ) 
     outdf['FactorEst'] = s2ch
     outdf['DiffEst'] = np.where(outdf['FactorV']>0, outdf['FactorV']-s2ch,np.nan)
-    outdf['DiffS2'] = np.where(outdf['FactorV']>0, 
-            np.power( (np.power(outdf['FactorV'] ,-satpwr ) -  np.power(s2al,-satpwr) ),
-                       -1/satpwr )-s2 ,np.nan)
+    (wgt_rec,v_in_rec) = satinvfunc (s2al, outdf['FactorV'] ,pu)
+    outdf['DiffS2'] = np.where(wgt_rec<=0, np.nan,s2-v_in_rec  )
     if (debug):
         print (outdf[['FactorEstAL','FactorEstNAL','FactorEst','DiffS2']])
     if stobijdr:
@@ -617,11 +627,148 @@ fitdatverplgr = predict_values(cut2,indatverplmxigr,fitgrps,fitpara,expdefs,Fals
 #fitdatverplgr = dofitdatverplgr(cut2,indatverplmxigr,fitgrps,expdefs)
 fitdatverplgrx = fitdatverplgr[abs(fitdatverplgr["DiffEst"])> 2e6] 
 seaborn.scatterplot(data=fitdatverplgrx,x="FactorEst",y="DiffEst",hue="GeoInd")
+
+
+# +
+def diagdtaAL(indat,pltgrps,hasfitted,prevrres,grpind,curvpwr):
+    recisAL=(indat['MaxAfst']==0 ) & ((indat['FactorV']!=0 ) )
+    outframe=indat.copy(deep=False)
+    curvpwr=1 #unused
+    outframe['EstVPAL']  =np.power(prevrres['FactorEstAL'],curvpwr)
+    outframe['EstVPo']   =np.power(prevrres['FactorEstNAL'],curvpwr)
+    outframe['EstVP']    =np.power(prevrres['FactorEst'],curvpwr)
+    xaxval='EstVPAL'
+    outframe['FactVrat']  = outframe['FactorV']  / outframe[xaxval]  
+    ALframe= outframe[recisAL].copy(deep=False)
+    fig, ax = plt.subplots(figsize=(12, 6))
+    seaborn.scatterplot(data=ALframe,x=xaxval,y="FactVrat",hue="GeoInd",ax=ax)
+    hlpos=2.5
+    ax.axhline(hlpos,alpha=0.3)
+    ax.axhline(1/hlpos,alpha=0.3)
+    ax.set_yscale('log')
+    ax.set_xscale('log')
+    ax.set_title('total volume per area estimates (using AL): FactorV/ '+xaxval)
+#    ax.set_yscale('log')
+    # Put a legend to the right of the current axis
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    retcols=fitgrps+[grpind,'GrpExpl','GeoInd',xaxval,'FactorV','FactVrat']
+    extr= (ALframe['FactVrat'] > hlpos) | (ALframe['FactVrat']<1/ hlpos) 
+    return ALframe[extr][retcols]
+
+diagdtaAL(indatverplmxigr,fitgrps,True,fitdatverplgr,'mxigrp',expdefs)     
+
+
+# +
+def diagdtaSF(indat,pltgrps,hasfitted,prevrres,grpind,curvpwr):
+    recisAL=(indat['MaxAfst']==0 ) & ((indat['FactorV']!=0 ) )
+    outframe=indat.copy(deep=False)
+    curvpwr=1 #unused
+    outframe['EstVPAL']  =np.power(prevrres['FactorEstAL'],curvpwr)
+    outframe['EstVPo']   =np.power(prevrres['FactorEstNAL'],curvpwr)
+    outframe['EstVP']    =np.power(prevrres['FactorEst'],curvpwr)
+    xaxval='EstVPAL'
+    outframe['FactVrat']  = outframe['FactorV']  / outframe[xaxval]  
+    ALframe= outframe[recisAL].copy(deep=False)
+    fig, ax = plt.subplots(figsize=(12, 6))
+    seaborn.scatterplot(data=ALframe,x=xaxval,y="FactVrat",hue="GeoInd",ax=ax)
+    hlpos=2.5
+    ax.axhline(hlpos,alpha=0.3)
+    ax.axhline(1/hlpos,alpha=0.3)
+    ax.set_yscale('log')
+    ax.set_xscale('log')
+    ax.set_title('total volume per area estimates (using AL): FactorV/ '+xaxval)
+#    ax.set_yscale('log')
+    # Put a legend to the right of the current axis
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    retcols=fitgrps+[grpind,'GrpExpl','GeoInd',xaxval,'FactorV','FactVrat']
+    extr= (ALframe['FactVrat'] > hlpos) | (ALframe['FactVrat']<1/ hlpos) 
+    return ALframe[extr][retcols]
+
+diagdtaSF(indatverplmxigr,fitgrps,True,fitdatverplgr,'mxigrp',expdefs) 
 # -
+
+fitdatverplgr.dtypes
+
+
+# +
+#mogelijk: maxafst joinen uit diffdata
+
+def pltmotdistgrp (mydati,horax,vertax,vnsep):
+    stelafst =195.0 # afstand waar maxbin wordt geplaatst
+    mydat=pd.DataFrame(mydati)    
+    opdel=['MaxAfst','GeoInd','MotiefV','GrpExpl']
+#    mydat['FactorEst2'] = np.where(mydat['FactorEstNAL']==0,0, 
+#                                 1/ (1/mydat['FactorEstAL'] + 1  /mydat['FactorEstNAL'] ) )
+    fsel=['FactorEst','FactorV', 'FactorEstNAL','FactorEstAL','DiffS2']
+
+    rv2= mydat.groupby (opdel)[fsel].agg(['sum']).reset_index()
+#    print ( rv2[ (rv2['MotiefV']==1) & (rv2['MaxAfst']==0) ] ) 
+    rv2.columns=opdel+fsel
+    if(vertax=='FactorEst'):
+        limcat=2e9
+    else:
+        limcat=1e9
+    bigmotd= rv2[(rv2['MaxAfst']==0) & (rv2['FactorV']>limcat)  ].groupby('GrpExpl').agg(['count']).reset_index()
+    bigmotl = list( bigmotd['GrpExpl'])
+#    print(bigmotl)
+    
+    rv2['MaxAfst']=np.where(rv2['MaxAfst']==0 ,stelafst ,rv2['MaxAfst'])
+#    rv2['MaxAfst']=rv2['MaxAfst'] * np.where(rv2['GeoInd']=='AankPC',1,1.02)
+    rv2['Qafst']=1/(1/(rv2['MaxAfst']  *0+1e10) +1/ (np.power(rv2['MaxAfst'] ,1.8) *2e8 ))
+    rv2['linpmax'] = rv2['FactorEstNAL']/ rv2['FactorEstAL']
+    rv2['linpch']= rv2['FactorEst']/ rv2['FactorEstAL']
+    rv2['drat']= rv2['FactorV']/ rv2['FactorEstAL']
+    rv2['DiffS2']= np.where(rv2['DiffS2']< rv2['FactorEstNAL']/100 ,np.nan,  rv2['DiffS2'])
+
+    rvs = rv2[np.isin(rv2['GrpExpl'],bigmotl)].copy()
+#    rv2['MotiefV']=rv2['MotiefV'].astype(int).astype(str)
+    fig, ax = plt.subplots(figsize=(12, 6))
+    
+#    print ( rvs[ (rvs['MotiefV']==1) & (rvs['MaxAfst']== stelafst) ] ) 
+    
+    rvs['huecol'] = rvs['GrpExpl']
+    if vnsep:
+        rvs['huecol'] = rvs['huecol'] + ' ' + rvs['GeoInd']
+    if(vertax=='FactorEst'):
+        seaborn.scatterplot(data=rvs,x=horax,y='FactorV',hue='huecol',ax=ax)
+        seaborn.lineplot(data=rvs,x=horax,   y='FactorEst',hue='huecol',ax=ax)
+#Qafst nooit zomaar plotten: ggeft grote verwarring !
+#        seaborn.lineplot(data=rvs,x=horax,   y='Qafst',ax=ax)
+    elif(vertax=='linpch'):
+        seaborn.scatterplot(data=rvs,x=horax,y='drat',hue='huecol',ax=ax)
+        ax.axhline(0.5,alpha=0.3)
+        seaborn.lineplot(data=rvs,x=horax,   y='linpch',hue='huecol',ax=ax)
+    elif(vertax=='DiffS2'):
+#        ax.axhline(0.0)
+        seaborn.scatterplot(data=rvs,x=horax,   y=vertax,hue='huecol',ax=ax)
+        seaborn.lineplot(data=rvs,x=horax,   y=horax,hue='huecol',ax=ax,alpha=0.3)
+        ax.set_yscale('log')
+    else:
+        seaborn.scatterplot(data=rvs,x=horax,   y=vertax,hue='huecol',ax=ax)
+        
+    ax.set_xscale('log')
+#    ax.set_yscale('log')
+    # Put a legend to the right of the current axis
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    figname = "../output/gplo_fmdg_"+"horax"+"_"+vertax+"_"+'G1.svg';
+    fig.savefig(figname, bbox_inches="tight") 
+    return (rv2)
+ov=pltmotdistgrp(fitdatverplgr,'MaxAfst','FactorEst',False)
+# -
+
+ov=pltmotdistgrp(fitdatverplgr,'MaxAfst','linpch',False)
 
 cut3=  choose_cutoff(indatverplmxigr,fitgrps,True,fitdatverplgr,'mxigrp',expdefs)  
 #cut3=  choose_cutoff(indatverplgr,fitgrps,True,fitdatverplgr,expdefs)  
 #cut3
+
+def selrecs(c3in):    
+    rv= c3in[fitgrps+['MaxAfst','GeoInd']+['FactorVP','EstVPAL','NormS2','FactorVF']].copy(deep=False)
+    rv['r1']=rv['FactorVP']/rv['EstVPAL']
+    rv['r2']=rv['FactorVP']/rv['NormS2']
+    return rv
+#selrecs(cut3) 
+
 
 cut3[cut3[ 'FactorVFo']>1][[ 'FactorVFo']]
 
@@ -711,70 +858,6 @@ def getmaxafstadmax_old( dd, landcod,myKAfstV):
 # hier komen waarden uit ONDER binstm. Dat is niet goed.
 
 
-# +
-#mogelijk: maxafst joinen uit diifdata
-
-def pltmotdistgrp (mydati,horax,vertax,vnsep):
-    stelafst =195.0 # afstand waar maxbin wordt geplaatst
-    mydat=pd.DataFrame(mydati)    
-    opdel=['MaxAfst','GeoInd','MotiefV','GrpExpl']
-#    mydat['FactorEst2'] = np.where(mydat['FactorEstNAL']==0,0, 
-#                                 1/ (1/mydat['FactorEstAL'] + 1  /mydat['FactorEstNAL'] ) )
-    fsel=['FactorEst','FactorV', 'FactorEstNAL','FactorEstAL','DiffS2']
-
-    rv2= mydat.groupby (opdel)[fsel].agg(['sum']).reset_index()
-#    print ( rv2[ (rv2['MotiefV']==1) & (rv2['MaxAfst']==0) ] ) 
-    rv2.columns=opdel+fsel
-    if(vertax=='FactorEst'):
-        limcat=2e9
-    else:
-        limcat=1e9
-    bigmotd= rv2[(rv2['MaxAfst']==0) & (rv2['FactorV']>limcat)  ].groupby('GrpExpl').agg(['count']).reset_index()
-    bigmotl = list( bigmotd['GrpExpl'])
-#    print(bigmotl)
-    
-    rv2['MaxAfst']=np.where(rv2['MaxAfst']==0 ,stelafst ,rv2['MaxAfst'])
-#    rv2['MaxAfst']=rv2['MaxAfst'] * np.where(rv2['GeoInd']=='AankPC',1,1.02)
-    rv2['Qafst']=1/(1/(rv2['MaxAfst']  *0+1e10) +1/ (np.power(rv2['MaxAfst'] ,1.8) *2e8 ))
-    rv2['linpmax'] = rv2['FactorEstNAL']/ rv2['FactorEstAL']
-    rv2['linpch']= rv2['FactorEst']/ rv2['FactorEstAL']
-    rv2['drat']= rv2['FactorV']/ rv2['FactorEstAL']
-    rv2['DiffS2']= np.where(rv2['DiffS2']< rv2['FactorEstNAL']/100 ,np.nan,  rv2['DiffS2'])
-
-    rvs = rv2[np.isin(rv2['GrpExpl'],bigmotl)].copy()
-#    rv2['MotiefV']=rv2['MotiefV'].astype(int).astype(str)
-    fig, ax = plt.subplots(figsize=(12, 6))
-    
-#    print ( rvs[ (rvs['MotiefV']==1) & (rvs['MaxAfst']== stelafst) ] ) 
-    
-    rvs['huecol'] = rvs['GrpExpl']
-    if vnsep:
-        rvs['huecol'] = rvs['huecol'] + ' ' + rvs['GeoInd']
-    if(vertax=='FactorEst'):
-        seaborn.scatterplot(data=rvs,x=horax,y='FactorV',hue='huecol',ax=ax)
-        seaborn.lineplot(data=rvs,x=horax,   y='FactorEst',hue='huecol',ax=ax)
-#Qafst nooit zomaar plotten: ggeft grote verwarring !
-#        seaborn.lineplot(data=rvs,x=horax,   y='Qafst',ax=ax)
-    elif(vertax=='linpch'):
-        seaborn.scatterplot(data=rvs,x=horax,y='drat',hue='huecol',ax=ax)
-        ax.axhline(0.5,alpha=0.3)
-        seaborn.lineplot(data=rvs,x=horax,   y='linpch',hue='huecol',ax=ax)
-    elif(vertax=='DiffS2'):
-#        ax.axhline(0.0)
-        seaborn.scatterplot(data=rvs,x=horax,   y=vertax,hue='huecol',ax=ax)
-        seaborn.lineplot(data=rvs,x=horax,   y=horax,hue='huecol',ax=ax,alpha=0.3)
-        ax.set_yscale('log')
-    else:
-        seaborn.scatterplot(data=rvs,x=horax,   y=vertax,hue='huecol',ax=ax)
-        
-    ax.set_xscale('log')
-#    ax.set_yscale('log')
-    # Put a legend to the right of the current axis
-    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    figname = "../output/gplo_fmdg_"+"horax"+"_"+vertax+"_"+'G1.svg';
-    fig.savefig(figname, bbox_inches="tight") 
-    return (rv2)
-ov=pltmotdistgrp(fitdatverplgr,'MaxAfst','FactorEst',False)
 # -
 
 ov=pltmotdistgrp(fitdatverplgr[fitdatverplgr['MotiefV']==1],'MaxAfst','FactorEst',True)
