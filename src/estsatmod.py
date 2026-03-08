@@ -369,12 +369,15 @@ cut2=  choose_cutoffv6(indatverplmxigr,fitgrps,False,0,'mxigrp',expdefs)
 # +
 def satfunc(v_AL,v_in,pu):
         satpwr = pu['SP']
-        val=  np.power( (np.power(v_in ,-satpwr ) +  np.power(v_AL ,-satpwr) ), -1/satpwr )  
+        onezero=(v_in<=0) | (v_AL <=0)
+#        print(v_in[onezero])
+        val=  np.where (onezero,0,
+              np.power( (np.power(v_in +onezero,-satpwr ) +  np.power(v_AL+onezero ,-satpwr) ), -1/satpwr )  )
         return val
 
 def satinvfunc(v_AL,val,pu):
         satpwr = pu['SP']
-        badval=val > v_AL
+        badval=np.where(np.isnan(v_AL*val),1,  (val > v_AL) | (v_AL<=0))
         wgt= np.where (badval,0,np.power((v_AL-val)/v_AL,satpwr+1) )
         v_in=np.where (badval,0,
             np.power( (np.power(val ,-satpwr ) -  np.power(v_AL ,-satpwr) ), -1/satpwr )  )
@@ -392,7 +395,7 @@ def satinvfuncAL(v_in,val,pu):
 def choose_cutoffv8(indat,pltgrps,hasfitted,prevrres,grpind,pu):
     curvpwr = pu['CP']    
     outframe=indat[[grpind,'GrpExpl','MaxAfst','KAfstCluCode','GeoInd' ] +pltgrps].copy(deep=False)
-    minwgt=.25   
+    minwgt=.1   
 
     recisAL=indat['MaxAfst']==0
     if 1==1:
@@ -409,9 +412,11 @@ def choose_cutoffv8(indat,pltgrps,hasfitted,prevrres,grpind,pu):
         outframe['EstVP']    =np.power(prevrres['FactorEst'],curvpwr)
         (wgt_est,v_in_est) = satinvfunc (outframe['EstVPAL'] , outframe['FactorVP'] ,pu)
         (wgt_lim,v_in_lim) = satinvfunc (outframe['LimVPAL'] , outframe['FactorVP'] ,pu)
-        (wgt_al,v_al_est) =  satinvfunc (outframe['EstVPo'] , outframe['FactorVP'] ,pu)
+        EstVPoh  =np.where(outframe['EstVPo'] ==0, 1e4*outframe['FactorVP'],outframe['EstVPo'] )
+        (wgt_al,v_al_est) =  satinvfunc (EstVPoh , outframe['FactorVP'] ,pu)
+        
 #voor diagnostiek      
-        outframe['NormS2'] = v_in_est
+#        outframe['NormS2'] = v_in_est
     else: 
 #bootstrap by selecting smaller FactorVs within the grpind        
         outframe['EstVP']  =np.power(indat['FactorV'],curvpwr)
@@ -430,14 +435,20 @@ def choose_cutoffv8(indat,pltgrps,hasfitted,prevrres,grpind,pu):
         outframe['FactorVFo'] = np.where(outframe['osafe'] >0, v_in_est,0)        
         outframe['FactorVFAL'] = outframe['FactorVP'] 
         outframe['ALsafe'] = np.where(recisAL,np.where( (outframe['FactorVFAL'] !=0),1,1e-3),0)
-    if 1==1:
+    if 1==0:
         outframe['osafe'] = np.where((outframe['FactorVFo'] < (minwgt * outframe['EstVPAL'] )) & \
                                  (outframe['FactorVFo'] !=0) &  outframe['osafe'] ,1,0) *(1-recisAL)
     if 1==1:
+        outframe['osafe'] = np.where((outframe['osafe'] !=0) | recisAL | ( outframe['FactorVFo'] ==0),
+                                 outframe['osafe'] ,1e-10)        
         if np.sum(outframe['osafe'] * outframe['ALsafe']) !=0:
             raise ("Error: overlapping fits")
         outframe['FactorVF'] = (outframe['FactorVFo']*outframe['osafe'] +
                                 outframe['FactorVFAL'] * outframe['ALsafe'] )
+    if 0==1:
+        ofwithna= outframe[np.isnan(outframe['FactorVF'])]
+        print (ofwithna)
+    if 1==1:
         for lkey in ('LW','LO'):
             colnamAL ="M_"+ lkey +"_AL"
             colnamALo="F_"+ lkey +"_AL"
@@ -502,16 +513,20 @@ def fitinddiag(fitdf,motiefc,naarhuisc,geoindex,grpind,pu):
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 fitinddiag(cut2,10,5,'VertPC','mxigrp',expdefs)    
 
+pointspertype(cut2)
+
 
 # +
 def _regressgrp(indf, yvar, xvars,pcols):  
 #        reg_nnls = LinearRegression(fit_intercept=False )
-#        print(('o',len(indf)) )
         y_train=indf[yvar]
         X_train=indf[xvars]
+#        print(('o',len(indf),X_train.sum(),y_train.sum()) )
         if 1==1:
             #smask = ~ (np.isnan(y_train) | np.isnan(np.sum(X_train)) )
-            smask =  (y_train >0) & (np.sum(X_train,axis=1) >0) 
+            #smask = np.where(False== np.isnan(y_train) ,
+            #                  (y_train >0) & (np.sum(X_train,axis=1) >0) ,0)
+            smask = (y_train >0) & (np.sum(X_train,axis=1) >0)
             indf= indf[smask]
             y_train=indf[yvar]
             X_train=indf[xvars]
@@ -521,6 +536,7 @@ def _regressgrp(indf, yvar, xvars,pcols):
         if(len(indf)==0) :
             rv=np.zeros(len(xvars))
         else:
+#            print(('lr',len(indf),X_train.sum(),y_train.sum()) )
             fit1 = nnls(X_train, y_train)    
             rv=pd.DataFrame(fit1[0],index=pcols).T
         return(rv)
@@ -605,7 +621,7 @@ def predict_values(indf,topreddf,pltgrp,rf,pu,stobijdr):
         print (outdf[['FactorEstAL','FactorEstNAL']])
     #s2ch= np.min( (np.where((s2==0),s2al,s2 ), np.where((s2al==0),s2,s2al ) ) ,axis=0)
     #was s2ch= np.where(outdf['MaxAfst']==0, s2al,  np.where((s2<=0),0,  satfunc(s2al,s2,pu) ) )
-    s2ch=  np.where((s2<=0),0,  satfunc(s2al,s2,pu) ) 
+    s2ch=  satfunc(s2al,s2,pu) 
     outdf['FactorEst'] = s2ch
     outdf['DiffEst'] = np.where(outdf['FactorV']>0, outdf['FactorV']-s2ch,np.nan)
     (wgt_rec,v_in_rec) = satinvfunc (s2al, outdf['FactorV'] ,pu)
@@ -618,15 +634,16 @@ def predict_values(indf,topreddf,pltgrp,rf,pu,stobijdr):
 
 
 def _dofitdatverplgr(indf,topreddf,pltgrp,pu):
-    rf = fit_cat_parameters(indf,topreddf,pltgrp,pu)
+    rf = fit_cat_parameters(indf,topreddf,pltgrp,pu)    
     return predict_values(indf,topreddf,pltgrp,rf,pu,False)
 
 fitpara= fit_cat_parameters(cut2,indatverplmxigr,fitgrps,expdefs)
-fitdatverplgr = predict_values(cut2,indatverplmxigr,fitgrps,fitpara,expdefs,False)
-#fitdatverplgr = dofitdatverplgr(cut2,indatverplgr,fitgrps,expdefs)
-#fitdatverplgr = dofitdatverplgr(cut2,indatverplmxigr,fitgrps,expdefs)
-fitdatverplgrx = fitdatverplgr[abs(fitdatverplgr["DiffEst"])> 2e6] 
-seaborn.scatterplot(data=fitdatverplgrx,x="FactorEst",y="DiffEst",hue="GeoInd")
+if 1==1:
+    fitdatverplgr = predict_values(cut2,indatverplmxigr,fitgrps,fitpara,expdefs,False)
+    #fitdatverplgr = dofitdatverplgr(cut2,indatverplgr,fitgrps,expdefs)
+    #fitdatverplgr = dofitdatverplgr(cut2,indatverplmxigr,fitgrps,expdefs)
+    fitdatverplgrx = fitdatverplgr[abs(fitdatverplgr["DiffEst"])> 2e6] 
+    seaborn.scatterplot(data=fitdatverplgrx,x="FactorEst",y="DiffEst",hue="GeoInd")
 
 
 # +
@@ -760,7 +777,12 @@ ov=pltmotdistgrp(fitdatverplgr,'MaxAfst','linpch',False)
 
 cut3=  choose_cutoff(indatverplmxigr,fitgrps,True,fitdatverplgr,'mxigrp',expdefs)  
 #cut3=  choose_cutoff(indatverplgr,fitgrps,True,fitdatverplgr,expdefs)  
-#cut3
+cut3
+
+cutstrs=['GeoInd','GrpExpl']
+c3diff = cut3.drop(columns=cutstrs)-cut2.drop(columns=cutstrs)
+c3diff.to_excel("../output/chk-c3diff.xlsx")
+
 
 def selrecs(c3in):    
     rv= c3in[fitgrps+['MaxAfst','GeoInd']+['FactorVP','EstVPAL','NormS2','FactorVF']].copy(deep=False)
@@ -775,6 +797,8 @@ cut3[cut3[ 'FactorVFo']>1][[ 'FactorVFo']]
 # +
 #fitinddiag(cut3,10,5,'VertPC',p_CP)    
 # -
+
+pointspertype(cut3)
 
 #voor de time being, overschrijf de vorige selectie gegevens
 for r in range(2):
