@@ -86,7 +86,7 @@ if False:
 
 fitgrps=['MotiefV','isnaarhuis']
 #SP tussen 0.3 en 1 per motief
-expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0,'SP' :1.0}
+expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0,'SP' :0.5}
 
 indatverplmxigr=pd.read_pickle("../intermediate/indatverplmxigr_ini.pkl") 
 #MLlen(indatverplmxigr)
@@ -440,7 +440,8 @@ def choose_cutoffv8(indat,pltgrps,hasfitted,prevrres,grpind,pu):
         outframe['osafe'] = np.where(wgt_est>minwgt*minwgt, wgt_est,0)
         outframe['FactorVFo'] = np.where(outframe['osafe'] >0, v_in_est,0)        
         outframe['FactorVFAL'] = v_al_est
-        outframe['ALsafe'] = np.where(recisAL,wgt_al ,0)
+        #outframe['ALsafe'] = np.where(recisAL,wgt_al ,0)
+        outframe['ALsafe'] = np.where(wgt_al>minwgt,wgt_al ,0)
     else:
         (wgt_est,v_in_est) = satinvfunc (outframe['EstVPAL'] , outframe['FactorVP'] ,pu)
         outframe['osafe'] = np.where(wgt_est>minwgt, wgt_est,0)
@@ -453,6 +454,9 @@ def choose_cutoffv8(indat,pltgrps,hasfitted,prevrres,grpind,pu):
     if 1==1:
         outframe['osafe'] = np.where((outframe['osafe'] !=0) | recisAL | ( outframe['FactorVFo'] ==0),
                                  outframe['osafe'] ,1e-10)        
+        bothmask=(outframe['osafe'] * outframe['ALsafe']==0)
+        outframe['osafe'] *=bothmask
+        outframe['ALsafe'] *=bothmask
         if np.sum(outframe['osafe'] * outframe['ALsafe']) !=0:
             raise ("Error: overlapping fits")
         outframe['FactorVF'] = (outframe['FactorVFo']*outframe['osafe'] +
@@ -791,9 +795,10 @@ cut3=  choose_cutoff(indatverplmxigr,fitgrps,True,fitdatverplgr,'mxigrp',expdefs
 #cut3=  choose_cutoff(indatverplgr,fitgrps,True,fitdatverplgr,expdefs)  
 cut3
 
-cutstrs=['GeoInd','GrpExpl']
-c3diff = cut3.drop(columns=cutstrs)-cut2.drop(columns=cutstrs)
-c3diff.to_excel("../output/chk-c3diff.xlsx")
+if 0==1:
+    cutstrs=['GeoInd','GrpExpl']
+    c3diff = cut3.drop(columns=cutstrs)-cut2.drop(columns=cutstrs)
+    c3diff.to_excel("../output/chk-c3diff.xlsx")
 
 
 def selrecs(c3in):    

@@ -141,7 +141,7 @@ rudifungcache = getcachedgrids(rudifungrid)
 
 useKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01uKA.pkl")
 xlatKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01xKA.pkl")
-useKAfstV  = useKAfstVa [useKAfstVa ["MaxAfst"] <20].copy()
+useKAfstV  = useKAfstVa [useKAfstVa ["MaxAfst"] <180].copy()
 maxcuse= np.max(useKAfstV[useKAfstV ["MaxAfst"] !=0] ['KAfstCluCode'])
 xlatKAfstV  = xlatKAfstVa [(xlatKAfstVa['KAfstCluCode']<=maxcuse ) |
                            (xlatKAfstVa['KAfstCluCode']==np.max(useKAfstV[ 'KAfstCluCode']) )].copy()
@@ -184,7 +184,7 @@ def mkfietswijk3pc4(pc4data,pc4grid,rudigrid):
 fietswijk3pc4=mkfietswijk3pc4(cbspc4data,pc4inwgcache,rudifungcache)
 bd=fietswijk3pc4 [abs(fietswijk3pc4['aantal_inwoners_d2'] ) > 1 ]
 
-expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0}
+expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0,'SP':0.5}
 
 from importlib import reload  # Python 3.4+
 if False:
@@ -464,8 +464,8 @@ np.max(np.abs(rv))
 #stQa = grosres (elst,rudifungcache,1,fitpara, fitdatverplgr,useKAfstVQ,'DBgf01Q-'+globset)
 #stQa
 # -
-#einde van poging om fitdatres te herhalen
-#nu weer naar oorspronkelijke data en ative mode vergelijingken
+# einde van poging om fitdatres te herhalen
+# nu weer naar oorspronkelijke data en ative mode vergelijingken
 
 
 # +

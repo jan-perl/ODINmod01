@@ -160,7 +160,7 @@ rudifungcache = getcachedgrids(rudifungrid)
 useKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01uKA.pkl")
 xlatKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01xKA.pkl")
 #was<20
-useKAfstV  = useKAfstVa [useKAfstVa ["MaxAfst"] <80].copy()
+useKAfstV  = useKAfstVa [useKAfstVa ["MaxAfst"] <180].copy()
 maxcuse= np.max(useKAfstV[useKAfstV ["MaxAfst"] !=0] ['KAfstCluCode'])
 xlatKAfstV  = xlatKAfstVa [(xlatKAfstVa['KAfstCluCode']<=maxcuse ) |
                            (xlatKAfstVa['KAfstCluCode']==np.max(useKAfstV[ 'KAfstCluCode']) )].copy()
@@ -203,7 +203,7 @@ def mkfietswijk3pc4(pc4data,pc4grid,rudigrid):
 fietswijk3pc4=mkfietswijk3pc4(cbspc4data,pc4inwgcache,rudifungcache)
 bd=fietswijk3pc4 [abs(fietswijk3pc4['aantal_inwoners_d2'] ) > 1 ]
 
-expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0,'SP':1.0}
+expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0,'SP':0.5}
 
 
 # +
@@ -981,7 +981,7 @@ def trypowerland (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,myskipPCMdf,plt
     pu[v2i]=v2v
     print(pu)
     mygeoschpc4all= mkgeoschparafr(pc4data,pc4grid,rudigrid,myKAfstV,pu,sstepsd)
-    mygeoschpc4i, geobingr = addmxibins(mygeoschpc4all,nmxibins_glb)
+    mygeoschpc4i, geobingr = addmxibins(mygeoschpc4all,nmxibins_glb,glb_mxinormopp)
     mygeoschmixpMotief= allmotmxicorrgrp(summmxigrp(mygeoschpc4i),
                     summmxicorrgrp(mygeoschpc4i,myskipPCMdf),np.max(odinverplgr['MotiefV']))
     myodinverplmxigr = odinmergemxi (odinverplgr ,mygeoschpc4i,grpexpcontrs)
@@ -1000,7 +1000,7 @@ def trypowerland (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,myskipPCMdf,plt
         myfitpara= estsatmod.fit_cat_parameters(cut2i,mydatverplgr,pltgrps,pu)
         myfitverplgr = estsatmod.predict_values(cut2i,mydatverplgr,pltgrps,myfitpara,pu,False)
 #        myfitverplgr = dofitdatverplgr(cut3i,mydatverplgr,pltgrps,pu)
-    rdf=estsatmod.calcchidgrp(myfitverplgr)
+    rdf=estsatmod.calcchidgrp(myfitverplgr,['MaxAfst','GeoInd'])
     chisq= np.sum(rdf['chisq'].reset_index().iloc[:,1])
     return([chisq,myfitpara,rdf])
     
@@ -1457,7 +1457,7 @@ def predictnewdistr(pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,myskipPCMdf,p
     pu= puin.copy()
     mygeoschpc4all= mkgeoschparafr(pc4data,pc4grid,rudigrid,myKAfstV,pu,sstepsd)
     if predgrping == 'mxigrp':        
-        mygeoschpc4i, geobingr = addmxibins(mygeoschpc4all,nmxibins_glb)
+        mygeoschpc4i, geobingr = addmxibins(mygeoschpc4all,nmxibins_glb,glb_mxinormopp)
         mygeoschmxigrp = summmxigrp(mygeoschpc4i)
         mygeoschpc4i['PC4ori'] =mygeoschpc4i['PC4']
     elif predgrping == 'PC4':    
@@ -1477,7 +1477,7 @@ def predictnewdistr(pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,myskipPCMdf,p
 #deze dus niet    myfitpara= fit_cat_parameters(cut2i,mydatverplgr,pltgrps,pu)
     myfitverplgr = estsatmod.predict_values(cut2i,mydatverplgr,pltgrps,myfitpara,pu,False)
 
-    rdf=estsatmod.calcchidgrp(myfitverplgr)
+    rdf=estsatmod.calcchidgrp(myfitverplgr,['MaxAfst','GeoInd'])
     chisq= np.sum(rdf['chisq'].reset_index().iloc[:,1])
     return(myfitverplgr)
 
