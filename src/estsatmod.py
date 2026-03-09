@@ -200,16 +200,28 @@ cut2=  choose_cutoffold(indatverplmxigr,fitgrps,False,0,'mxigrp',expdefs)
 #gewicht: w= (p * (1/p - 1/l))** (+ pow+1)   -> aparte kolom
 # -
 
-def pointspertype(cutdf):
-    cutcnt= cutdf.copy(deep=False)[['osafe','ALsafe','FactorVP','GrpExpl','FactorVFAL']]
+def pointspertype(cutdf,grps=fitgrps,selmask='All'):
+    cutcnt= cutdf.copy(deep=False)[['osafe','ALsafe','FactorVP','GrpExpl','FactorVFAL']+grps]
     cutcnt['FactorVok'] =cutcnt['FactorVP'] >0
     cutcnt['allrecs'] = cutcnt['FactorVok']*0+1
     cutcnt['osafrat'] = cutcnt['FactorVFAL'] * cutcnt['osafe']
-    rv= cutcnt.groupby('GrpExpl').agg('sum')
+    rv= cutcnt.groupby(['GrpExpl']+grps).agg('sum').reset_index()
     rv['osafrat'] = rv['osafrat'] / rv['osafe']
-    mlim=0
-    return rv[rv['allrecs'] > mlim]
-pointspertype(cut2)
+    if selmask=='All':
+        mlim=0
+        rmask=rv['allrecs'] > mlim
+    elif selmask=='rondje huis':        
+        rmask=rv['GrpExpl'].str.contains(selmask)
+    elif selmask=='Err':        
+        rmask=np.isnan(rv['FactorVFAL']  ) | (rv['osafe'] ==0) | (rv['osafe'] ==0)
+    else:
+        die ("pointspertype: wrong value for " +selmask)
+    return rv[rmask]
+#pointspertype(cut2,fitgrps,'rondje huis').sort_values('FactorVP')
+#pointspertype(cut2,fitgrps,'Err')
+#pointspertype(cut2,fitgrps,'All')
+#pointspertype(cut2,'Err')
+#pointspertype(cut2)
 
 
 # +
@@ -395,7 +407,7 @@ def satinvfuncAL(v_in,val,pu):
 def choose_cutoffv8(indat,pltgrps,hasfitted,prevrres,grpind,pu):
     curvpwr = pu['CP']    
     outframe=indat[[grpind,'GrpExpl','MaxAfst','KAfstCluCode','GeoInd' ] +pltgrps].copy(deep=False)
-    minwgt=.1   
+    minwgt=.5 
 
     recisAL=indat['MaxAfst']==0
     if 1==1:
@@ -702,10 +714,10 @@ def diagdtaSF(indat,pltgrps,hasfitted,prevrres,grpind,curvpwr):
     return ALframe[extr][retcols]
 
 diagdtaSF(indatverplmxigr,fitgrps,True,fitdatverplgr,'mxigrp',expdefs) 
-# -
 
-fitdatverplgr.dtypes
 
+# +
+#fitdatverplgr.dtypes
 
 # +
 #mogelijk: maxafst joinen uit diffdata

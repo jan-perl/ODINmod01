@@ -86,7 +86,7 @@ cbspc4data.dtypes
 prov0=cx.providers.nlmaps.grijs.copy()
 print( cbspc4data.crs)
 print (prov0)
-#plot_crs=3857
+plot_crs=3857
 #plot_crs=28992
 if 1==1:
 #    prov0['url']='https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/{variant}/EPSG:28992/{z}/{x}/{y}.png'
@@ -576,6 +576,32 @@ def addgrpexpl(indf,myspecvals,col0,col1,grp1map):
 
 
 # +
+fitgrps=['MotiefV','isnaarhuis']
+def setsmallgrpsovmot (df, grps):
+    minnumrec=100
+    factcol='FactorVGen'
+    tosumdf=df.copy(deep=False)
+    tosumdf['FactorVGen']  = np.where(tosumdf['HighPCfls'],0, tosumdf['FactorV'] )
+    reccount='numrec_grp'
+    tosumdf[reccount]=1    
+    sumdf2=tosumdf.groupby(grps)[[factcol,reccount]].agg('sum').sort_values(factcol).reset_index()
+    #sumdf only for diagnostincs to sumsel1
+    sumdf=sumdf2.copy()
+    norm=sumdf[factcol].sum()
+    sumdf[factcol]/=norm
+    sumdf['torep'] = sumdf[reccount]<minnumrec
+    sumsel1=sumdf[sumdf[reccount]<minnumrec*20]
+    print(sumsel1)
+    summrg = sumdf2[fitgrps+[reccount]]
+    dfchk=df.merge(summrg,how='left')
+    assert (len(dfchk) == len(df))
+    overigmotief=13
+    df['MotiefV'] = np.where(dfchk[reccount]>=minnumrec,df['MotiefV'],overigmotief)
+    return df
+    
+allodinyr= setsmallgrpsovmot (allodinyr,fitgrps)    
+
+# +
 #other file merge geo
 #other file addparsrecs
 #synchronize with ODINcatVNuse
@@ -633,7 +659,6 @@ def mkdfverplxypc4 (df,myspecvals,pltgrps,selstr,myKAfstV,myxlatKAfstV,mygeoschp
 #        rv= rv1.append(rv2) .reset_index(drop=True)   
     return rv
 
-fitgrps=['MotiefV','isnaarhuis']
 odinverplgr = mkdfverplxypc4 (allodinyr ,specvaltab,fitgrps,'Motief en isnaarhuis',
                                 useKAfstV,xlatKAfstV,geoschpc4r2)
 odinverplgr

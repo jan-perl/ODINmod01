@@ -419,7 +419,7 @@ def _qcutmxi(df,mxivarin1,mxivarin2,mxiout,nbins):
 #add df into mxi bins, retulting in outdf with mxi in addition to PC4
 #returned binfr is not used, provided for debugging
 
-def addmxibins (df,nbins):
+def addmxibins (df,nbins,mxinormopp):
     outdf=df.set_index(keys=['KAfstCluCode','PC4'],drop=False)
 #    print(outdf)
     outdf['normMXI']= np.where(outdf['MaxAfst'] ==0, 
@@ -427,6 +427,8 @@ def addmxibins (df,nbins):
        (outdf['M_LW_OW'] + outdf['M_LW_OO'] + outdf['M_LO_OW'] + outdf['M_LO_OO'] ) ) 
     outdf['scaleMXI']= np.where(outdf['MaxAfst'] ==0, outdf['M_LW_AL'], 
                                   (outdf['M_LW_OW'] + outdf['M_LO_OW'] ) ) /outdf['normMXI']
+    if mxinormopp:
+        outdf['normMXI'] /= outdf['oppervlak']+1000
 #    outdf['mxigrp'] =4
     binfr=1
     allret= outdf.drop(columns=['PC4','KAfstCluCode']).groupby('KAfstCluCode').apply(_qcutmxi, 'scaleMXI','normMXI',
@@ -436,7 +438,8 @@ def addmxibins (df,nbins):
     outdf=outdf.reset_index(drop=True)
     return ([outdf,binfr])
 nmxibins_glb=7
-geoschpc4, geobingr = addmxibins(geoschpc4all,nmxibins_glb)
+glb_mxinormopp=True
+geoschpc4, geobingr = addmxibins(geoschpc4all,nmxibins_glb,glb_mxinormopp)
 # -
 
 geoschpc4
@@ -968,7 +971,7 @@ ov=estsatmod.pltmotdistgrp(fitdatverplgr,'linpmax','linpch',False)
 
 ov=estsatmod.pltmotdistgrp(fitdatverplgr,'MaxAfst','linpch',False)
 
-estsatmod.calcchidgrp(fitdatverplgr)
+estsatmod.calcchidgrp(fitdatverplgr,['MaxAfst','GeoInd'])
 
 
 # +
