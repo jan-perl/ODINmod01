@@ -493,10 +493,10 @@ def getddcInAct(dfmdummy,runname,lbl,myuseKAfstV,normfr):
 ddc_base = getddcInAct("dummy2","Set05N-",bname,useKAfstV ,[]) 
 
 
-# +
+# + endofcell="--"
 #PC4 data active modes in zelfde format als pc4orisum
 def getPC4InAct(ddc_dat,perGeoInd):
-    cfact=calcFactVPC4(ddc_dat,perGeoInd)
+    cfact=actmodval.calcFactVPC4(ddc_dat,perGeoInd)
     keepcols=['PC4','FactorV','FactorVActive']
     if perGeoInd:
         keepcols=keepcols+['GeoInd']
@@ -504,29 +504,35 @@ def getPC4InAct(ddc_dat,perGeoInd):
         columns={"FactorV":"FactorVin",'FactorVActive':'FactorVInActive'})         
     return rv 
 
-basePC4act = actmodval.getPC4InAct(ddc_base ,False) 
+basePC4act = getPC4InAct(ddc_base ,False) 
 #basePC4act = getPC4InAct("dummy2","Dbg01Q","origPC4chk",useKAfstV ,[]) 
-baseactpcdiffng=mrgpcdiffr(calcFactVPC4(datadiffcache,False),basePC4act)
-baseactpcdiffng.sum()/totaalVgen
-t2.T
-#
+baseactpcdiffng=actmodval.mrgpcdiffr(actmodval.calcFactVPC4(actmodval.datadiffcache,False),basePC4act)
+baseactpcdiffng.sum()/actmodval.totaalVgen
+
+#t2= baseactpcdiffng.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief
+#t2.T
+#/totaalVgen
 # -
+#t2.T
+#
+# --
 
-(chisq,rf)= fitactivem(baseactpcdiffng,'VGenpara')
-r1b=mkactpccmpfig(baseactpcdiffng,'Base fit RUDIDUN geo tov afstandsklasse resultaat')
+(chisq,rf)= actmodval.fitactivem(baseactpcdiffng,'VGenpara')
+r1b=actmodval.mkactpccmpfig(baseactpcdiffng,'Base fit RUDIDUN geo tov afstandsklasse resultaat')
 
+showgdir=actmodval.showgdir
 base1tifname=showgdir+'/basemo01.tif'
 def mkgeofig1(mytifname,mytots2pcdiffng,figbase,im1tit,im2tit,im3tit):
-    act1grid= make1stgridgeorel (mytifname,cbspc4data.merge(mytots2pcdiffng,how='left',
-                                left_on=['postcode4'],right_on='PC4'),act1tifcols,999)
+    act1grid= actmodval.make1stgridgeorel (mytifname,cbspc4data.merge(mytots2pcdiffng,how='left',
+                                left_on=['postcode4'],right_on='PC4'),actmodval.act1tifcols,999)
     act1grid= rasterio.open(mytifname)
     actcache={}
     actcache[3]= act1grid.read(3) 
     actcache[5]= act1grid.read(4) 
     act1grid.close()
-    r1=actpltland(actcache,3,nlextent,figbase+"-nl",figbase+"-nl",im1tit,im2tit,im3tit)
-    actcacheutr=mkloccach(actcache,utrextent,nlextent)
-    r1=actpltland(actcacheutr,3,utrextent,figbase+"-ut",figbase+"-ut",im1tit,im2tit,im3tit)
+    r1=actmodval.actpltland(actcache,3,actmodval.nlextent,figbase+"-nl",figbase+"-nl",im1tit,im2tit,im3tit)
+    actcacheutr=actmodval.mkloccach(actcache,actmodval.utrextent,actmodval.nlextent)
+    r1=actmodval.actpltland(actcacheutr,3,actmodval.utrextent,figbase+"-ut",figbase+"-ut",im1tit,im2tit,im3tit)
     return r1
 r1=mkgeofig1(base1tifname,baseactpcdiffng,'actcmp-base0-dcls',
               'Aandeel actieve modes obv RUDIFUN dichtheden',
@@ -536,13 +542,13 @@ r1=mkgeofig1(base1tifname,baseactpcdiffng,'actcmp-base0-dcls',
 basePC4actright= basePC4act.rename(
         columns={"FactorV":"FactorVOrig"}).rename(columns={"FactorVin":"FactorV",
                  'FactorVInActive':'FactorVActive'})
-baseactrawmpcdiffng=mrgpcdiffr(basePC4actright ,pc4orisumng)
+baseactrawmpcdiffng=actmodval.mrgpcdiffr(basePC4actright ,actmodval.pc4orisumng)
 #baseactrawmpcdiffng
-t2=baseactrawmpcdiffng.sum()/totaalVgen
+t2=baseactrawmpcdiffng.sum()/actmodval.totaalVgen
 t2.T
 
-(chisq,rf)= fitactivem(baseactrawmpcdiffng,'VGenlin')
-r1b=mkactpccmpfig(baseactrawmpcdiffng,'Base fit RUDIDUN geo tov ODIN metingen')
+(chisq,rf)= actmodval.fitactivem(baseactrawmpcdiffng,'VGenlin')
+r1b=actmodval.mkactpccmpfig(baseactrawmpcdiffng,'Base fit RUDIDUN geo tov ODIN metingen')
 
 r1=mkgeofig1(base1tifname,baseactrawmpcdiffng,'actcmp-base0-raw',
               'Aandeel actieve modes in ODIN',
@@ -555,8 +561,8 @@ def geoactch(explst,basedatright):
     for exp in explst:
         chg_base = getddcInAct("dummy2","Set05N-",exp,useKAfstV ,[]) 
         chgPC4act = getPC4InAct(chg_base ,False) 
-        chgactrawmpcdiffng=mrgpcdiffr(basedatright , chgPC4act)
-        t2=chgactrawmpcdiffng.sum()/totaalVgen
+        chgactrawmpcdiffng=actmodval.mrgpcdiffr(basedatright , chgPC4act)
+        t2=chgactrawmpcdiffng.sum()/actmodval.totaalVgen
         print (t2.T)
         r1=mkgeofig1(base1tifname,chgactrawmpcdiffng,'actcmp-base0-'+exp,
               'Aandeel actieve modes experiment '+exp,
