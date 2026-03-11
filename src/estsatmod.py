@@ -562,7 +562,21 @@ def _regressgrp(indf, yvar, xvars,pcols):
 def _fitsub(indf,fitgrp,_regressgrp,  colvacols2, colpacols2):
     rf= indf.groupby(fitgrp ).apply( _regressgrp, 'FactorVF', colvacols2, colpacols2)
     return rf
-    
+
+landcrossmults= {'OA':1,'OW':1,'OO':1,'OM':1+1e-10}
+lwlopair=['LW','LO']
+
+def addtotscgrps(rf,pu):
+     for lkey in lwlopair:
+        colin="P_"+ lkey +"_" + "AL"
+        satlim= rf[colin]
+        screst=0
+        for okey in landcrossmults.keys():
+            colnam="P_"+ lkey +"_" + okey
+            screst +=  rf[colnam]*  landcrossmults[okey]
+#        sc2=satfunc(satlim,screst,pu) 
+        colout="S_"+ lkey +"_" + "AL"
+        rf[colout] =screst
     
 def fit_cat_parameters(indf,topreddf,pltgrp,pu):
     debug=False
@@ -576,17 +590,18 @@ def fit_cat_parameters(indf,topreddf,pltgrp,pu):
     else:
         fitgrp=pltgrp + ['GeoInd' ]
     rf= _fitsub(indf,fitgrp,_regressgrp,  colvacols2, colpacols2).reset_index()
+    addtotscgrps(rf,pu)
     return rf
 
+#previously, these were est to zero; now they are used as a check
 def setlandcols(outdf,colvacols2,pu ):
-    okmults= {'OA':1,'OW':1,'OO':1,'OM':1+1e-10}
     landdf=outdf.copy()
-    for lkey in ['LW','LO']:
+    for lkey in lwlopair:
         colin="M_"+ lkey +"_" + "AL"
         indat= landdf[colin]
-        for okey in okmults.keys():
+        for okey in landcrossmults.keys():
             colnam="M_"+ lkey +"_" + okey
-            landdf[colnam]= indat * okmults[okey]
+            landdf[colnam]= indat * landcrossmults[okey]
     return landdf    
 
 #neem de parameters , en voorspel
@@ -618,18 +633,28 @@ def predict_values(indf,topreddf,pltgrp,rf,pu,stobijdr):
 #    print(blk1)
     s2= np.sum(np.array(blk1)*np.array(blk2),axis=1).astype(float)
     outdf['FactorEstNAL'] =s2
-    if oldALmode:
+    
+    if 0&oldALmode:
         blk1al=outdf[colvacols2 ] * (colpacols2alchisAL.astype(int))
         blk2al=outdf[colpacols2 ] * (colpacols2alchisAL.astype(int))
     #    print(blk1)
         s2al= np.sum(np.array(blk1al)*np.array(blk2al),axis=1).astype(float)    
-    else:
+    elif 0==1:
         outdfland=setlandcols(outdf,colvacols2,pu )
         blk1al=outdfland[colvacols2 ] 
         blk2al=outdfland[colpacols2 ] 
     #    print(blk1)
         s2al= np.sum(np.array(blk1al)*np.array(blk2al),axis=1).astype(float)
+    else:
+        s2al=0
+        s2nl=0
+        for lkey in lwlopair:
+            colext= lkey +"_" + "AL"
+            s2al+= outdf["M_"+colext] *outdf["P_"+colext]
+            s2nl+= outdf["M_"+colext] *outdf["S_"+colext]
+
     outdf['FactorEstAL']  =s2al
+    outdf['FactorEstNL']  =satfunc(s2al,s2nl,pu) 
         
 #todo: als s2al 0 is, opzoeken waar MaxAfst ==0 en de s2al daarvan invullen als default
 #dat levert dan min of meer consistente kantelpunten op
@@ -660,6 +685,11 @@ if 1==1:
     #fitdatverplgr = dofitdatverplgr(cut2,indatverplmxigr,fitgrps,expdefs)
     fitdatverplgrx = fitdatverplgr[abs(fitdatverplgr["DiffEst"])> 2e6] 
     seaborn.scatterplot(data=fitdatverplgrx,x="FactorEst",y="DiffEst",hue="GeoInd")
+# -
+
+paratab=fitdatverplgr[fitdatverplgr['MaxAfst']==0].groupby (['MotiefV','isnaarhuis','GeoInd']).agg('mean')
+paratab.reset_index().to_excel("../output/fitparatab0.xlsx")
+paratab
 
 
 # +
@@ -732,7 +762,7 @@ def pltmotdistgrp (mydati,horax,vertax,vnsep):
     opdel=['MaxAfst','GeoInd','MotiefV','GrpExpl']
 #    mydat['FactorEst2'] = np.where(mydat['FactorEstNAL']==0,0, 
 #                                 1/ (1/mydat['FactorEstAL'] + 1  /mydat['FactorEstNAL'] ) )
-    fsel=['FactorEst','FactorV', 'FactorEstNAL','FactorEstAL','DiffS2']
+    fsel=['FactorEst','FactorV', 'FactorEstNAL','FactorEstAL','FactorEstNL','DiffS2']
 
     rv2= mydat.groupby (opdel)[fsel].agg(['sum']).reset_index()
 #    print ( rv2[ (rv2['MotiefV']==1) & (rv2['MaxAfst']==0) ] ) 
@@ -748,9 +778,9 @@ def pltmotdistgrp (mydati,horax,vertax,vnsep):
     rv2['MaxAfst']=np.where(rv2['MaxAfst']==0 ,stelafst ,rv2['MaxAfst'])
 #    rv2['MaxAfst']=rv2['MaxAfst'] * np.where(rv2['GeoInd']=='AankPC',1,1.02)
     rv2['Qafst']=1/(1/(rv2['MaxAfst']  *0+1e10) +1/ (np.power(rv2['MaxAfst'] ,1.8) *2e8 ))
-    rv2['linpmax'] = rv2['FactorEstNAL']/ rv2['FactorEstAL']
-    rv2['linpch']= rv2['FactorEst']/ rv2['FactorEstAL']
-    rv2['drat']= rv2['FactorV']/ rv2['FactorEstAL']
+    rv2['linpmax'] = rv2['FactorEstNAL']/ rv2['FactorEstNL']
+    rv2['linpch']= rv2['FactorEst']/ rv2['FactorEstNL']
+    rv2['drat']= rv2['FactorV']/ rv2['FactorEstNL']
     rv2['DiffS2']= np.where(rv2['DiffS2']< rv2['FactorEstNAL']/100 ,np.nan,  rv2['DiffS2'])
 
     rvs = rv2[np.isin(rv2['GrpExpl'],bigmotl)].copy()
@@ -936,5 +966,7 @@ def calcchidgrp (mydati,opdel):
 calcchidgrp(fitdatverplgr,['MaxAfst','GeoInd'])
 
 calcchidgrp(fitdatverplgr,['MotiefV','GeoInd']).sort_values(['ChiRat'])
+
+calcchidgrp(fitdatverplgr,['GeoInd']).sort_values(['ChiRat'])
 
 

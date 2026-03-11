@@ -626,8 +626,47 @@ def mkactpccmpfig(indf0,title):
 #    ax.set_yscale('log')
     return(fig)
 r1=mkactpccmpfig(infotots2pcdiffng,'Data center functions excluded')
-# -
+# +
+#deze scatter plot ziet er goed uit
 
+def mkactpccmpfig1d(indf0,title):
+#    indf0['RatActiveVSc'] = 1.75*indf0['RatActiveV']**2 +.05
+    indf=indf0[(indf0['FactorVin']>minFactorVplot ) ].copy(deep=False)
+    fig, ax = plt.subplots(figsize=(6, 4))
+    indf['sizser'] = np.abs(indf['FactorVin']) 
+    nlev=50
+    mybin=np.linspace(0,1,10)
+#    print(mybin)
+    indf['RatActiveVl']=np.round (indf['RatActiveV'] *nlev)*1.0/nlev
+    
+    
+    
+    indf['RatActiveVInl']=np.round (indf['RatActiveVIn'] *nlev)*1.0/nlev
+#    indflev = indf[['RatActiveVl','RatActiveVInl','sizser']].groupby(['RatActiveVl','RatActiveVInl']).agg('sum').reset_index()
+    indflev= np.histogram2d(indf['RatActiveV'],indf['RatActiveVIn'],bins=mybin,weights=indf['sizser'] )
+    indflevh= indf.pivot_table(index='RatActiveVl',columns='RatActiveVInl',values='sizser'
+                            ,aggfunc='sum'  ,fill_value=0)
+    indflevh=np.sqrt(indflevh)
+#    print(indflev)
+    c2=sns.lineplot(data=indf, x='RatActiveV',y='FitRatVActive',ax=ax)
+    indf['sizsers'] = (indf['sizser']) 
+    c1=plt.hist2d(indf['RatActiveV'],indf['RatActiveVIn'],bins=100,weights=indf['sizsers'],
+                cmap = "RdYlGn_r", 
+           norm = colors.LogNorm() ,alpha=0.3)
+    
+#    c1=sns.heatmap(data=indflev, ax=ax,cmap="rocket_r" ,cbar=True,alpha=0.3)
+#    ax.invert_yaxis()
+#cmap="mako",     
+
+#    c1=sns.scatterplot(data=indf, x='RatActiveV',y='RatActiveVIn',hue='sizser',size='sizser',ax=ax)
+    fig.suptitle(title)
+    ax.set_xlabel('Schatting active modes a.h.v. land gem. motief en afstand')
+    ax.set_ylabel('Punten: aandeel active per PC4')
+#    ax.set_xscale('log')
+#    ax.set_yscale('log')
+    return(fig)
+#r1=mkactpccmpfig1d(infotots2pcdiffng,'Data center functions excluded')
+infotots2pcdiffng.dtypes
 
 
 # +
