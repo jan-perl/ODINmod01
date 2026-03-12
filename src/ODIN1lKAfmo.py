@@ -203,7 +203,7 @@ def mkfietswijk3pc4(pc4data,pc4grid,rudigrid):
 fietswijk3pc4=mkfietswijk3pc4(cbspc4data,pc4inwgcache,rudifungcache)
 bd=fietswijk3pc4 [abs(fietswijk3pc4['aantal_inwoners_d2'] ) > 1 ]
 
-expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0,'SP':1.0}
+expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0,'SP':1.0, 'XAL':2.5}
 
 
 # +
@@ -1017,9 +1017,9 @@ rv
 #let op p_LO ongelijk 1 geeft vooral veel negatieve waarden en dus NAs, die punten tellen dan niet mee in chi^2
 
 #@jit(parallel=True)
-def chisqsampler (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,pltgrps):
+def chisqsampler (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,pltgrps,pin):
 #    expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0}
-    pl = expdefs.copy()
+    pl = pin.copy()
     lw = np.linspace(1.1,1.3,3)
     oa = np.linspace(1.6,2.0,3)
     lo = np.linspace(1.7,2.0,3)
@@ -1036,7 +1036,7 @@ def chisqsampler (pc4data,pc4grid,rudigrid,myKAfstV,inxlatKAfstV,pltgrps):
     return z
 #chitries= chisqsampler (cbspc4data,pc4inwgrid,rudifungrid,useKAfstVland,xlatKAfstV)    
 if False:
-    chitries= chisqsampler (cbspc4data,pc4inwgcache,rudifungcache,useKAfstV,xlatKAfstV,fitgrps)    
+    chitries= chisqsampler (cbspc4data,pc4inwgcache,rudifungcache,useKAfstV,xlatKAfstV,fitgrps,expdefs)    
     print (chitries)
 
 #    lw = np.linspace(1,1.4,3)
@@ -1068,12 +1068,26 @@ def largestdiffsPC (pc4dta,indf):
     pllanddiffam= pc4dta[['postcode4']].merge(indf[(indf['MaxAfst']==0) ] ,
                                     how='left',left_on=('postcode4'), right_on = ('PC4'))
     pllanddiffam['DiffAbs'] =abs(pllanddiffam['DiffEst'])
+    pllanddiffam['MotiefV'] = pllanddiffam['MotiefV'] .astype(int,errors='ignore')
     okval= pllanddiffam[np.isnan(pllanddiffam['DiffAbs']) == False]
     rv =okval.sort_values(by='DiffAbs').tail(30).groupby(
-          ['postcode4','GrpExpl'])[['isnaarhuis','DiffEst']].agg(
+          ['postcode4','MotiefV','GrpExpl','GeoInd'])[['isnaarhuis','DiffEst']].agg(
            {'isnaarhuis':'count','DiffEst':'mean'} )
-    return rv
-largestdiffsPC (cbspc4data,fitdatverplpc4gr)
+    return rv.reset_index()
+ldiff=largestdiffsPC (cbspc4data,fitdatverplpc4gr)
+print(ldiff.to_csv( sep=",",index=False))
+
+
+def doinsp(dbsel):
+    fig, ax = plt.subplots(figsize=(16, 40))
+    pcsel=dbsel['postcode4'].to_list()
+    print(dbsel)
+    chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],pcsel ))]
+    pchkpckrt = chkpckrt.to_crs(epsg=plot_crs).plot(alpha=.3,ax=ax)
+    #,hue=dbsel['MotiefV']
+    cx.add_basemap(pchkpckrt, source= prov0)
+doinsp(ldiff[(ldiff["MotiefV"]!=11)& (ldiff["postcode4"]//1000<2)])    
+
 
 # +
 #inspectie
@@ -1082,7 +1096,9 @@ largestdiffsPC (cbspc4data,fitdatverplpc4gr)
 #chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(3511,3512,3584 )))]
 #chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(6511,6525 )))]
 #chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(2513 ,2333)))]
-chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(2333,2334,2331) ))]
+#chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(2333,2334,2331) ))]
+#chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(8011) ))]
+chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(3521,3511,3571) ))]
 #chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(5611,5612 )))]
 #chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(2678,2691 )))]
 #chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(1012,1017,1043,1101,1118 )))]
@@ -1565,7 +1581,7 @@ def grosres (explst,incache0,mult,fitp,oridat,myuseKAfst,runname,setname,predgrp
     st.reset_index().to_excel("../output/fitrelres_"+runname+setname+".xlsx")
     return st
 stQ = grosres (elst[0:3],rudifungcache,1,fitpara, fitdatverplgr,
-               useKAfstVQ,'Dbg05Q-',globset,'PC4')
+               useKAfstVQ,'Dbg06Q-',globset,'PC4')
 stQ
 
 stQ
@@ -1578,6 +1594,8 @@ stQ
 #stQa
 # -
 print("Finished")
+
+
 
 
 

@@ -425,58 +425,26 @@ def pcnietwoon(df):
     return rv
 allodinyr['OthPC'] =pcnietwoon(allodinyr)
 
-# +
-some_string="""OthPC,MotiefV,Comment
-1775,1,kassen werk/oppervl overschat
-1779,1,kassen werk/oppervl overschat
-2641,1,kassen werk/oppervl overschat
-2651,1,kassen werk/oppervl overschat
-2665,1,kassen werk/oppervl overschat
-2671,1,kassen werk/oppervl overschat
-2675,1,kassen werk/oppervl overschat
-2676,1,kassen werk/oppervl overschat
-2678,1,kassen werk/oppervl overschat
-2681,1,kassen werk/oppervl overschat
-2691,1,kassen werk/oppervl overschat
-5928,1,logistiek werk/oppervl overschat
-1118,8,binnenstad Adam
-1118,11,binnenstad Adam
-6525,6,radboud U
-2333,1,werk Leiden
-3011,1,werk rotterdam
-3011,7,winkelen rotterdam
-3511,1,werk utrecht
-1334,7,winkel
-1442,7,winkel
-1703,7,winkel
-1825,7,winkel
-2321,7,winkel
-2513,7,winkel
-3562,7,winkel
-3825,7,winkel
-5038,7,winkel
-8911,7,winkel
-9712,7,winkel
-7811,7,winkel
-9723,7,winkel
-3511,7,winkelen utrecht
-3311,7,Binnenstad Dordrcht
-3431,7,Nieuwegein City Plaza
-3995,7,Houten Rond en Castellum
-7311,7,Binnenstad Apeldoorn
-7511,7,Binnenstad Enschede
-9203,7,Drachten winkels
-9401,7,Assen winkels
-"""
-
 #read CSV string into pandas DataFrame
-highman = pd.read_csv(io.StringIO(some_string), sep=",")
-highman
+highman = pd.read_csv("../inputs/exclpc4motman.csv", sep=",")
+def chhdbl():
+    highdbl= highman.groupby(['OthPC','MotiefV']).agg('count').reset_index().rename(columns={"Comment":"count"})
+    hcnt=highman.merge(highdbl,how='left')
+    herr = hcnt[hcnt['count']!=1]
+    if (len(herr) >0):
+        print ("doubles")
+        print (herr)
+        die
+#highman
+
+
+hs=highman.sort_values(['OthPC','MotiefV'])
+hs
 
 
 # +
 def surplusPCmotief(allpc4,df,man,filtered,njaar):
-    pc4data=allpc4[['postcode4','aantal_inwoners','oppervlak']].rename(columns={'postcode4':'OthPC'} ) .copy()
+    pc4data=allpc4[['postcode4','aantal_inwoners','oppervlak']].rename(columns={'postcode4':'OthPC'} ) .copy(deep=False)
     pc4totaal = pc4data[['aantal_inwoners','oppervlak']].sum()
 #       .reset_index().rename(
 #          columns={'aantal_inwoners':'inwoners_totaal', 'oppervlak': 'oppervlak_totaal' } )
@@ -496,6 +464,7 @@ def surplusPCmotief(allpc4,df,man,filtered,njaar):
                       ( (allemotief['FactorV'] + allemotief['oppfrac'] ) >4e5 )
     man['flgman']=1.1
     allemotief=allemotief.merge(man,how='left')
+    tehoog=False
     allemotief['isSpec']= tehoog | (False== np.isnan(allemotief['flgman'])) 
     if filtered:
         rv =allemotief[ allemotief['isSpec']]

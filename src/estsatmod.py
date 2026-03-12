@@ -86,7 +86,7 @@ if False:
 
 fitgrps=['MotiefV','isnaarhuis']
 #SP tussen 0.3 en 1 per motief
-expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0,'SP' :1.0}
+expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0,'SP' :1.0, 'XAL':2.5}
 
 indatverplmxigr=pd.read_pickle("../intermediate/indatverplmxigr_ini.pkl") 
 #MLlen(indatverplmxigr)
@@ -406,7 +406,8 @@ def satinvfuncAL(v_in,val,pu):
 
 def choose_cutoffv8(indat,pltgrps,hasfitted,prevrres,grpind,pu):
     curvpwr = pu['CP']    
-    outframe=indat[[grpind,'GrpExpl','MaxAfst','KAfstCluCode','GeoInd' ] +pltgrps].copy(deep=False)
+    colscpy=[grpind,'GrpExpl','MaxAfst','KAfstCluCode','GeoInd' ] +pltgrps
+    outframe=indat[colscpy].copy(deep=False)
     minwgto=np.power(0.25,pu['SP'])
     minwgtal=.5 
 
@@ -427,7 +428,11 @@ def choose_cutoffv8(indat,pltgrps,hasfitted,prevrres,grpind,pu):
         (wgt_lim,v_in_lim) = satinvfunc (outframe['LimVPAL'] , outframe['FactorVP'] ,pu)
         EstVPoh  =np.where(outframe['EstVPo'] ==0, 1e4*outframe['FactorVP'],outframe['EstVPo'] )
         (wgt_al,v_al_est) =  satinvfunc (EstVPoh , outframe['FactorVP'] ,pu)
-        
+        hlpos=pu['XAL']
+        extral= (outframe['LimVPAL'] >= hlpos * outframe['EstVPAL']) | (outframe['LimVPAL'] * hlpos <= outframe['EstVPAL']) 
+        if 1==0:
+            print (outframe[extral & recisAL][colscpy+['LimVPAL','EstVPAL','FactorVP']])
+       
 #voor diagnostiek      
 #        outframe['NormS2'] = v_in_est
     else: 
@@ -435,10 +440,12 @@ def choose_cutoffv8(indat,pltgrps,hasfitted,prevrres,grpind,pu):
         outframe['EstVP']  =np.power(indat['FactorV'],curvpwr)
         outframe['EstVPAL']  =outframe['LimVPAL'] 
         outframe['EstVPo'] =1.0
-        outframe['EstVPo'] =np.where (recisAL,1e20*outframe['EstVPo'],1e-9 *outframe['EstVPo'])        
+        outframe['EstVPo'] =np.where (recisAL,1e20*outframe['EstVPo'],1e-9 *outframe['EstVPo'])   
+        extral=False
+
     if hasfitted:
-        wgt_est = wgt_est*wgt_lim
-        outframe['osafe'] = np.where(wgt_est>minwgto*minwgto, wgt_est,0)
+        wgt_est = np.sqrt(wgt_est*wgt_lim)
+        outframe['osafe'] = np.where(wgt_est>minwgto, wgt_est,0)
         outframe['FactorVFo'] = np.where(outframe['osafe'] >0, v_in_est,0)        
         outframe['FactorVFAL'] = v_al_est
         #outframe['ALsafe'] = np.where(recisAL,wgt_al ,0)
@@ -455,7 +462,7 @@ def choose_cutoffv8(indat,pltgrps,hasfitted,prevrres,grpind,pu):
     if 1==1:
         outframe['osafe'] = np.where((outframe['osafe'] !=0) | recisAL | ( outframe['FactorVFo'] ==0),
                                  outframe['osafe'] ,1e-10)        
-        bothmask=(outframe['osafe'] * outframe['ALsafe']==0)
+        bothmask=((outframe['osafe'] * outframe['ALsafe']==0 ) & (extral ==False) )
         outframe['osafe'] *=bothmask
         outframe['ALsafe'] *=bothmask
         if np.sum(outframe['osafe'] * outframe['ALsafe']) !=0:
@@ -686,18 +693,26 @@ if 1==1:
     #fitdatverplgr = dofitdatverplgr(cut2,indatverplmxigr,fitgrps,expdefs)
     fitdatverplgrx = fitdatverplgr[abs(fitdatverplgr["DiffEst"])> 2e6] 
     seaborn.scatterplot(data=fitdatverplgrx,x="FactorEst",y="DiffEst",hue="GeoInd")
+
+
 # -
 
-paratab=fitdatverplgr[fitdatverplgr['MaxAfst']==0].groupby (['MotiefV','isnaarhuis','GeoInd']).agg('mean')
-paratab.reset_index().to_excel("../output/fitparatab0.xlsx")
-paratab
+def exp_fitpara(fitdat,clufrom,outfn):
+    if clufrom >20:
+        sel=fitdatverplgr['MaxAfst']==0
+    else:
+        sel=fitdatverplgr['KAfstCluCode']>=clufrom
+    paratab=fitdatverplgr[sel].groupby (['MotiefV','isnaarhuis','GeoInd','GrpExpl']).agg('mean').reset_index()
+    paratab.to_excel("../output/"+outfn,index=False)
+    return paratab
+exp_fitpara(fitdatverplgr,99,"fitparatab0.xlsx")
 
 
 # +
-def diagdtaAL(indat,pltgrps,hasfitted,prevrres,grpind,curvpwr):
+def diagdtaAL(indat,pltgrps,hasfitted,prevrres,grpind,pu):
     recisAL=(indat['MaxAfst']==0 ) & ((indat['FactorV']!=0 ) )
     outframe=indat.copy(deep=False)
-    curvpwr=1 #unused
+    curvpwr=pu['CP']
     outframe['EstVPAL']  =np.power(prevrres['FactorEstAL'],curvpwr)
     outframe['EstVPo']   =np.power(prevrres['FactorEstNAL'],curvpwr)
     outframe['EstVP']    =np.power(prevrres['FactorEst'],curvpwr)
@@ -705,8 +720,8 @@ def diagdtaAL(indat,pltgrps,hasfitted,prevrres,grpind,curvpwr):
     outframe['FactVrat']  = outframe['FactorV']  / outframe[xaxval]  
     ALframe= outframe[recisAL].copy(deep=False)
     fig, ax = plt.subplots(figsize=(12, 6))
-    seaborn.scatterplot(data=ALframe,x=xaxval,y="FactVrat",hue="GeoInd",ax=ax)
-    hlpos=2.5
+    seaborn.scatterplot(data=ALframe,x=xaxval,y="FactVrat",hue="GeoInd",ax=ax)  
+    hlpos=pu['XAL']
     ax.axhline(hlpos,alpha=0.3)
     ax.axhline(1/hlpos,alpha=0.3)
     ax.set_yscale('log')
@@ -850,11 +865,13 @@ pointspertype(cut3)
 
 # +
 #voor de time being, overschrijf de vorige selectie gegevens
-for r in range(4):
+nsatiterdef=4
+for r in range(nsatiterdef):
     cut3=  choose_cutoff(indatverplmxigr,fitgrps,True,fitdatverplgr,'mxigrp',expdefs) 
     print(pointspertype(cut3))
     fitpara= fit_cat_parameters(cut3,indatverplmxigr,fitgrps,expdefs)
     fitdatverplgr = predict_values(cut3,indatverplmxigr,fitgrps,fitpara,expdefs,False)
+    exp_fitpara(fitdatverplgr,99,"fitparatab"+(str(r+1))+".xlsx")
     
 fitdatverplgrx = fitdatverplgr[abs(fitdatverplgr["DiffEst"])> 2e6] 
 seaborn.scatterplot(data=fitdatverplgrx,x="FactorEst",y="DiffEst",hue="GeoInd")
@@ -907,13 +924,9 @@ mxitotdiagpl(ds,'mxigrp')
 
 fitdatverplgr[fitdatverplgr['MaxAfst']==0]
 
-paratab=fitdatverplgr[fitdatverplgr['MaxAfst']==0].groupby (['MotiefV','isnaarhuis','GeoInd']).agg('mean')
-paratab.reset_index().to_excel("../output/fitparatab1.xlsx")
-paratab
+exp_fitpara(fitdatverplgr,99,"fitparatabd.xlsx")
 
-parahitab=fitdatverplgr[fitdatverplgr['KAfstCluCode']>12].groupby (['KAfstCluCode','mxigrp','MotiefV','isnaarhuis','GeoInd']).agg('mean')
-parahitab.reset_index().to_excel("../output/fitparatab1hi.xlsx")
-parahitab
+exp_fitpara(fitdatverplgr,13,"fitparatab1hi.xlsx")
 
 fitdatverplgr.groupby (['MotiefV','isnaarhuis','GeoInd','MaxAfst']).agg('mean')
 
@@ -936,7 +949,7 @@ def getmaxafstadmax_old( dd, landcod,myKAfstV):
 
 # -
 
-ov=pltmotdistgrp(fitdatverplgr[fitdatverplgr['MotiefV']==1],'MaxAfst','FactorEst',True)
+ov=pltmotdistgrp(fitdatverplgr[fitdatverplgr['MotiefV']==2],'MaxAfst','FactorEst',True)
 
 ov=pltmotdistgrp(fitdatverplgr[fitdatverplgr['MotiefV']!=99],'linpmax','FactorEst',True)
 
@@ -987,7 +1000,7 @@ def tryexpp(indat,pu,niter,diag):
         chirat2=calcchidgrp(lfitdatverplgr,['GeoInd'])['ChiRat'].mean()
         if diag:
             print((pu,r+1,chirat2))
-tryexpp(indatverplmxigr,expdefs,4,True)        
+tryexpp(indatverplmxigr,expdefs,nsatiterdef,True)        
 
 
 def varpu(indat,pu,niter,diag):
