@@ -175,14 +175,18 @@ def deffactorv(rv,useKAfstV,UseSelFactorV):
         assert(0)
     return rv[np.isin(rv['KAfstCluCode'],useKAfstV) ].copy (deep=False)
 
+
 MainUseSelFactorV='FactorVGen'
 #voor de default run worden ALLE data gebruikt   
 #hierop zijn dan ook de asserts in de code afgesteld
 totaalmotief  =      74170863993
 if MainUseSelFactorV=='FactorVGen':
+    #let op: deze verandert iedere keer als ../inputs/exclpc4motman.csv verandert
     totaalmotief  =  69115694090
+    totaalmotief = 72471495506 # 12 maart 2026
 odinverplgr= deffactorv(odinverplgr_o,maskKAfstV,MainUseSelFactorV )
-print(odinverplgr[odinverplgr['KAfstCluCode'] ==landcod]['FactorVGen'].sum()/totaalmotief/2)
+ototaal= odinverplgr[odinverplgr['KAfstCluCode'] ==landcod]['FactorVGen'].sum()
+print(ototaal/2, ototaal/totaalmotief/2)
 
 chkvalues(pd.DataFrame( odinverplgr[odinverplgr['KAfstCluCode'] ==landcod][['FactorV']].agg('sum'))/totaalmotief/2,1.0,"som FactorV modaliteiten convert_duurzaam_slice")
 

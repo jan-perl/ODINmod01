@@ -774,23 +774,29 @@ diagdtaSF(indatverplmxigr,fitgrps,True,fitdatverplgr,'mxigrp',expdefs)
 
 def pltmotdistgrp (mydati,horax,vertax,vnsep):
     stelafst =195.0 # afstand waar maxbin wordt geplaatst
-    mydat=pd.DataFrame(mydati)    
+    mydat=pd.DataFrame(mydati).copy(deep=True)    
     opdel=['MaxAfst','GeoInd','MotiefV','GrpExpl']
 #    mydat['FactorEst2'] = np.where(mydat['FactorEstNAL']==0,0, 
 #                                 1/ (1/mydat['FactorEstAL'] + 1  /mydat['FactorEstNAL'] ) )
     fsel=['FactorEst','FactorV', 'FactorEstNAL','FactorEstAL','FactorEstNL','DiffS2']
 
+    #maxcat=4 if vnsep else 7
+    maxcat=8
+    rsel= mydat[mydat['MaxAfst']==0].groupby (['MotiefV'])['FactorV'].agg(['sum']).reset_index().sort_values('sum').tail(maxcat)
+#    totrsel = rsel['sum'].max()
+#    rsel = rsel[rsel['sum'] *20 > totrsel]
+    bigmotl = list( rsel['MotiefV'])
+#    print (bigmotl)
+    mydat['GrpExpl'] =  np.where(np.isin(mydat['MotiefV'],bigmotl), mydat['GrpExpl'], 'Overig' )
+    mydat['MotiefV'] =  np.where(np.isin(mydat['MotiefV'],bigmotl), mydat['MotiefV'], 99 )
+    
+    
     rv2= mydat.groupby (opdel)[fsel].agg(['sum']).reset_index()
 #    print ( rv2[ (rv2['MotiefV']==1) & (rv2['MaxAfst']==0) ] ) 
     rv2.columns=opdel+fsel
-    if(vertax=='FactorEst'):
-        limcat=2e9
-    else:
-        limcat=1e9
-    bigmotd= rv2[(rv2['MaxAfst']==0) & (rv2['FactorV']>limcat)  ].groupby('GrpExpl').agg(['count']).reset_index()
-    bigmotl = list( bigmotd['GrpExpl'])
-#    print(bigmotl)
+    rv2['huecol'] =  rv2['GrpExpl']
     
+
     rv2['MaxAfst']=np.where(rv2['MaxAfst']==0 ,stelafst ,rv2['MaxAfst'])
 #    rv2['MaxAfst']=rv2['MaxAfst'] * np.where(rv2['GeoInd']=='AankPC',1,1.02)
     rv2['Qafst']=1/(1/(rv2['MaxAfst']  *0+1e10) +1/ (np.power(rv2['MaxAfst'] ,1.8) *2e8 ))
@@ -799,13 +805,13 @@ def pltmotdistgrp (mydati,horax,vertax,vnsep):
     rv2['drat']= rv2['FactorV']/ rv2['FactorEstNL']
     rv2['DiffS2']= np.where(rv2['DiffS2']< rv2['FactorEstNAL']/100 ,np.nan,  rv2['DiffS2'])
 
-    rvs = rv2[np.isin(rv2['GrpExpl'],bigmotl)].copy()
+    rvs = rv2
 #    rv2['MotiefV']=rv2['MotiefV'].astype(int).astype(str)
     fig, ax = plt.subplots(figsize=(12, 6))
     
 #    print ( rvs[ (rvs['MotiefV']==1) & (rvs['MaxAfst']== stelafst) ] ) 
     
-    rvs['huecol'] = rvs['GrpExpl']
+ 
     if vnsep:
         rvs['huecol'] = rvs['huecol'] + ' ' + rvs['GeoInd']
     if(vertax=='FactorEst'):
@@ -868,7 +874,7 @@ pointspertype(cut3)
 nsatiterdef=4
 for r in range(nsatiterdef):
     cut3=  choose_cutoff(indatverplmxigr,fitgrps,True,fitdatverplgr,'mxigrp',expdefs) 
-    print(pointspertype(cut3))
+#    print(pointspertype(cut3))
     fitpara= fit_cat_parameters(cut3,indatverplmxigr,fitgrps,expdefs)
     fitdatverplgr = predict_values(cut3,indatverplmxigr,fitgrps,fitpara,expdefs,False)
     exp_fitpara(fitdatverplgr,99,"fitparatab"+(str(r+1))+".xlsx")
@@ -1000,14 +1006,19 @@ def tryexpp(indat,pu,niter,diag):
         chirat2=calcchidgrp(lfitdatverplgr,['GeoInd'])['ChiRat'].mean()
         if diag:
             print((pu,r+1,chirat2))
+        if chirat2>1.1:
+            print ("Error converging")
+            return chirat2
+        return chirat2
 tryexpp(indatverplmxigr,expdefs,nsatiterdef,True)        
 
 
 def varpu(indat,pu,niter,diag):
-    lpu=pu
+    lpu=pu.copy()
     for sp in [.49,.5,.55,0.9,1.0]:
         lpu['SP'] =sp
         tryexpp(indat,lpu,niter,diag)
+    return
 varpu(indatverplmxigr,expdefs,4,True) 
 
 calcchidgrp(fitdatverplgr,['MaxAfst','GeoInd'])

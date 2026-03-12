@@ -711,7 +711,7 @@ if debugmxisum:
 #eerst kleine categorieen verwijderen uit odinverplgr
 #niet zo doen: zo ontstaan dubbele records per PC3. Dus: verplaatsen naar ODINcatVN
 grpexpcontrs= ['isnaarhuis','GeoInd','MotiefV','GrpExpl']
-def replacesmallGrpExpl(dfin,landcod):    
+def replacesmallGrpExpl_donotuse(dfin,landcod):    
     defcode=13
     numgrprecs=dfin[dfin['KAfstCluCode']==landcod].groupby(grpexpcontrs)[['GrpExpl']].agg('count').rename(
        columns={'GrpExpl':'NumExplRecs'}).reset_index()
@@ -1531,6 +1531,47 @@ flst = glob.glob ("../intermediate/addgrds/"+globset+"*[a-z]_00*.tif")
 elst = list(re.sub(".tif$",'',re.sub('^.*/','',f) ) for f in flst) 
 elst
 
+#voor deze verhogingen zijn waarden ook analytisch te benaderen uit bekende PC4 waarden.
+#heel grid is dan eigenlijk niet nodig; maar wal goede check
+expposcanchk= ['base' ,'same', 'swap','verd' ,'icat' ,'scat' ]
+
+
+# +
+def compareexprdf(dfm,runname,lbl,myuseKAfstV,normfrin):
+#    dfm.reset_index().to_pickle("../output/fitdf_%s_%s.pd"%(runname,lbl))
+    flgs=lbl.split(sep='_');
+    print(("compareexprdf:",flgs))
+    mymaskKAfstV= list(myuseKAfstV['KAfstCluCode'])
+    mcols=fitgrps+ ['KAfstCluCode', 'GeoInd', 'GrpExpl']
+    print(mcols)
+    normfr=normfrin[mcols].copy(deep=False)
+    for c in normfrin.columns:
+        if not (c in mcols):
+            normfr["C_"+c] = normfrin[c]
+    cmpfr=dfm.merge(normfr, on=mcols, how='outer')
+    print(cmpfr.columns)
+    cmpres= cmpfr.agg('sum').reset_index()
+    print(cmpres)
+    rv=cmpres    
+    return rv 
+
+def chkanallu (explst,incache0,mult,fitp,oridat,myuseKAfst,runname,setname,predgrping):
+    rdf00N=predictnewdistr (cbspc4data,pc4inwgcache,rudifungcache,myuseKAfst,myuseKAfst,
+                skipPCMdf,fitgrps,expdefs,fitpara,predgrping)
+   
+    st = ( compareexprdf(runexperiment(exp,incache0,mult,fitp,myuseKAfst,predgrping),
+                   runname,exp,myuseKAfst ,rdf00N)  for exp in explst )
+    st = pd.concat (st)
+    #print(dto)
+    #st=st.append(dto)
+#    st.reset_index().to_excel("../output/cka_"+runname+setname+".xlsx")
+    return st
+ckar = chkanallu (elst[0:1],rudifungcache,1,fitpara, fitdatverplgr,
+               useKAfstVQ,'Cka06-',globset,'PC4')
+ckar
+
+
+# -
 
 def grosumm(dfm,runname,lbl,myuseKAfstV,normfr):
     dfm.reset_index().to_pickle("../output/fitdf_%s_%s.pd"%(runname,lbl))
@@ -1586,7 +1627,7 @@ stQ
 
 stQ
 
-     
+
 
 # +
 #check eens alles

@@ -30,7 +30,7 @@
 # line land use -> travel distance disctribution -> active mode fraction
 # precision of modelling
 
-#buurten/wijken vs PC4
+#buurten/wijken vs PC4 ; distribution of areas
 
 # +
 odin verpl -> act mode
@@ -39,6 +39,9 @@ uitleg grafiek
 horizontal scale: contribution of distance class to movements
     determined by land-use, infrastructure and preferences (social networks, differences in social class )
 vers
+
+# -
+
 
 
 

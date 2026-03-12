@@ -14,6 +14,7 @@
 
 # +
 #Modellering van ODIN gegevens obv ruimtelijk dichtheden
+#maak nieuwe indelingen en scrijf naar schijf
 # -
 
 # todo
