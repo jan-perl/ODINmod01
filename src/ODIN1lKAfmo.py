@@ -1091,7 +1091,7 @@ def largestdiffsPC (pc4dta,indf):
           ['postcode4','MotiefV','Comment']).first()
     return rv.reset_index()
 ldiff=largestdiffsPC (cbspc4data,fitdatverplpc4gr)
-ldiff.rename(columns={'postcode4': 'OthPC'}.to_csv('../output/exclpc4motman_addl.csv', sep=",",index=False)
+ldiff.rename(columns={'postcode4': 'OthPC'}).to_csv('../output/exclpc4motman_addl.csv', sep=",",index=False)
 ldiff
 
 
@@ -1114,14 +1114,16 @@ def doinsp_ax(dbsel,ax):
     #,hue=dbsel['MotiefV']
     cx.add_basemap(pchkpckrt, source= prov0)
 
-def doinsp(dbsel):    
+def doinsp(dbsel,lbl):    
     fig, ax = plt.subplots(figsize=(16, 40))   
     doinsp_ax(dbsel,ax)
-    figname = "../output/himan_prop.png"
+    figname = "../output/himan_prop-"+lbl+".png"
     fig.savefig(figname,dpi=600) 
-doinsp(ldiff[(ldiff["MotiefV"]!=99)& (ldiff["postcode4"]//100==35)])    
-
+doinsp(ldiff[(ldiff["MotiefV"]!=99)& (ldiff["postcode4"]//100==35)],"35")
 # -
+
+
+doinsp(ldiff[(ldiff["MotiefV"]!=99)& (ldiff["postcode4"]//100!=999)],"all")
 
 
 def doinsp9(dbsel):    
@@ -1134,24 +1136,6 @@ def doinsp9(dbsel):
     figw.savefig(figname,dpi=300) 
 doinsp9(ldiff[(ldiff["MotiefV"]!=99)& (ldiff["postcode4"]//1000!=95)])   
 
-
-# +
-#inspectie
-#grote onderschatters landelijK; winkelcentra, schiphol, en mindere mate universiteit
-
-#chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(3511,3512,3584 )))]
-#chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(6511,6525 )))]
-#chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(2513 ,2333)))]
-#chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(2333,2334,2331) ))]
-#chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(8011) ))]
-chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(3521,3511,3571) ))]
-#chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(5611,5612 )))]
-#chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(2678,2691 )))]
-#chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(1012,1017,1043,1101,1118 )))]
-#chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],(2262,2333,2511,2595 )))]
-pchkpckrt = chkpckrt.to_crs(epsg=plot_crs).plot(alpha=.3)
-cx.add_basemap(pchkpckrt, source= prov0)
-# -
 
 pllanddiff.index
 

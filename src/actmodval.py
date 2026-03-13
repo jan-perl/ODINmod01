@@ -820,7 +820,7 @@ pltactsdb(KafstActiveVori,'orisel','ODIN data Gen - afstanden'+clustr, True)
 
 odinverplAsftsumspec=mkverplAsftsu(odinverplflgsmspec)
 KafstActiveVorimspec = prepactsdb(odinverplAsftsumspec,useKAfstV) 
-pltactsdb(KafstActiveVorimspec,'orisel','Originele ODIN data (incl Spec)'+clustr, False)  
+pltactsdb(KafstActiveVorimspec,'oriall','Originele ODIN data (incl Spec)'+clustr, False)  
 
 # +
 #OK , we weten nu dat we 

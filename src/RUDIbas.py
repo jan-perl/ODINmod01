@@ -19,8 +19,11 @@
 #also defines testing properties for using with workbooks
 # -
 
-suprtests['RUDIbas']
-suprdata['RUDIbas']
+import numpy as np
+import pandas as pd
+
+suprtests=['RUDIbas']
+suprdata=['RUDIbas']
 myname='RUDIbas'
 
 # +
@@ -29,14 +32,15 @@ myname='RUDIbas'
 #wel presenteren we het steeds als cumulatieve sommen tot een bepaalde bin
 # -
 
-useKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01uKA.pkl")
-xlatKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01xKA.pkl")
-useKAfstV  = useKAfstVa [useKAfstVa ["MaxAfst"] <180].copy()
-maxcuse= np.max(useKAfstV[useKAfstV ["MaxAfst"] !=0] ['KAfstCluCode'])
-xlatKAfstV  = xlatKAfstVa [(xlatKAfstVa['KAfstCluCode']<=maxcuse ) |
-                           (xlatKAfstVa['KAfstCluCode']==np.max(useKAfstV[ 'KAfstCluCode']) )].copy()
-#print(xlatKAfstV)   
-print(useKAfstV)   
+if ()
+    useKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01uKA.pkl")
+    xlatKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01xKA.pkl")
+    useKAfstV  = useKAfstVa [useKAfstVa ["MaxAfst"] <180].copy()
+    maxcuse= np.max(useKAfstV[useKAfstV ["MaxAfst"] !=0] ['KAfstCluCode'])
+    xlatKAfstV  = xlatKAfstVa [(xlatKAfstVa['KAfstCluCode']<=maxcuse ) |
+                               (xlatKAfstVa['KAfstCluCode']==np.max(useKAfstV[ 'KAfstCluCode']) )].copy()
+    #print(xlatKAfstV)   
+    print(useKAfstV)   
 
 #dit was alleen voor ODIN1KAFmo om met kleine sets te werken.
 #deze variabele niet gebruiken voor verwerken hele sets, wel voor regressie tests op Q set

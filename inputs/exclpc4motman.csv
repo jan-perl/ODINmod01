@@ -3,24 +3,39 @@ OthPC,MotiefV,Comment
 1012,1,werk binnenstad Adam
 1012,7,binnenstad Adam
 1012,11,binnenstad Adam
+1012,13,binnenstad Adam
+1017,1,binnenstad Adam
 1017,11,musea Adam
+1018,11,musea Adam
+1043,1,werk Sloterdijk
 1064,10,sloterplas sport
 1081,6,VU
+1081,12,VU
+1082,1,werk zuidas
 1101,1,werk Adam ZO
+1101,11,Asd Arena
 1118,1,Schiphol
 1118,2,Schiphol
 1118,4,Schiphol
 1118,8,Schiphol
 1118,11,Schiphol
 1118,13,Schiphol
+1211,7,winkel Hilversum
 1271,7,winkel Huizen
-1334,7,winkel Almere
+1315,7,winkel Almere
+1334,7,winkel Almere Buiten
 1442,7,winkel Purmerend
+1506,7,winkel Zaandam
 1703,7,winkel Alkmaar NO
 1775,1,kassen werk/oppervl overschat
 1779,1,kassen werk/oppervl overschat
 1825,7,winkel Alkmaar
+2011,7,binnenstad Haarlem
+2011,11,binnenstad Haarlem
+2132,1,winkel Hoofddorp
+2132,7,winkel Hoofddorp
 2262,7,winkel Leidschendam
+2312,7,binnenstad Leiden
 2312,11,binnenstad Leiden
 2321,7,winkel
 2333,1,werk Leiden Science
@@ -29,9 +44,12 @@ OthPC,MotiefV,Comment
 2511,7,binnenstad Den Haag
 2511,11,binnenstad Den Haag
 2513,7,winkel Den Haag
+2586,11,Scheveningen
 2595,1,ministeries zak bezoek
 2595,2,ministeries zak bezoek
+2611,7,binnenstad Delft
 2611,11,binnenstad Delft
+2624,7,winkel Tanthof
 2628,6,TU Delft
 2641,1,kassen werk/oppervl overschat
 2651,1,kassen werk/oppervl overschat
@@ -42,19 +60,25 @@ OthPC,MotiefV,Comment
 2678,1,kassen werk/oppervl overschat
 2681,1,kassen werk/oppervl overschat
 2691,1,kassen werk/oppervl overschat
+2711,7,winkel Zoetermeer
 3011,1,werk rotterdam
 3011,2,werk rotterdam
 3011,7,winkelen rotterdam
 3011,11,binnenstad rotterdam
+3012,7,musea Rotterdam
 3012,11,musea Rotterdam
+3015,1,Erasmus MC
+3015,6,Erasmus MC
 3062,6,Erasmus U
 3067,7,Alexandrium
+3083,7,winkel Rtd zuid
 3311,7,Binnenstad Dordrcht
 3431,7,Nieuwegein City Plaza
 3511,1,werk utrecht binnenstad
 3511,2,werk utrecht binnenstad
 3511,7,winkelen utrecht binnenstad
 3511,11,utrecht binnenstad
+3511,13,utrecht binnenstad
 3512,11,Utrecht musea
 3521,1,werk utrecht jaarbeurs
 3521,2,werk utrecht jaarbeurs
@@ -64,19 +88,27 @@ OthPC,MotiefV,Comment
 3641,7,winkel Mijdrecht
 3701,7,winkel Zeist
 3812,7,winkel Amersfoort
+3818,6,Amf Zuid
 3825,7,winkel
 3995,7,Houten Rond en Castellum
 4461,7,winkel Goes
 4811,11,binnenstad Breda
 4815,7,winkel Breda
+4818,6,hogeschool Breda
+5037,6,Tilburg U
 5038,7,winkel
 5038,11,binnenstad Tilburg
+5171,11,Efteling
 5211,11,binnenstad Den Bosch
-5611,11,binnenstad Den Eindhoven
+5223,6,Avans Den Bosch
+5611,1,binnenstad Eindhoven
+5611,11,binnenstad Eindhoven
 5612,6,TU Eindhoven
+5625,7,winkel Woensel
 5657,13,Eindhoven airport
 5928,1,logistiek werk/oppervl overschat
 6211,11,binnenstad Maastricht
+6229,1,Maastricht MC en werk
 6511,7,binnenstad Nijmegen
 6511,11,binnenstad Nijmegen
 6525,1,radboud U
@@ -84,14 +116,18 @@ OthPC,MotiefV,Comment
 6525,6,radboud U
 6525,9,radboud U
 6525,10,radboud U sport
+6811,7,Binnenstad Arnhem
+6811,11,Binnenstad Arnhem
 7311,7,Binnenstad Apeldoorn
 7511,7,Binnenstad Enschede
 7811,7,winkel Emmen
 8011,11,ijsselhallen Zwolle
+8017,6,H Zwolle
 8911,7,winkel Leeuwarden
 9203,7,Drachten winkels
 9401,7,Assen winkels
 9711,11,Binnenstad Groningen
 9712,7,winkel Groningen
+9723,1,winkel Groningen Zuid
 9723,7,winkel Groningen Zuid
 9747,6,Univ Groningen
