@@ -45,6 +45,9 @@ vers
 
 
 
+# + language="html"
+# <img src="../output/act_reg_orisel_m1.svg" width="350" height="350" />
+
 # +
 #ch2 fast calculation of effects of changing land-use
 

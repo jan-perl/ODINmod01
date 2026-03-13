@@ -1063,30 +1063,76 @@ pllanddiff= cbspc4data[['postcode4']].merge(fitdatverplpc4gr[(fitdatverplpc4gr['
             how='left',left_on=('postcode4'), right_on = ('PC4'))
 print ( (len(cbspc4data), len(pllanddiff) ) )
 
+#ter referentie: al uitgesloten PCs ; later: valideren dat FactorVSpec buiten range is
+highman = pd.read_csv("../inputs/exclpc4motman.csv", sep=",")
+highman.dtypes
+
 
 def largestdiffsPC (pc4dta,indf):
     pllanddiffam= pc4dta[['postcode4']].merge(indf[(indf['MaxAfst']==0) ] ,
                                     how='left',left_on=('postcode4'), right_on = ('PC4'))
+    pllanddiffGrpSum=pllanddiffam.groupby('GrpExpl')['FactorV'].agg('sum').\
+        reset_index().rename(columns={'FactorV':'FactGrpSum'})
+#    print (pllanddiffGrpSum)
+    pllanddiffam = pllanddiffam.merge(pllanddiffGrpSum,how='left') .merge(
+        highman.rename(columns={'OthPC':'postcode4'}),how='left')  
+#    print (pllanddiffam)
+    pllanddiffam['Comment'].fillna('',inplace=True)
     pllanddiffam['DiffAbs'] =abs(pllanddiffam['DiffEst'])
+    pllanddiffam['DiffRel'] =-abs(pllanddiffam['DiffEst']/np.sqrt(pllanddiffam['FactGrpSum']) )
     pllanddiffam['MotiefV'] = pllanddiffam['MotiefV'] .astype(int,errors='ignore')
-    okval= pllanddiffam[np.isnan(pllanddiffam['DiffAbs']) == False]
-    rv =okval.sort_values(by='DiffAbs').tail(30).groupby(
-          ['postcode4','MotiefV','GrpExpl','GeoInd'])[['isnaarhuis','DiffEst']].agg(
+    okval= pllanddiffam[np.isnan(pllanddiffam['DiffAbs']) == False]    
+    rv =okval.sort_values(by='DiffRel').head(60)
+    rv= rv.append (pllanddiffam[pllanddiffam['Comment'] !=''] )
+    rv=rv.groupby(
+          ['postcode4','MotiefV','Comment','GrpExpl','GeoInd'])[['isnaarhuis','DiffEst']].agg(
            {'isnaarhuis':'count','DiffEst':'mean'} )
+    rv=rv.groupby(
+          ['postcode4','MotiefV','Comment']).first()
     return rv.reset_index()
 ldiff=largestdiffsPC (cbspc4data,fitdatverplpc4gr)
-print(ldiff.to_csv( sep=",",index=False))
+ldiff.rename(columns={'postcode4': 'OthPC'}.to_csv('../output/exclpc4motman_addl.csv', sep=",",index=False)
+ldiff
 
 
-def doinsp(dbsel):
-    fig, ax = plt.subplots(figsize=(16, 40))
+# +
+def doinsp_ax(dbsel,ax):    
     pcsel=dbsel['postcode4'].to_list()
-    print(dbsel)
+#    print(dbsel)
     chkpckrt = cbspc4data[(np.isin (cbspc4data['postcode4'],pcsel ))]
     pchkpckrt = chkpckrt.to_crs(epsg=plot_crs).plot(alpha=.3,ax=ax)
+    chkpckrt= chkpckrt.merge(dbsel,how='right')
+    chkpckrt['centers']= chkpckrt.to_crs(epsg=plot_crs).representative_point()
+    labcolor='red'
+    prevcolor='green'
+    for x, y, name,cmt in zip(chkpckrt['centers'].x,chkpckrt['centers'].y,
+                          chkpckrt['postcode4'],chkpckrt['Comment']):
+        c2=labcolor if (cmt=="") else prevcolor
+        pchkpckrt.text(x, y , name, color=c2,size=10,alpha=.8)
+#    coord_list = [(x, y) for x, y in zip(itotUtr[ "center"].x, itotUtr[ "center"].y)]    
+    #ctrxform = centergridcoords (smftg1,buurtendata[ "center"]) 
     #,hue=dbsel['MotiefV']
     cx.add_basemap(pchkpckrt, source= prov0)
-doinsp(ldiff[(ldiff["MotiefV"]!=11)& (ldiff["postcode4"]//1000<2)])    
+
+def doinsp(dbsel):    
+    fig, ax = plt.subplots(figsize=(16, 40))   
+    doinsp_ax(dbsel,ax)
+    figname = "../output/himan_prop.png"
+    fig.savefig(figname,dpi=600) 
+doinsp(ldiff[(ldiff["MotiefV"]!=99)& (ldiff["postcode4"]//100==35)])    
+
+# -
+
+
+def doinsp9(dbsel):    
+    figw, axw = plt.subplots(nrows=3, ncols=3 ,figsize=(16, 40))   
+#    print(axw)
+    for d in range(9):
+         doinsp_ax(dbsel[dbsel["postcode4"]//1000==(d+1)],axw[d//3,d%3])
+    figname = "../output/himan_prop9.png"
+    figw.tight_layout(pad=4)
+    figw.savefig(figname,dpi=300) 
+doinsp9(ldiff[(ldiff["MotiefV"]!=99)& (ldiff["postcode4"]//1000!=95)])   
 
 
 # +
@@ -1537,23 +1583,92 @@ expposcanchk= ['base' ,'same', 'swap','verd' ,'icat' ,'scat' ]
 
 
 # +
+def chkanallu_prep (explst,incache0,mult,fitp,oridat,myuseKAfst,runname,setname,predgrping):
+    rdf00N=predictnewdistr (cbspc4data,pc4inwgcache,rudifungcache,myuseKAfst,myuseKAfst,
+                skipPCMdf,fitgrps,expdefs,fitpara,predgrping)
+   
+    st = [runexperiment(exp,incache0,mult,fitp,myuseKAfst,predgrping)  for exp in explst ]
+#    st2 = ( for (exp , stp) in zip( explst,st) :
+        
+#    st=pd.concat(st)
+    #st=st.append(dto)
+#    st.reset_index().to_excel("../output/cka_"+runname+setname+".xlsx")
+    return (rdf00N, st)
+(c_rdf00N, c_st) = chkanallu_prep (elst[-2:],rudifungcache,1,fitpara, fitdatverplgr,
+               useKAfstVQ,'Cka06-',globset,'mxigrp')
+# -
+
+print(c_rdf00N.columns)
+
+
+# +
+def dopred(c,thismod, modpara):
+    o=c.copy()
+    if thismod=='same':
+        o*=np.power(1+modpara ,1.1)
+    return o
+
+
 def compareexprdf(dfm,runname,lbl,myuseKAfstV,normfrin):
 #    dfm.reset_index().to_pickle("../output/fitdf_%s_%s.pd"%(runname,lbl))
     flgs=lbl.split(sep='_');
     print(("compareexprdf:",flgs))
+    thismod= flgs[3]
+    modpara = int(flgs[4])*.001
     mymaskKAfstV= list(myuseKAfstV['KAfstCluCode'])
-    mcols=fitgrps+ ['KAfstCluCode', 'GeoInd', 'GrpExpl']
+    mcols=fitgrps+ ['KAfstCluCode', 'GeoInd', 'GrpExpl','mxigrp']
     print(mcols)
-    normfr=normfrin[mcols].copy(deep=False)
-    for c in normfrin.columns:
-        if not (c in mcols):
-            normfr["C_"+c] = normfrin[c]
-    cmpfr=dfm.merge(normfr, on=mcols, how='outer')
-    print(cmpfr.columns)
-    cmpres= cmpfr.agg('sum').reset_index()
-    print(cmpres)
+    dfms =dfm.sort_values(mcols)
+    norms=normfrin.sort_values(mcols)
+    cmpfr = dfms[mcols].copy()
+    print (((len(norms) , len(dfms))))
+    if (len(norms) != len(dfms)):
+        cmpfr['Icolcmp'] =len(mcols)*10
+    else:
+        cmpfr['Icolcmp'] =np.sum( [ (dfms[c] == norms[c]).astype(int) for c in mcols ] ,axis=0)
+    totcmp=0
+    for c in dfm.columns:
+        if c[0:2] == "M_":
+            pred=dopred(norms[c],thismod, modpara)
+            cmpfr[c] = dfms[c]/ np.where(pred!=0,pred,1)
+            diffs = (np.abs(cmpfr[c]-1) > 1e-6).astype(int)
+            totcmp += diffs
+    
+    cmpfr['Mcolcomp'] =totcmp 
+    if totcmp.sum() > len(norms):
+        fig, ax = plt.subplots(figsize=(6, 4) )
+        for c in dfm.columns:
+            if c[0:2] == "M_":
+                chart= ax.scatter(norms[c],cmpfr[c],label=thismod+"/"+c)
+        ax.legend()
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+        plt.show()
+        
+#    cmpfr=dfm.merge(normfr, on=mcols, how='left')
+#    print(cmpfr)
+    cmpres= cmpfr.mean().reset_index()
+    #nu horen alle records met een C_ de verwachtte waarde te hebben
+#    print(cmpres)
     rv=cmpres    
     return rv 
+
+def chkanallu_prec (explst,incache0,mult,fitp,oridat,myuseKAfst,runname,setname,predgrping,
+                   rdf00N,stprec):
+
+    st = ( compareexprdf(stp,
+                   runname,exp,myuseKAfst ,rdf00N)  for (exp , stp) in zip( explst,stprec) )
+    st = pd.concat (st)
+    #print(dto)
+    #st=st.append(dto)
+#    st.reset_index().to_excel("../output/cka_"+runname+setname+".xlsx")
+    return st
+ckar = chkanallu_prec (elst[-2:],rudifungcache,1,fitpara, fitdatverplgr,
+               useKAfstVQ,'Cka06-',globset,'PC4',c_rdf00N, c_st)
+ckar
+
+
+# -
 
 def chkanallu (explst,incache0,mult,fitp,oridat,myuseKAfst,runname,setname,predgrping):
     rdf00N=predictnewdistr (cbspc4data,pc4inwgcache,rudifungcache,myuseKAfst,myuseKAfst,
@@ -1568,10 +1683,7 @@ def chkanallu (explst,incache0,mult,fitp,oridat,myuseKAfst,runname,setname,predg
     return st
 ckar = chkanallu (elst[0:1],rudifungcache,1,fitpara, fitdatverplgr,
                useKAfstVQ,'Cka06-',globset,'PC4')
-ckar
 
-
-# -
 
 def grosumm(dfm,runname,lbl,myuseKAfstV,normfr):
     dfm.reset_index().to_pickle("../output/fitdf_%s_%s.pd"%(runname,lbl))
@@ -1635,6 +1747,10 @@ stQ
 #stQa
 # -
 print("Finished")
+
+
+
+
 
 
 

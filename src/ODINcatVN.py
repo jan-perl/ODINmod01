@@ -435,8 +435,7 @@ def chhdbl():
         print ("doubles")
         print (herr)
         die
-#highman
-
+highman
 
 hs=highman.sort_values(['OthPC','MotiefV'])
 hs

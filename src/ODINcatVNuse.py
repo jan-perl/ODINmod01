@@ -184,6 +184,7 @@ if MainUseSelFactorV=='FactorVGen':
     #let op: deze verandert iedere keer als ../inputs/exclpc4motman.csv verandert
     totaalmotief  =  69115694090
     totaalmotief = 72471495506 # 12 maart 2026
+    totaalmotief = 71202386306 # 13 maart 2026
 odinverplgr= deffactorv(odinverplgr_o,maskKAfstV,MainUseSelFactorV )
 ototaal= odinverplgr[odinverplgr['KAfstCluCode'] ==landcod]['FactorVGen'].sum()
 print(ototaal/2, ototaal/totaalmotief/2)
