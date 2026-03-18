@@ -21,6 +21,7 @@
 
 import numpy as np
 import pandas as pd
+import os as os
 
 suprtests=['RUDIbas']
 suprdata=['RUDIbas']
@@ -32,16 +33,22 @@ myname='RUDIbas'
 #wel presenteren we het steeds als cumulatieve sommen tot een bepaalde bin
 # -
 
-if ()
-    useKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01uKA.pkl")
+uskafn="../intermediate/ODINcatVN01uKA.pkl"
+if (os.path.isfile(uskafn)):
+    useKAfstVa=pd.read_pickle(uskafn)
     xlatKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01xKA.pkl")
     useKAfstV  = useKAfstVa [useKAfstVa ["MaxAfst"] <180].copy()
     maxcuse= np.max(useKAfstV[useKAfstV ["MaxAfst"] !=0] ['KAfstCluCode'])
     xlatKAfstV  = xlatKAfstVa [(xlatKAfstVa['KAfstCluCode']<=maxcuse ) |
                                (xlatKAfstVa['KAfstCluCode']==np.max(useKAfstV[ 'KAfstCluCode']) )].copy()
     #print(xlatKAfstV)   
-    print(useKAfstV)   
+    #print(useKAfstV)   
 
 #dit was alleen voor ODIN1KAFmo om met kleine sets te werken.
 #deze variabele niet gebruiken voor verwerken hele sets, wel voor regressie tests op Q set
-useKAfstVQ  = useKAfstV [useKAfstV ["MaxAfst"] <4]
+if (os.path.isfile(uskafn)):
+    useKAfstVQ  = useKAfstV [useKAfstV ["MaxAfst"] <4]
+
+fitgrps=['MotiefV','isnaarhuis']
+#SP tussen 0.3 en 1 per motief
+expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0,'SP' :1.0, 'XAL':2.5}

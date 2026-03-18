@@ -76,6 +76,8 @@ import contextily as cx
 import xyzservices.providers as xyz
 import matplotlib.pyplot as plt
 
+import RUDIbas
+
 import rasteruts1
 import rasterio
 calcgdir="../intermediate/calcgrids"
@@ -89,60 +91,22 @@ import numba
 #from numba.utils import IS_PY3
 from numba.decorators import jit
 
-stryear='2020'
-cbspc4data =pd.read_pickle("../intermediate/CBS/pc4data_"+stryear+".pkl")
-cbspc4data= cbspc4data.sort_values(by=['postcode4']).reset_index()
+RUDIbas.suprtests = RUDIbas.suprtests+['cbspc4plot']
+import cbspc4plot
 
-cbspc4data['oppervlak'] = cbspc4data.area
-cbspc4data['aantal_inwoners'] = np.where(cbspc4data['aantal_inwoners'] <0,0,
-                                         cbspc4data['aantal_inwoners'] )
-
-cbspc4data.dtypes
-
-#providers = cx.providers.flatten()
-#providers
-prov0=cx.providers.nlmaps.grijs.copy()
-print( cbspc4data.crs)
-print (prov0)
-plot_crs=3857
-#plot_crs=28992
-if 1==1:
-#    prov0['url']='https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/{variant}/EPSG:28992/{z}/{x}/{y}.png'
-    prov0['url']='https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/{variant}/EPSG:3857/{z}/{x}/{y}.png'    
-#    prov0['bounds']=  [[48.040502, -1.657292 ],[56.110590 ,12.431727 ]]  
-    prov0['bounds']=  [[48.040502, -1.657292 ],[56.110590 ,12.431727 ]]  
-    prov0['min_zoom']= 0
-    prov0['max_zoom'] =12
-    print (prov0)
-
-pland= cbspc4data.to_crs(epsg=plot_crs).plot()
-cx.add_basemap(pland, source= prov0)
-
-cbspc4datahtn = cbspc4data[(cbspc4data['postcode4']>3990) & (cbspc4data['postcode4']<3999)]
-phtn = cbspc4datahtn.to_crs(epsg=plot_crs).plot()
-cx.add_basemap(phtn, source= prov0)
-
-cbspc4datahtn = cbspc4data[(cbspc4data['postcode4']==3995)]
-phtn = cbspc4datahtn.to_crs(epsg=plot_crs).plot()
-cx.add_basemap(phtn, source= prov0)
-
-pc4tifname=calcgdir+'/cbs2020pc4-NL.tif'
-pc4excols= ['aantal_inwoners','aantal_mannen', 'aantal_vrouwen']
-pc4inwgrid= rasterio.open(pc4tifname)
+cbspc4data= cbspc4plot.cbspc4data
+if 0==1:
+    pc4tifname=calcgdir+'/cbs2020pc4-NL.tif'
+    pc4excols= ['aantal_inwoners','aantal_mannen', 'aantal_vrouwen']
+pc4inwgrid=cbspc4plot.pc4inwgrid
 
 #rudifunset, heb originele data niet nodig, alleen grid
 #Rf_net_buurt=pd.read_pickle("../intermediate/rudifun_Netto_Buurt_o.pkl") 
 #Rf_net_buurt.reset_index(inplace=True,drop=True)
 #gemaakt in ROfietsbalans2
-rudifuntifname=calcgdir+'/oriTN2-NL.tif'
-rudifungrid= rasterio.open(rudifuntifname)
+rudifungrid= cbspc4plot.rudifungrid
 
-
-def getcachedgrids(src):
-    clst={}
-    for i in src.indexes:
-        clst[i] = src.read(i) 
-    return clst
+getcachedgrids= cbspc4plot.getcachedgrids
 pc4inwgcache = getcachedgrids(pc4inwgrid)
 rudifungcache = getcachedgrids(rudifungrid)
 
@@ -157,19 +121,25 @@ rudifungcache = getcachedgrids(rudifungrid)
 #wel presenteren we het steeds als cumulatieve sommen tot een bepaalde bin
 # -
 
-useKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01uKA.pkl")
-xlatKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01xKA.pkl")
-#was<20
-useKAfstV  = useKAfstVa [useKAfstVa ["MaxAfst"] <180].copy()
-maxcuse= np.max(useKAfstV[useKAfstV ["MaxAfst"] !=0] ['KAfstCluCode'])
-xlatKAfstV  = xlatKAfstVa [(xlatKAfstVa['KAfstCluCode']<=maxcuse ) |
-                           (xlatKAfstVa['KAfstCluCode']==np.max(useKAfstV[ 'KAfstCluCode']) )].copy()
-#print(xlatKAfstV)   
-print(useKAfstV)   
+if 0==1:
+    useKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01uKA.pkl")
+    xlatKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01xKA.pkl")
+    #was<20
+    useKAfstV  = useKAfstVa [useKAfstVa ["MaxAfst"] <180].copy()
+    maxcuse= np.max(useKAfstV[useKAfstV ["MaxAfst"] !=0] ['KAfstCluCode'])
+    xlatKAfstV  = xlatKAfstVa [(xlatKAfstVa['KAfstCluCode']<=maxcuse ) |
+                               (xlatKAfstVa['KAfstCluCode']==np.max(useKAfstV[ 'KAfstCluCode']) )].copy()
+    #print(xlatKAfstV)   
+    print(useKAfstV)
+else:
+    useKAfstV=RUDIbas.useKAfstV
 
-useKAfstVQ  = useKAfstV [useKAfstV ["MaxAfst"] <4]
-#print(xlatKAfstV)   
-print(useKAfstVQ)   
+if 0==1:
+    useKAfstVQ  = useKAfstV [useKAfstV ["MaxAfst"] <4]
+    #print(xlatKAfstV)   
+    print(useKAfstVQ)   
+else:
+    useKAfstVQ=RUDIbas.useKAfstVQ        
 
 # +
 #import ODiN2pd
@@ -203,8 +173,10 @@ def mkfietswijk3pc4(pc4data,pc4grid,rudigrid):
 fietswijk3pc4=mkfietswijk3pc4(cbspc4data,pc4inwgcache,rudifungcache)
 bd=fietswijk3pc4 [abs(fietswijk3pc4['aantal_inwoners_d2'] ) > 1 ]
 
-expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0,'SP':1.0, 'XAL':2.5}
-
+fitgrps=RUDIbas.fitgrps
+#SP tussen 0.3 en 1 per motief
+expdefs =RUDIbas.expdefs
+#expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0,'SP':1.0, 'XAL':2.5}
 
 # +
 #filtgridprecalc_unused wordt in huidige code niet gebruikt: aanname is dat dit toch verschillend is per variant
@@ -453,7 +425,7 @@ useKAfstVland = useKAfstV [useKAfstV['MaxAfst']==0]
 geoschpc4land=mkgeoschparafr(cbspc4data,pc4inwgcache,rudifungcache,useKAfstVland,expdefs,sstepsd)
 geoschpc4land
 
-
+RUDIbas.suprtests = RUDIbas.suprtests+['ODINcatVNuse']
 
 from importlib import reload  # Python 3.4+
 if False:
@@ -824,7 +796,6 @@ def mkdfverplxypc4 (dfg2,pltgrps,selstr,myKAfstV,myxlatKAfstV,geoschpc4in,pu):
     
     return rv
 
-fitgrps=['MotiefV','isnaarhuis']
 indatverplpc4gr = mkdfverplxypc4 (odinverplgr ,fitgrps,'Motief en isnaarhuis',
                                 useKAfstV,xlatKAfstV,geoschpc4,2.0)
 len(indatverplpc4gr)
@@ -844,6 +815,7 @@ indatverplmxigr.dtypes
 
 
 #only import after writing intermediate file -> avoid deadlocks
+RUDIbas.suprtests = RUDIbas.suprtests+['estsatmod']
 import estsatmod
 
 #M_LW_AL, M_LO_AL zou uiteindelijk voor landelijke schatting alleen afhankelijk moeten zijn van excluded PCs
@@ -1731,6 +1703,8 @@ stQ
 #stQa
 # -
 print("Finished")
+
+
 
 
 

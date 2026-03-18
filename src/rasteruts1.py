@@ -45,7 +45,6 @@ import rasterstats
 
 from numba import cuda
 import numpy as np
-
 import numba
 #from numba.utils import IS_PY3
 from numba.decorators import jit

@@ -63,6 +63,13 @@ import contextily as cx
 import xyzservices.providers as xyz
 import matplotlib.pyplot as plt
 
+import RUDIbas
+
+suprtests= 'ODINcatVNuse' in RUDIbas.suprtests 
+suprdata= 'ODINcatVNuse' in RUDIbas.suprdata
+#suprtests=True
+print ('Suprtests',suprtests)
+
 import rasteruts1
 import rasterio
 calcgdir="../intermediate/calcgrids"
@@ -72,54 +79,8 @@ from scipy.optimize import nnls
 from sklearn import linear_model
 import seaborn
 
-stryear='2020'
-cbspc4data =pd.read_pickle("../intermediate/CBS/pc4data_"+stryear+".pkl")
-cbspc4data= cbspc4data.sort_values(by=['postcode4']).reset_index()
-
-cbspc4data['oppervlak'] = cbspc4data.area
-
-cbspc4data.dtypes
-
-#providers = cx.providers.flatten()
-#providers
-prov0=cx.providers.nlmaps.grijs.copy()
-print( cbspc4data.crs)
-print (prov0)
-plot_crs=3857
-#plot_crs=28992
-if 1==1:
-#    prov0['url']='https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/{variant}/EPSG:28992/{z}/{x}/{y}.png'
-    prov0['url']='https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/{variant}/EPSG:3857/{z}/{x}/{y}.png'    
-#    prov0['bounds']=  [[48.040502, -1.657292 ],[56.110590 ,12.431727 ]]  
-    prov0['bounds']=  [[48.040502, -1.657292 ],[56.110590 ,12.431727 ]]  
-    prov0['min_zoom']= 0
-    prov0['max_zoom'] =12
-    print (prov0)
-
-pland= cbspc4data.to_crs(epsg=plot_crs).plot()
-cx.add_basemap(pland, source= prov0)
-
-cbspc4datahtn = cbspc4data[(cbspc4data['postcode4']>3990) & (cbspc4data['postcode4']<3999)]
-phtn = cbspc4datahtn.to_crs(epsg=plot_crs).plot()
-cx.add_basemap(phtn, source= prov0)
-
-cbspc4datahtn = cbspc4data[(cbspc4data['postcode4']==3995)]
-phtn = cbspc4datahtn.to_crs(epsg=plot_crs).plot()
-cx.add_basemap(phtn, source= prov0)
-
-pc4tifname=calcgdir+'/cbs2020pc4-NL.tif'
-pc4excols= ['aantal_inwoners','aantal_mannen', 'aantal_vrouwen']
-pc4inwgrid= rasterio.open(pc4tifname)
-
-
-def getcachedgrids(src):
-    clst={}
-    for i in src.indexes:
-        clst[i] = src.read(i) 
-    return clst
-pc4inwgcache = getcachedgrids(pc4inwgrid)
-
-# nu nog MXI overzetten naar PC4 ter referentie
+RUDIbas.suprtests = RUDIbas.suprtests+['cbspc4plot']
+import cbspc4plot
 
 # +
 #odinverplgr per PC aank of vertr
@@ -132,7 +93,7 @@ pc4inwgcache = getcachedgrids(pc4inwgrid)
 #xlatKAfstV=pd.read_pickle("../intermediate/ODINcatVN01xKA.pkl")
 # -
 
-fitgrps=['MotiefV','isnaarhuis']
+fitgrps=RUDIbas.fitgrps
 
 odinverplflgs_o=pd.read_pickle("../intermediate/ODINcatVN03db.pkl")
 kflgsflds=['FactorV',"FactorKm","FactorKmAuto","FactorKmActive","FactorVActive"]
@@ -244,8 +205,9 @@ def mkverplsum1(indf,landcod):
     totdf=indf[indf['KAfstCluCode']==landcod]    
     rv=totdf.groupby("GrpTyp")[infoflds].agg('sum')
     return rv
-o2=mkverplsum1(odinverplklinfo,landcod)
-o2 *aantaljaren / totaalmotief
+if (not suprtests): 
+    o2=mkverplsum1(odinverplklinfo,landcod)
+    o2 *aantaljaren / totaalmotief
 #assert niet eenvoudig mogelijk i.v.m. afwijkende normalisatie Jaar
 
 # +
@@ -253,7 +215,8 @@ def mkverplsum1metlab(indf,kf,landcod):
     totdf=indf[indf['KAfstCluCode']==landcod]    
     rv=totdf.groupby(['KAfstCluCode']+kf)[infoflds].agg('sum')
     return rv
-t2=(mkverplsum1metlab(odinverplklinfo,kinfoflds,landcod)*aantaljaren/totaalmotief).reset_index()
+if (not suprtests): 
+    t2=(mkverplsum1metlab(odinverplklinfo,kinfoflds,landcod)*aantaljaren/totaalmotief).reset_index()
 
 def convert_duurzaam_slice(t3):
     t2= t3[t3['GrpTyp']=='KHvm'].copy(deep=False)
@@ -264,20 +227,22 @@ def convert_duurzaam_slice(t3):
     return t2
 #aantallen in miljarden per jaar, laatste kolom in kms
 #t2
-t2=convert_duurzaam_slice(t2)
-t2['GemAfst']=t2['FactorKm']/ t2['FactorV']
-#print(pd.DataFrame( t2[['FactorV']].agg('sum') ) )
-chkvalues(pd.DataFrame( t2[['FactorV']].agg('sum') ),1.0,"som FactorV modaliteiten convert_duurzaam_slice")
-t2
+if (not suprtests): 
+    t2=convert_duurzaam_slice(t2)
+    t2['GemAfst']=t2['FactorKm']/ t2['FactorV']
+    #print(pd.DataFrame( t2[['FactorV']].agg('sum') ) )
+    chkvalues(pd.DataFrame( t2[['FactorV']].agg('sum') ),1.0,"som FactorV modaliteiten convert_duurzaam_slice")
+    t2
 
 # +
 #https://www.cbs.nl/nl-nl/visualisaties/verkeer-en-vervoer/verkeer/verkeersprestaties-personenautos
 #In 2022 legden alle Nederlandse personenauto’s samen 114,3 miljard kilometer af.
 # -
 
-t2=mkverplsum1metlab(odinverplklinfo[odinverplklinfo['GrpTyp']=='Jaar'],kinfoflds,landcod)/1e9
-t2['GemAfst']=t2['FactorKm']/ t2['FactorV']   
-t2
+if (not suprtests): 
+    t2=mkverplsum1metlab(odinverplklinfo[odinverplklinfo['GrpTyp']=='Jaar'],kinfoflds,landcod)/1e9
+    t2['GemAfst']=t2['FactorKm']/ t2['FactorV']   
+    t2
 
 
 # +
@@ -340,13 +305,13 @@ def convert_diffgrpsidatold(indf,fg,kf,fclu,landcod,relative):
     else:
         rv= indfs [fg+kf+ ['KAfstCluCode','FactorC','FactorKm'] ]
     return rv 
-odindiffgrpinfo0 = convert_diffgrpsidatold(odinverplklinfo,fitgrpse,kinfoflds,['GrpTyp'],landcod,True)
-odindiffgrpinfo0
+if (not suprtests): 
+    odindiffgrpinfo0 = convert_diffgrpsidatold(odinverplklinfo,fitgrpse,kinfoflds,['GrpTyp'],landcod,True)
+    odindiffgrpinfo0
 
 
 # +
- #nu kenmerken per opvolgend slice
-
+#nu kenmerken per opvolgend slice
 def _mkratios2 (indfs,indfgr,onflds,cflds):
 #    print((indfs.columns),len(indfs))
 #    print((indfgr.columns),len(indfgr))
@@ -375,7 +340,6 @@ def _chkratios2 (indfr,grp,cflds):
     if len(indfail1)>0:
         print(grp,len(indfail1),len(indfr),indfail1)
         raise("programming error")
-
 
 def convert_diffgrpsidat(indf,fg,kf,infflds,fclu,pf,landcod,relative):
     indfs =indf [ ~np.isnan (indf['FactorV'])].sort_values(by=fg+kf+['KAfstCluCode']).reset_index(drop=True)    
@@ -415,10 +379,10 @@ def convert_diffgrpsidat(indf,fg,kf,infflds,fclu,pf,landcod,relative):
     else:
         rv= indfs [fg+kf+ ['KAfstCluCode'] + ifcflds ]
     return rv 
-
-odindiffgrpinfo2 = convert_diffgrpsidat(odinverplklinfo,fitgrpse,kinfoflds,infoflds,
-                                       ['GrpTyp'],"_c",landcod,True)
-odindiffgrpinfo2
+if (not suprtests): 
+    odindiffgrpinfo2 = convert_diffgrpsidat(odinverplklinfo,fitgrpse,kinfoflds,infoflds,
+                                           ['GrpTyp'],"_c",landcod,True)
+    odindiffgrpinfo2
 
 
 # +
@@ -427,47 +391,54 @@ def _dbg (df):
     s2= s1[s1['GrpTyp']=='Jaar']
     return s2
 
-s2r = _dbg(odinverplklinfo)    
-s2r.groupby('KAfstCluCode').sum()
+if (not suprtests): 
+    s2r = _dbg(odinverplklinfo)    
+    s2r.groupby('KAfstCluCode').sum()
 # -
 
 #dit stukje code vergelijkt de data van de oude en nieuwe methode
 #en laat de verschillend zien in FactorVd. Deze blijken nul te zijn
-odindiffgrpinfo = odindiffgrpinfo2
-odindiffgrpinfodifa = odindiffgrpinfo2.merge(odindiffgrpinfo0)
-odindiffgrpinfodifa['FactorVd']= odindiffgrpinfodifa['FactorC'] - odindiffgrpinfodifa['FactorV_c']
-odindiffgrpinfodifa['FactorKmd']= odindiffgrpinfodifa['FactorKm'] - odindiffgrpinfodifa['FactorKm_c']
-odindiffgrpinfodifa.sort_values(by='FactorVd')
+if (not suprtests): 
+    odindiffgrpinfo = odindiffgrpinfo2
+    odindiffgrpinfodifa = odindiffgrpinfo2.merge(odindiffgrpinfo0)
+    odindiffgrpinfodifa['FactorVd']= odindiffgrpinfodifa['FactorC'] - odindiffgrpinfodifa['FactorV_c']
+    odindiffgrpinfodifa['FactorKmd']= odindiffgrpinfodifa['FactorKm'] - odindiffgrpinfodifa['FactorKm_c']
+    odindiffgrpinfodifa.sort_values(by='FactorVd')
 
-odindiffgrpinfodifa.groupby("GrpTyp").agg('sum')
+if (not suprtests): 
+    odindiffgrpinfodifa.groupby("GrpTyp").agg('sum')
 
 #eens kijken of de Factor C en factorKm ergens op slaan
-odindiffgrpinfo[odindiffgrpinfo['GrpTyp']=='Jaar'].sort_values(by=fitgrpse+['KAfstCluCode']+kinfoflds)
+if (not suprtests): 
+    odindiffgrpinfo[odindiffgrpinfo['GrpTyp']=='Jaar'].sort_values(by=fitgrpse+['KAfstCluCode']+kinfoflds)
 
 #eens kijken of de Factor C en factorKm ergens op slaan
-odinverplgr.sort_values(by=fitgrpse+['GeoInd','PC4','KAfstCluCode'])
+if (not suprtests): 
+    odinverplgr.sort_values(by=fitgrpse+['GeoInd','PC4','KAfstCluCode'])
 
 
-# +
 def mkduurzconvert(lf,fg):
     ds= convert_duurzaam_slice(lf.rename(columns={'FactorV_c':'FactorV', 'FactorKm_c':'FactorKm'}))
     ds=ds.drop(columns=["GrpTyp", "GrpVal","GrpV_label"])
     dssu=ds.groupby(['KAfstCluCode']+fg).agg('sum').reset_index()    
     return dssu
-    
-duurzrefnrs = mkduurzconvert(odindiffgrpinfo,fitgrpse)
-# -
+if (not suprtests):     
+    duurzrefnrs = mkduurzconvert(odindiffgrpinfo,fitgrpse)
 
-seaborn.lineplot(data=duurzrefnrs,x="FactorKm",y="KmActive",hue="GrpExpl")
+if (not suprtests):    
+    seaborn.lineplot(data=duurzrefnrs,x="FactorKm",y="KmActive",hue="GrpExpl")
 
-seaborn.lineplot(data=duurzrefnrs,x="FactorKm",y="CO2GT",hue="GrpExpl")
+if (not suprtests):    
+    seaborn.lineplot(data=duurzrefnrs,x="FactorKm",y="CO2GT",hue="GrpExpl")
 
-odinverplflgs
+if (not suprtests):    
+    odinverplflgs
 
 kflgsflds
 
-odindiffflginfo = convert_diffgrpsidat(odinverplflgs,fitgrpse,[],kflgsflds, [],"_c",landcod,False)
-odindiffflginfo
+if (not suprtests):    
+    odindiffflginfo = convert_diffgrpsidat(odinverplflgs,fitgrpse,[],kflgsflds, [],"_c",landcod,False)
+    odindiffflginfo
 
 
 def mkdatadiff0(verpl,fg,landcod):    
@@ -503,9 +474,10 @@ datadiffcache = mkdatadiff(odinverplgr,fitgrpse,infoflds,'PC4',landcod)
 datadiffcache.dtypes
 # -
 
-c2 =datadiffcache.groupby("GeoInd")[['FactorV_v','FactorKm_v']].agg('sum')/totaalmotief
-chkvalues( c2,1.0,"mkdatadiff(odinverplgr")
-c2
+if (not suprtests):    
+    c2 =datadiffcache.groupby("GeoInd")[['FactorV_v','FactorKm_v']].agg('sum')/totaalmotief
+    chkvalues( c2,1.0,"mkdatadiff(odinverplgr")
+    c2
 
 #zoeken naar missende data als bovenstaande d2 uit datadiffcache niet op 0 uit komt
 datadiferr=False
@@ -545,19 +517,19 @@ def normflgvals (vg,kenmu,fg,cflds,outkeeppart):
     for fld in cflds:
         ds[fld] = ds['FactorV_v'] * ds[fld+'_c']/ ds['FactorV_c']   
     debug = False
+    errstr=""
     if debug:
         ds['Checkn2'] = 1 * ds['FCone']
         indftst=ds.groupby(fg+['KAfstCluCode'] +  ["GrpTyp",'GeoInd'] ).agg('sum').reset_index()    
         indfail1 = indftst[(abs(indftst['Checkn2']-1)> 1e-6) & (indftst['Checkn2'] !=0)]
         if len(indfail1)>0:
-            print(indfail1)
-            raise("programming error")   
+            errstr = errstr+ str(indfail1)
 #    todrop1= list( (fld+"_v" for fld in cflds) )
-    todrop2= list ( (fld+"_c" for fld in cflds) ) 
+    todrop2= list ( [fld+"_c" for fld in cflds] ) 
 #    print(todrop2)
     dsc= ds.drop(columns=todrop2)               
     dssu=dsc.groupby(fg+outkeeppart+ ['GeoInd'] ).agg('sum').reset_index()    
-    return dssu
+    return (errstr, dssu )
 
 
 #pak nu database als odinverplgr, differentieer per slice, en plak 
@@ -565,23 +537,25 @@ def normflgvals (vg,kenmu,fg,cflds,outkeeppart):
 def mkinfosums(vg,kenmu,fg,kenmcols,landcod):    
 #    print(('vg',len(vg),vg.dtypes))    
 #    print(('kenmu',len(kenmu),kenmu.dtypes))
-    dssu=  normflgvals (vg,kenmu,fg,kenmcols,[]) 
+    (errstr, dssu )=  normflgvals (vg,kenmu,fg,kenmcols,[]) 
+    if errstr != "":
+        print (errstr)
+        raise("programming error")   
     return dssu
-    
-infotots2 = mkinfosums(datadiffcache ,odindiffflginfo,fitgrpse,kflgsflds,landcod)
-infotots2.dtypes
+if (not suprtests):     
+    infotots2 = mkinfosums(datadiffcache ,odindiffflginfo,fitgrpse,kflgsflds,landcod)
+    infotots2.dtypes
 # -
 
-infotots2 
+if (not suprtests):    
+    infotots2 
 
-# +
 #dubbel check: komen FactorV_v en FactorV precies uit (resultaat 1.0) op de totalen in ODINcatVN ?
-
-o2=infotots2.groupby(["GeoInd"]).agg('sum')
-if True:
-    print(o2/totaalmotief)    
-chkvalues( (o2[['FactorV_v','FactorKm_v','FactorV']] )/totaalmotief,1.0,"Factors infotots2")
-# -
+if (not suprtests):    
+    o2=infotots2.groupby(["GeoInd"]).agg('sum')
+    if True:
+        print(o2/totaalmotief)    
+    chkvalues( (o2[['FactorV_v','FactorKm_v','FactorV']] )/totaalmotief,1.0,"Factors infotots2")
 
 # nu maskeren en tof wegschrijven per PC4
 
@@ -632,7 +606,7 @@ def mksumperklas(vg,kenmu,fg):
     dssu1 = pd.concat(dssu0)
     return dssu1
     
-if True:
+if (not suprtests):    
     cattots2 = mksumperklas(datadiffcache,odindiffgrpinfo,fitgrpse)
     o2=cattots2.groupby(["GrpTyp","GeoInd"]).agg('sum')
     print(o2/totaalmotief)    
@@ -655,21 +629,23 @@ chkvalues(ltot/totaalmotief,1.0, "Factor odinltot (odinverplgr ")
 ltot
 # -
 
-t2=mkverplsum1(odinverplklinfo,landcod)/totaalmotief
-t2=t2.reset_index()
-t2['grpfact']= np.where (t2['GrpTyp']=='Jaar',1,aantaljaren)
-t2=t2.set_index('GrpTyp')
-t2['FactorV']=t2['FactorV']*t2['grpfact']
-t2['FactorKm']=t2['FactorKm']*t2['grpfact']
-#print(d2)
-t2['GemAfst']=t2['FactorKm']/ t2['FactorV']            
-chkvalues(t2[['FactorV']] ,1.0, "Factor mkverplsum1(odinverplklinfo ")
-t2
+if (not suprtests):    
+    t2=mkverplsum1(odinverplklinfo,landcod)/totaalmotief
+    t2=t2.reset_index()
+    t2['grpfact']= np.where (t2['GrpTyp']=='Jaar',1,aantaljaren)
+    t2=t2.set_index('GrpTyp')
+    t2['FactorV']=t2['FactorV']*t2['grpfact']
+    t2['FactorKm']=t2['FactorKm']*t2['grpfact']
+    #print(d2)
+    t2['GemAfst']=t2['FactorKm']/ t2['FactorV']            
+    chkvalues(t2[['FactorV']] ,1.0, "Factor mkverplsum1(odinverplklinfo ")
+    t2
 
-o2= datadiffcache.groupby(['GeoInd']).sum()/totaalmotief
-#ook hier hoort FactorV_v / totaalmotief weer op 1.0 uit te komen.
-print(o2)
-chkvalues(o2[['FactorV_v','FactorKm_v']],1.0, "datadiffcache FactorV_v")
+if (not suprtests):    
+    o2= datadiffcache.groupby(['GeoInd']).sum()/totaalmotief
+    #ook hier hoort FactorV_v / totaalmotief weer op 1.0 uit te komen.
+    print(o2)
+    chkvalues(o2[['FactorV_v','FactorKm_v']],1.0, "datadiffcache FactorV_v")
 
 print("Finished")
 

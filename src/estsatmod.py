@@ -34,6 +34,9 @@
 #beschrijf kenmerken
 #volledig additief
 # binnen cirkels
+
+# +
+# #%load_ext cudf.pandas
 # -
 
 import pandas as pd
@@ -49,6 +52,13 @@ import geopandas
 import contextily as cx
 import xyzservices.providers as xyz
 import matplotlib.pyplot as plt
+
+import RUDIbas
+
+suprtests= 'estsatmod' in RUDIbas.suprtests 
+suprdata= 'estsatmod' in RUDIbas.suprdata
+#suprtests=True
+print ('Suprtests',suprtests)
 
 import rasteruts1
 import rasterio
@@ -84,14 +94,15 @@ if False:
     #was<20
     useKAfstV  = useKAfstVa [useKAfstVa ["MaxAfst"] <180].copy()
 
-fitgrps=['MotiefV','isnaarhuis']
+fitgrps=RUDIbas.fitgrps
 #SP tussen 0.3 en 1 per motief
-expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0,'SP' :1.0, 'XAL':2.5}
+expdefs =RUDIbas.expdefs
 
-indatverplmxigr=pd.read_pickle("../intermediate/indatverplmxigr_ini.pkl") 
-#MLlen(indatverplmxigr)
-indatverplmxigr['PC4'] =0
-indatverplmxigr.dtypes
+if (not suprdata):  
+    indatverplmxigr=pd.read_pickle("../intermediate/indatverplmxigr_ini.pkl") 
+    #MLlen(indatverplmxigr)
+    indatverplmxigr['PC4'] =0
+    indatverplmxigr.dtypes
 
 # indatverplmxigr is een excel baar overzicht met afstands overzichten per motief, gesommeerd over het land
 # en niet gefilterd
@@ -112,7 +123,8 @@ def showtotmot(df,metm):
         shgr = shgr + ['M_LW_AL','M_LO_AL']
     dflg= dfl.groupby(['MotiefV','GeoInd'])[shgr].agg('sum')
     return dflg.T
-showtotmot(indatverplmxigr,True)    
+if (not suprtests):
+    showtotmot(indatverplmxigr,True)    
 
 indatverplmxigr [(indatverplmxigr ['FactorV']>0 ) ==False]
 
@@ -535,9 +547,11 @@ def fitinddiag(fitdf,motiefc,naarhuisc,geoindex,grpind,pu):
     seaborn.scatterplot(data=plmelt,x="FactorVPrel",y="vals", hue='cols', ax=ax)
     ax.set_xscale('log')
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-fitinddiag(cut2,10,5,'VertPC','mxigrp',expdefs)    
+if (not suprtests):
+    fitinddiag(cut2,10,5,'VertPC','mxigrp',expdefs)    
 
-pointspertype(cut2)
+if (not suprtests):
+    pointspertype(cut2)
 
 
 # +
@@ -691,6 +705,7 @@ if 1==1:
     fitdatverplgr = predict_values(cut2,indatverplmxigr,fitgrps,fitpara,expdefs,False)
     #fitdatverplgr = dofitdatverplgr(cut2,indatverplgr,fitgrps,expdefs)
     #fitdatverplgr = dofitdatverplgr(cut2,indatverplmxigr,fitgrps,expdefs)
+if (not suprtests):
     fitdatverplgrx = fitdatverplgr[abs(fitdatverplgr["DiffEst"])> 2e6] 
     seaborn.scatterplot(data=fitdatverplgrx,x="FactorEst",y="DiffEst",hue="GeoInd")
 
@@ -705,10 +720,10 @@ def exp_fitpara(fitdat,clufrom,outfn):
     paratab=fitdatverplgr[sel].groupby (['MotiefV','isnaarhuis','GeoInd','GrpExpl']).agg('mean').reset_index()
     paratab.to_excel("../output/"+outfn,index=False)
     return paratab
-exp_fitpara(fitdatverplgr,99,"fitparatab0.xlsx")
+if (not suprtests):
+    exp_fitpara(fitdatverplgr,99,"fitparatab0.xlsx")
 
 
-# +
 def diagdtaAL(indat,pltgrps,hasfitted,prevrres,grpind,pu):
     recisAL=(indat['MaxAfst']==0 ) & ((indat['FactorV']!=0 ) )
     outframe=indat.copy(deep=False)
@@ -733,11 +748,10 @@ def diagdtaAL(indat,pltgrps,hasfitted,prevrres,grpind,pu):
     retcols=fitgrps+[grpind,'GrpExpl','GeoInd',xaxval,'FactorV','FactVrat']
     extr= (ALframe['FactVrat'] > hlpos) | (ALframe['FactVrat']<1/ hlpos) 
     return ALframe[extr][retcols]
+if (not suprtests):
+    diagdtaAL(indatverplmxigr,fitgrps,True,fitdatverplgr,'mxigrp',expdefs)     
 
-diagdtaAL(indatverplmxigr,fitgrps,True,fitdatverplgr,'mxigrp',expdefs)     
 
-
-# +
 def diagdtaSF(indat,pltgrps,hasfitted,prevrres,grpind,curvpwr):
     recisAL=(indat['MaxAfst']==0 ) & ((indat['FactorV']!=0 ) )
     outframe=indat.copy(deep=False)
@@ -762,8 +776,8 @@ def diagdtaSF(indat,pltgrps,hasfitted,prevrres,grpind,curvpwr):
     retcols=fitgrps+[grpind,'GrpExpl','GeoInd',xaxval,'FactorV','FactVrat']
     extr= (ALframe['FactVrat'] > hlpos) | (ALframe['FactVrat']<1/ hlpos) 
     return ALframe[extr][retcols]
-
-diagdtaSF(indatverplmxigr,fitgrps,True,fitdatverplgr,'mxigrp',expdefs) 
+if (not suprtests):
+    diagdtaSF(indatverplmxigr,fitgrps,True,fitdatverplgr,'mxigrp',expdefs) 
 
 
 # +
@@ -838,10 +852,12 @@ def pltmotdistgrp (mydati,horax,vertax,vnsep):
     figname = "../output/gplo_fmdg_"+"horax"+"_"+vertax+"_"+'G1.svg';
     fig.savefig(figname, bbox_inches="tight") 
     return (rv2)
-ov=pltmotdistgrp(fitdatverplgr,'MaxAfst','FactorEst',False)
+if (not suprtests):
+    ov=pltmotdistgrp(fitdatverplgr,'MaxAfst','FactorEst',False)
 # -
 
-ov=pltmotdistgrp(fitdatverplgr,'MaxAfst','linpch',False)
+if (not suprtests):
+    ov=pltmotdistgrp(fitdatverplgr,'MaxAfst','linpch',False)
 
 cut3=  choose_cutoff(indatverplmxigr,fitgrps,True,fitdatverplgr,'mxigrp',expdefs)  
 #cut3=  choose_cutoff(indatverplgr,fitgrps,True,fitdatverplgr,expdefs)  
@@ -861,13 +877,15 @@ def selrecs(c3in):
 #selrecs(cut3) 
 
 
-cut3[cut3[ 'FactorVFo']>1][[ 'FactorVFo']]
+if (not suprtests):
+    cut3[cut3[ 'FactorVFo']>1][[ 'FactorVFo']]
 
 # +
 #fitinddiag(cut3,10,5,'VertPC',p_CP)    
 # -
 
-pointspertype(cut3)
+if (not suprtests):
+    pointspertype(cut3)
 
 # +
 #voor de time being, overschrijf de vorige selectie gegevens
@@ -878,35 +896,44 @@ for r in range(nsatiterdef):
     fitpara= fit_cat_parameters(cut3,indatverplmxigr,fitgrps,expdefs)
     fitdatverplgr = predict_values(cut3,indatverplmxigr,fitgrps,fitpara,expdefs,False)
     exp_fitpara(fitdatverplgr,99,"fitparatab"+(str(r+1))+".xlsx")
-    
-fitdatverplgrx = fitdatverplgr[abs(fitdatverplgr["DiffEst"])> 2e6] 
-seaborn.scatterplot(data=fitdatverplgrx,x="FactorEst",y="DiffEst",hue="GeoInd")
+
+if (not suprtests):    
+    fitdatverplgrx = fitdatverplgr[abs(fitdatverplgr["DiffEst"])> 2e6] 
+    seaborn.scatterplot(data=fitdatverplgrx,x="FactorEst",y="DiffEst",hue="GeoInd")
 # -
 
-fitdatverplgr["x_LM_AL"] = fitdatverplgr["M_LW_AL"] * fitdatverplgr["M_LO_AL"]
-fitdatverplgrx = fitdatverplgr[abs(fitdatverplgr["DiffEst"])> 2e6] 
-seaborn.scatterplot(data=fitdatverplgrx,x="x_LM_AL",y="DiffEst",hue="GeoInd")
+if (not suprtests):    
+    fitdatverplgr["x_LM_AL"] = fitdatverplgr["M_LW_AL"] * fitdatverplgr["M_LO_AL"]
+    fitdatverplgrx = fitdatverplgr[abs(fitdatverplgr["DiffEst"])> 2e6] 
+    seaborn.scatterplot(data=fitdatverplgrx,x="x_LM_AL",y="DiffEst",hue="GeoInd")
 
-seaborn.scatterplot(data=fitdatverplgrx,x="M_LO_AL",y="DiffEst",hue="GeoInd")
+if (not suprtests):    
+    seaborn.scatterplot(data=fitdatverplgrx,x="M_LO_AL",y="DiffEst",hue="GeoInd")
 
-pointspertype(cut3)
+if (not suprtests):    
+    pointspertype(cut3)
 
-gr5km=fitdatverplgr[(fitdatverplgr['MaxAfst']==5) & (fitdatverplgr['MotiefV']==1)].copy()
-gr5km['linpmax']=gr5km['FactorEstNAL']/ gr5km['FactorEstAL']
-gr5km['linpch']= gr5km['FactorEst']/ gr5km['FactorEstAL']
-gr5km['drat']= gr5km['FactorV']/ gr5km['FactorEstAL']
-fig, ax = plt.subplots()
-seaborn.scatterplot(data=gr5km,x="linpmax",y="drat",size=.02,hue="GeoInd",ax=ax)
-ax.set_xscale('log')
-ax.set_yscale('log')
+
+def test5():
+    gr5km=fitdatverplgr[(fitdatverplgr['MaxAfst']==5) & (fitdatverplgr['MotiefV']==1)].copy()
+    gr5km['linpmax']=gr5km['FactorEstNAL']/ gr5km['FactorEstAL']
+    gr5km['linpch']= gr5km['FactorEst']/ gr5km['FactorEstAL']
+    gr5km['drat']= gr5km['FactorV']/ gr5km['FactorEstAL']
+    fig, ax = plt.subplots()
+    seaborn.scatterplot(data=gr5km,x="linpmax",y="drat",size=.02,hue="GeoInd",ax=ax)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+if (not suprtests):        
+    test5()
 
 # +
 #gr5km[gr5km['linpch'] >1000][['FactorEst','FactorEstAL','FactorEstNAL'] ]
 # -
 
-ds=fitdatverplgr[(fitdatverplgr['MotiefV']==1) & (fitdatverplgr['MaxAfst']==0)].sort_values(by='DiffEst').copy()
-ds['dchk' ] = ds['DiffEst'] / ds ['FactorVSpec']
-ds
+if (not suprtests):    
+    ds=fitdatverplgr[(fitdatverplgr['MotiefV']==1) & (fitdatverplgr['MaxAfst']==0)].sort_values(by='DiffEst').copy()
+    ds['dchk' ] = ds['DiffEst'] / ds ['FactorVSpec']
+    ds
 
 
 # +
@@ -925,16 +952,21 @@ def mxitotdiagpl(ds,xax):
     ax.set_title('1 groep landelijke sommen per mxigrp : data versus fit')
     print(ds.groupby([ 'GrpExpl','GeoInd'])[['FactorV','FactorEst','DiffEst']].agg('sum') )
 #mxitotdiagpl(ds,'M_LO_AL') 
-mxitotdiagpl(ds,'mxigrp')
+if (not suprtests):    
+    mxitotdiagpl(ds,'mxigrp')
 # -
 
-fitdatverplgr[fitdatverplgr['MaxAfst']==0]
+if (not suprtests):    
+    fitdatverplgr[fitdatverplgr['MaxAfst']==0]
 
-exp_fitpara(fitdatverplgr,99,"fitparatabd.xlsx")
+if (not suprtests):    
+    exp_fitpara(fitdatverplgr,99,"fitparatabd.xlsx")
 
-exp_fitpara(fitdatverplgr,13,"fitparatab1hi.xlsx")
+if (not suprtests):    
+    exp_fitpara(fitdatverplgr,13,"fitparatab1hi.xlsx")
 
-fitdatverplgr.groupby (['MotiefV','isnaarhuis','GeoInd','MaxAfst']).agg('mean')
+if (not suprtests):    
+    fitdatverplgr.groupby (['MotiefV','isnaarhuis','GeoInd','MaxAfst']).agg('mean')
 
 
 # +
@@ -955,21 +987,29 @@ def getmaxafstadmax_old( dd, landcod,myKAfstV):
 
 # -
 
-ov=pltmotdistgrp(fitdatverplgr[fitdatverplgr['MotiefV']==2],'MaxAfst','FactorEst',True)
+if (not suprtests):
+    ov=pltmotdistgrp(fitdatverplgr[fitdatverplgr['MotiefV']==2],'MaxAfst','FactorEst',True)
 
-ov=pltmotdistgrp(fitdatverplgr[fitdatverplgr['MotiefV']!=99],'linpmax','FactorEst',True)
+if (not suprtests):
+    ov=pltmotdistgrp(fitdatverplgr[fitdatverplgr['MotiefV']!=99],'linpmax','FactorEst',True)
 
-ov=pltmotdistgrp(fitdatverplgr,'linpmax','linpch',False)
+if (not suprtests):
+    ov=pltmotdistgrp(fitdatverplgr,'linpmax','linpch',False)
 
-ov=pltmotdistgrp(fitdatverplgr[fitdatverplgr['MotiefV']==7],'linpmax','linpch',True)
+if (not suprtests):
+    ov=pltmotdistgrp(fitdatverplgr[fitdatverplgr['MotiefV']==7],'linpmax','linpch',True)
 
-ov=pltmotdistgrp(fitdatverplgr[fitdatverplgr['MotiefV']==8],'linpmax','linpch',True)
+if (not suprtests):
+    ov=pltmotdistgrp(fitdatverplgr[fitdatverplgr['MotiefV']==8],'linpmax','linpch',True)
 
-ov=pltmotdistgrp(fitdatverplgr[fitdatverplgr['MotiefV']==8],'FactorEstNAL','DiffS2',True)
+if (not suprtests):    
+    ov=pltmotdistgrp(fitdatverplgr[fitdatverplgr['MotiefV']==8],'FactorEstNAL','DiffS2',True)
 
-ov=pltmotdistgrp(fitdatverplgr,'MaxAfst','linpch',False)
+if (not suprtests):
+    ov=pltmotdistgrp(fitdatverplgr,'MaxAfst','linpch',False)
 
-ov=pltmotdistgrp(fitdatverplgr,'linpmax','DiffS2',False)
+if (not suprtests):
+    ov=pltmotdistgrp(fitdatverplgr,'linpmax','DiffS2',False)
 
 
 def calcchidgrp (mydati,opdel):
@@ -989,7 +1029,8 @@ def calcchidgrp (mydati,opdel):
     rv2['EstRat'] = rv2['FactorEst']/ rv2['FactorV']
     rv=rv.merge(rv2,how='left')
     return rv
-calcchidgrp(fitdatverplgr,['GeoInd']).sort_values(['ChiRat'])
+if (not suprtests):
+    calcchidgrp(fitdatverplgr,['GeoInd']).sort_values(['ChiRat'])
 
 
 def tryexpp(indat,pu,niter,diag):
@@ -1010,7 +1051,8 @@ def tryexpp(indat,pu,niter,diag):
             print ("Error converging")
             return chirat2
         return chirat2
-tryexpp(indatverplmxigr,expdefs,nsatiterdef,True)        
+if (not suprtests):    
+     tryexpp(indatverplmxigr,expdefs,nsatiterdef,True)        
 
 
 def varpu(indat,pu,niter,diag):
@@ -1019,13 +1061,17 @@ def varpu(indat,pu,niter,diag):
         lpu['SP'] =sp
         tryexpp(indat,lpu,niter,diag)
     return
-varpu(indatverplmxigr,expdefs,4,True) 
+if (not suprtests):    
+    varpu(indatverplmxigr,expdefs,4,True) 
 
-calcchidgrp(fitdatverplgr,['MaxAfst','GeoInd'])
+if (not suprtests):    
+    calcchidgrp(fitdatverplgr,['MaxAfst','GeoInd'])
 
-calcchidgrp(fitdatverplgr,['MotiefV','GeoInd']).sort_values(['ChiRat'])
+if (not suprtests):    
+    calcchidgrp(fitdatverplgr,['MotiefV','GeoInd']).sort_values(['ChiRat'])
 
-calcchidgrp(fitdatverplgr,['GeoInd']).sort_values(['ChiRat'])
+if (not suprtests):    
+    calcchidgrp(fitdatverplgr,['GeoInd']).sort_values(['ChiRat'])
 
 
 

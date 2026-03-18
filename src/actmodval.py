@@ -37,6 +37,13 @@ import matplotlib.pyplot as plt
 from matplotlib import colors 
 import matplotlib.ticker as ticker
 
+import RUDIbas
+
+suprtests= 'actmodval' in RUDIbas.suprtests 
+suprdata= 'actmodval' in RUDIbas.suprdata
+#suprtests=True
+print ('Suprtests',suprtests)
+
 import rasteruts1
 import rasterio
 calcgdir="../intermediate/calcgrids"
@@ -53,85 +60,26 @@ import numba
 #from numba.utils import IS_PY3
 from numba.decorators import jit
 
-stryear='2020'
-cbspc4data =pd.read_pickle("../intermediate/CBS/pc4data_"+stryear+".pkl")
-cbspc4data= cbspc4data.sort_values(by=['postcode4']).reset_index()
-
-cbspc4data['oppervlak'] = cbspc4data.area
-cbspc4data['aantal_inwoners'] = np.where(cbspc4data['aantal_inwoners'] <0,0,
-                                         cbspc4data['aantal_inwoners'] )
-
-cbspc4data.dtypes
-
-#providers = cx.providers.flatten()
-#providers
-prov0=cx.providers.nlmaps.grijs.copy()
-print( cbspc4data.crs)
-print (prov0)
-plot_crs=3857
-#data_crs="epsg:28992"
-if 1==1:
-#    prov0['url']='https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/{variant}/EPSG:28992/{z}/{x}/{y}.png'
-    prov0['url']='https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/{variant}/EPSG:3857/{z}/{x}/{y}.png'    
-#    prov0['bounds']=  [[48.040502, -1.657292 ],[56.110590 ,12.431727 ]]  
-    prov0['bounds']=  [[48.040502, -1.657292 ],[56.110590 ,12.431727 ]]  
-    prov0['min_zoom']= 0
-    prov0['max_zoom'] =12
-    print (prov0)
-
-pland= cbspc4data.plot(alpha=0.4)
-cx.add_basemap(pland, source= prov0,crs=cbspc4data.crs)
-
-#alternatief: gebruik webcoordinaten in plot
-cbspc4datahtn = cbspc4data[(cbspc4data['postcode4']>3990) & (cbspc4data['postcode4']<3999)]
-phtn = cbspc4datahtn.to_crs(epsg=plot_crs).plot(alpha=0.4)
-cx.add_basemap(phtn, source= prov0)
+RUDIbas.suprtests = RUDIbas.suprtests+['cbspc4plot']
+import cbspc4plot
 
 
-# +
-#en nu netjes, met schaal in km
-def plaxkm(x, pos=None):
-      return '%.0f'%(x/1000.)
-
-def addbasemkmsch(ax,mapsrc):
-    cx.add_basemap(ax,source= mapsrc,crs="epsg:28992")
-    ax.xaxis.set_major_formatter(ticker.FuncFormatter(plaxkm))
-    ax.yaxis.set_major_formatter(ticker.FuncFormatter(plaxkm))
-    
-fig, ax = plt.subplots(figsize=(6, 4))
-cbspc4datahtn = cbspc4data[(cbspc4data['postcode4']>3990) & (cbspc4data['postcode4']<3999)]
-phtn = cbspc4datahtn.plot(ax=ax,alpha=0.4)
-addbasemkmsch(ax,prov0)
-# -
-
-cbspc4datahtn = cbspc4data[(cbspc4data['postcode4']==3995)]
-phtn = cbspc4datahtn.plot()
-cx.add_basemap(phtn, source= prov0,crs=cbspc4data.crs)
-
-pc4tifname=calcgdir+'/cbs2020pc4-NL.tif'
-pc4excols= ['aantal_inwoners','aantal_mannen', 'aantal_vrouwen']
-pc4inwgrid= rasterio.open(pc4tifname)
+cbspc4data= cbspc4plot.cbspc4data
+if 0==1:
+    pc4tifname=calcgdir+'/cbs2020pc4-NL.tif'
+    pc4excols= ['aantal_inwoners','aantal_mannen', 'aantal_vrouwen']
+pc4inwgrid=cbspc4plot.pc4inwgrid
 
 #rudifunset, heb originele data niet nodig, alleen grid
 #Rf_net_buurt=pd.read_pickle("../intermediate/rudifun_Netto_Buurt_o.pkl") 
 #Rf_net_buurt.reset_index(inplace=True,drop=True)
 #gemaakt in ROfietsbalans2
-rudifuntifname=calcgdir+'/oriTN2-NL.tif'
-rudifungrid= rasterio.open(rudifuntifname)
+rudifungrid= cbspc4plot.rudifungrid
 
-
-def getcachedgrids(src):
-    clst={}
-    for i in src.indexes:
-        clst[i] = src.read(i) 
-    return clst
+getcachedgrids= cbspc4plot.getcachedgrids
+addbasemkmsch= cbspc4plot.addbasemkmsch
 pc4inwgcache = getcachedgrids(pc4inwgrid)
 rudifungcache = getcachedgrids(rudifungrid)
-
-# nu nog MXI overzetten naar PC4 ter referentie
-
-
-
 
 # +
 #nu ODIN ranges opzetten
@@ -139,18 +87,24 @@ rudifungcache = getcachedgrids(rudifungrid)
 #wel presenteren we het steeds als cumulatieve sommen tot een bepaalde bin
 # -
 
-useKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01uKA.pkl")
-xlatKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01xKA.pkl")
-useKAfstV  = useKAfstVa [useKAfstVa ["MaxAfst"] <180].copy()
-maxcuse= np.max(useKAfstV[useKAfstV ["MaxAfst"] !=0] ['KAfstCluCode'])
-xlatKAfstV  = xlatKAfstVa [(xlatKAfstVa['KAfstCluCode']<=maxcuse ) |
-                           (xlatKAfstVa['KAfstCluCode']==np.max(useKAfstV[ 'KAfstCluCode']) )].copy()
-#print(xlatKAfstV)   
-print(useKAfstV)   
+if 0==1:
+    useKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01uKA.pkl")
+    xlatKAfstVa=pd.read_pickle("../intermediate/ODINcatVN01xKA.pkl")
+    useKAfstV  = useKAfstVa [useKAfstVa ["MaxAfst"] <180].copy()
+    maxcuse= np.max(useKAfstV[useKAfstV ["MaxAfst"] !=0] ['KAfstCluCode'])
+    xlatKAfstV  = xlatKAfstVa [(xlatKAfstVa['KAfstCluCode']<=maxcuse ) |
+                               (xlatKAfstVa['KAfstCluCode']==np.max(useKAfstV[ 'KAfstCluCode']) )].copy()
+    #print(xlatKAfstV)   
+    print(useKAfstV)   
+else:
+    useKAfstV=RUDIbas.useKAfstV
 
-#dit was alleen voor ODIN1KAFmo om met kleine sets te werken.
-#deze variabele niet gebruiken voor verwerken hele sets, wel voor regressie tests op Q set
-useKAfstVQ  = useKAfstV [useKAfstV ["MaxAfst"] <4]
+if 0==1:
+    #dit was alleen voor ODIN1KAFmo om met kleine sets te werken.
+    #deze variabele niet gebruiken voor verwerken hele sets, wel voor regressie tests op Q set
+    useKAfstVQ  = useKAfstV [useKAfstV ["MaxAfst"] <4]
+else:
+    useKAfstVQ=RUDIbas.useKAfstVQ   
 
 # +
 #import ODiN2pd
@@ -183,6 +137,8 @@ def mkfietswijk3pc4(pc4data,pc4grid,rudigrid):
 #fietswijk3pc4=mkfietswijk3pc4(cbspc4data,pc4inwgrid,rudifungrid)
 fietswijk3pc4=mkfietswijk3pc4(cbspc4data,pc4inwgcache,rudifungcache)
 bd=fietswijk3pc4 [abs(fietswijk3pc4['aantal_inwoners_d2'] ) > 1 ]
+
+RUDIbas.suprtests = RUDIbas.suprtests+['ODINcatVNuse']
 
 # +
 #not used expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0,'SP':1.0}
@@ -252,8 +208,9 @@ def mkdatadiff2(verpl,fg,infof,grpind,landcod):
 odindiffflginfo= ODINcatVNuse.convert_diffgrpsidat(odinverplflgs,
                 ODINcatVNuse.fitgrpse,[],ODINcatVNuse.kflgsflds, [],"_c",ODINcatVNuse.landcod,False)
 
+runnameo='Dbg01Q'
 lblo='origchk'
-fitdatverplgr = pd.read_pickle("../output/fitdf_"+lblo+".pd")
+fitdatverplgr = pd.read_pickle("../output/fitdf_"+runnameo+"_"+lblo+".pd")
 
 fitdatverplgr.dtypes
 
@@ -398,15 +355,14 @@ datadiffcache.groupby(['KAfstCluCode','GeoInd']).sum()
 #maak een frame met FactorVActive geschat op basis van FactorV, gesommeerd over astandsklasses
 #maak nog apart per motief
 def calcFactVPC4(ddc,perGeoInd):
+    (errstr, tv )=ODINcatVNuse.normflgvals(ddc ,odindiffflginfo,
+                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,['PC4']  )
     if perGeoInd:
-        return (ODINcatVNuse.normflgvals(ddc ,odindiffflginfo,
-                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,['PC4'] 
-                    ).      groupby(['PC4','GeoInd'] ).agg('sum')).reset_index().drop (
-     columns=['MotiefV','isnaarhuis','KAfstCluCode'])
+
+        return (tv.      groupby(['PC4','GeoInd'] ).agg('sum')).reset_index().drop (
+         columns=['MotiefV','isnaarhuis','KAfstCluCode']) 
     else:
-        return (ODINcatVNuse.normflgvals(ddc ,odindiffflginfo,
-                                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,['PC4'],
-            ).      groupby(['PC4'] ).agg('sum')*0.5).reset_index().drop (
+        return (tv.      groupby(['PC4'] ).agg('sum')*0.5).reset_index().drop (
                 columns=['MotiefV','isnaarhuis','KAfstCluCode'])
 calcFactVPC4(datadiffcache,False)
 calcFactVPC4(datadiffcache,True)
@@ -671,18 +627,18 @@ def actpltland(ecache,fld,selextent,fname,txt,im1tit,im2tit,im3tit):
     im1= ax1.imshow(image1,cmap='jet',alpha=.6,extent=selextent,
                     vmin=minmin, vmax=maxmax,zorder=3)
     ax1.set_title(im1tit)
-    addbasemkmsch(ax1,prov0)
+    addbasemkmsch(ax1,cbspc4plot.prov0)
 
     im2= ax2.imshow(image2,cmap='jet',alpha=.6,extent=selextent, 
                     vmin=minmin, vmax=maxmax,zorder=3)
     ax2.set_title(im2tit)
-    addbasemkmsch(ax2,prov0)
+    addbasemkmsch(ax2,cbspc4plot.prov0)
 
     im3=ax3.imshow(np.where(image3>=0, image3,np.nan),cmap='Reds',alpha=.6,
                    extent=selextent,zorder=3)
     im4=ax3.imshow(np.where(image3<=0, image3,np.nan),cmap='Blues_r',alpha=.6,
                    extent=selextent,zorder=3)
-    addbasemkmsch(ax3,prov0)
+    addbasemkmsch(ax3,cbspc4plot.prov0)
 
     # add space for colour bar
     fig.subplots_adjust(right=0.83)
