@@ -76,9 +76,21 @@ import preproc_spss
 
 import ODINcatVN
 
-import ODINcatVN
+# +
+#import partial routines in this order to run diagnostic data
+# -
 
-import modrescmp
+import cbspc4plot
+
+import ODINcatVNuse
+
+import estsatmod
+
+import actmodval
+
+
+
+
 
 import Mkaddgrids
 
@@ -86,6 +98,8 @@ import Mkaddgrids
 
 #run full national models
 import KafmoRun
+
+import modrescmp
 
 import Kafdatvis1
 
