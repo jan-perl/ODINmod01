@@ -85,6 +85,8 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from  matplotlib import colors
 
+import RUDIbas
+
 import rasteruts1
 import rasterio
 calcgdir="../intermediate/calcgrids"
@@ -105,45 +107,12 @@ gemeentendata ,  wijkgrensdata ,    buurtendata = ODiN2readpkl.getgwb(2020)
 
 grgem = gemeentendata[(gemeentendata['H2O']=='NEE') & (gemeentendata['AANT_INW']>1e5) ]
 
-stryear='2020'
-cbspc4data =pd.read_pickle("../intermediate/CBS/pc4data_"+stryear+".pkl")
-cbspc4data= cbspc4data.sort_values(by=['postcode4']).reset_index()
+RUDIbas.suprtests = RUDIbas.suprtests+['cbspc4plot']
+import cbspc4plot
 
-cbspc4data['oppervlak'] = cbspc4data.area
-cbspc4data['aantal_inwoners'] = np.where(cbspc4data['aantal_inwoners'] <0,0,
-                                         cbspc4data['aantal_inwoners'] )
-
-cbspc4data.dtypes
-
-#providers = cx.providers.flatten()
-#providers
-prov0=cx.providers.nlmaps.grijs.copy()
-print( cbspc4data.crs)
-print (prov0)
-plot_crs=3857
-#plot_crs=28992
-if 1==1:
-#    prov0['url']='https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/{variant}/EPSG:28992/{z}/{x}/{y}.png'
-    prov0['url']='https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/{variant}/EPSG:3857/{z}/{x}/{y}.png'    
-#    prov0['bounds']=  [[48.040502, -1.657292 ],[56.110590 ,12.431727 ]]  
-    prov0['bounds']=  [[48.040502, -1.657292 ],[56.110590 ,12.431727 ]]  
-    prov0['min_zoom']= 0
-    prov0['max_zoom'] =12
-    print (prov0)
-
-
-# +
-#en nu netjes, met schaal in km
-def plaxkm(x, pos=None):
-      return '%.0f'%(x/1000.)
-
-def addbasemkmsch(ax,mapsrc):
-    cx.add_basemap(ax,source= mapsrc,crs="epsg:28992")
-    ax.xaxis.set_major_formatter(ticker.FuncFormatter(plaxkm))
-    ax.yaxis.set_major_formatter(ticker.FuncFormatter(plaxkm))
-
-
-# -
+cbspc4data= cbspc4plot.cbspc4data
+prov0=cbspc4plot.prov0
+addbasemkmsch =cbspc4plot.addbasemkmsch
 
 pland= cbspc4data.plot()
 addbasemkmsch(pland,prov0)
@@ -176,13 +145,8 @@ def setaxreg(ax,reg):
         ax.set_ylim(bottom=452000, top=462000)    
 
 
-def getcachedgrids(src):
-    clst={}
-    for i in src.indexes:
-        clst[i] = src.read(i) 
-    return clst
-pc4inwgcache = getcachedgrids(pc4inwgrid)
-rudifungcache = getcachedgrids(rudifungrid)
+pc4inwgcache = cbspc4plot.getcachedgrids(pc4inwgrid)
+rudifungcache =  cbspc4plot.getcachedgrids(rudifungrid)
 
 
 def calccats(ingr,flgs):
@@ -464,18 +428,22 @@ fnamec=dict()
 for exp in exprrun :
     for dist in exprdists:
         gset[exp], fnamec[exp], expcach[exp]=writeexperiment(exp,rudifungcache,10,dist,'e1121a') 
-        logpltland(expcach[exp],3,nlextent,fnamec[exp],'nl',exp)
+        if (exp != 'base'): #geen logplots als er niks verandert
+            logpltland(expcach[exp],3,nlextent,fnamec[exp],'nl',exp)
         utrcache03=mkloccach(expcach[exp],utrextent,nlextent)
-        logpltland(utrcache03,3,utrextent,fnamec[exp],'utr',exp)   
+        if (exp != 'base'): #geen logplots als er niks verandert
+            logpltland(utrcache03,3,utrextent,fnamec[exp],'utr',exp)   
 #    print (showaddhtn(oset04)   )
 
 #expposs2
-for exp in [expposs2]  :
+for exp in expposs2  :
     print(exp)
     print (showaddreg(gset[exp],'utr' )) 
 
 #expposs2 
 for exp in [] :
     print( logpltland(expcach[exp],3,nlextent,fnamec[exp],'nl',exp) )
+
+print ("Finished")
 
 

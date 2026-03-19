@@ -65,8 +65,9 @@ import matplotlib.pyplot as plt
 
 import RUDIbas
 
-suprtests= 'ODINcatVNuse' in RUDIbas.suprtests 
-suprdata= 'ODINcatVNuse' in RUDIbas.suprdata
+myname='ODINcatVNuse'
+suprtests= myname in RUDIbas.suprtests 
+suprdata= myname in RUDIbas.suprdata
 #suprtests=True
 print ('Suprtests',suprtests)
 

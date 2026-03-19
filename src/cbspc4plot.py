@@ -39,8 +39,9 @@ import matplotlib.ticker as ticker
 
 import RUDIbas
 
-suprtests= 'cbspc4plot' in RUDIbas.suprtests 
-suprdata= 'cbspc4plot' in RUDIbas.suprdata
+myname='cbspc4plot'
+suprtests= myname in RUDIbas.suprtests 
+suprdata= myname in RUDIbas.suprdata
 #suprtests=True
 print ('Suprtests',suprtests)
 

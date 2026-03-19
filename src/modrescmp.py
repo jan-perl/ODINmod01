@@ -39,6 +39,8 @@ import matplotlib.ticker as ticker
 
 import RUDIbas
 
+myname='modrescmp'
+
 import rasteruts1
 import rasterio
 calcgdir="../intermediate/calcgrids"

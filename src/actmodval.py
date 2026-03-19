@@ -39,6 +39,7 @@ import matplotlib.ticker as ticker
 
 import RUDIbas
 
+myname='actmodval'
 suprtests= 'actmodval' in RUDIbas.suprtests 
 suprdata= 'actmodval' in RUDIbas.suprdata
 #suprtests=True
