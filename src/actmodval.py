@@ -39,11 +39,17 @@ import matplotlib.ticker as ticker
 
 import RUDIbas
 
+from importlib import reload  # Python 3.4+
+if True:
+        foo = reload(RUDIbas)
+
 myname='actmodval'
-suprtests= 'actmodval' in RUDIbas.suprtests 
-suprdata= 'actmodval' in RUDIbas.suprdata
+suprtests= myname in RUDIbas.suprtests 
+suprdata= myname in RUDIbas.suprdata
 #suprtests=True
 print ('Suprtests',suprtests)
+
+assertdbg=RUDIbas.assertdbg
 
 import rasteruts1
 import rasterio
@@ -136,8 +142,10 @@ def mkfietswijk3pc4(pc4data,pc4grid,rudigrid):
     outdf['aantal_inwoners_d2'] = outdf['aantal_inwoners_gr2'] -outdf['aantal_inwoners']
     return outdf
 #fietswijk3pc4=mkfietswijk3pc4(cbspc4data,pc4inwgrid,rudifungrid)
-fietswijk3pc4=mkfietswijk3pc4(cbspc4data,pc4inwgcache,rudifungcache)
-bd=fietswijk3pc4 [abs(fietswijk3pc4['aantal_inwoners_d2'] ) > 1 ]
+#noot: niet verder gebruikt
+if 0 == 1:
+    fietswijk3pc4=mkfietswijk3pc4(cbspc4data,pc4inwgcache,rudifungcache)
+    bd=fietswijk3pc4 [abs(fietswijk3pc4['aantal_inwoners_d2'] ) > 1 ]
 
 RUDIbas.suprtests = RUDIbas.suprtests+['ODINcatVNuse']
 
@@ -209,6 +217,8 @@ def mkdatadiff2(verpl,fg,infof,grpind,landcod):
 odindiffflginfo= ODINcatVNuse.convert_diffgrpsidat(odinverplflgs,
                 ODINcatVNuse.fitgrpse,[],ODINcatVNuse.kflgsflds, [],"_c",ODINcatVNuse.landcod,False)
 
+#noot: dit is ingelezen data van een oude run, geen andere data van huidige set
+#ook berekend met Q instelling
 runnameo='Dbg01Q'
 lblo='origchk'
 fitdatverplgr = pd.read_pickle("../output/fitdf_"+runnameo+"_"+lblo+".pd")
@@ -226,12 +236,18 @@ ddc_fitdat =  mkdatadiff2(fitdatverplgr.rename (
        columns={'FactorV':'FactorO', 'FactorEst':'FactorV' }),
             ODINcatVNuse.fitgrpse,  ODINcatVNuse.infoflds,'mxigrp',ODINcatVNuse.landcod)
 
+#noot: deze gebruik fitdata van een vorige run
 totinf_fitdat = ODINcatVNuse.mkinfosums(ddc_fitdat,odindiffflginfo,
                        ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,ODINcatVNuse.landcod)
-totinf_fitdat.groupby(["GeoInd"]).agg('sum')
+o2=totinf_fitdat.groupby(["GeoInd"]).agg('sum')/ODINcatVNuse.totaalmotief
+o2
 
-totinf_indat.groupby(["GeoInd"]).agg('sum')
 
+# +
+#noot: gefit past nooit op oud totaal:
+#assertdbg(np.array(o2[['FactorV_v','FactorV']]) ,1,"FactorVGen behouden",marg=2e-4)
+#o2
+# -
 
 #let op dit kan niet, want hierover hebben we gesommeerd !
 def permotief(totin,totfit,kflgs):
@@ -298,8 +314,8 @@ rdf00=fitdatverplgr
 
 # +
 #allerlei active modes vergelijkingen
+# -
 
-# +
 MainUseSelFactorV='FactorVGen'
 def deffactorvin(rv,UseSelFactorV): 
     if UseSelFactorV =='FactorVGen':
@@ -310,11 +326,20 @@ def deffactorvin(rv,UseSelFactorV):
         assert(0)
     rv= rv.reset_index().rename(columns={"FactorV":"FactorVin"})
     return rv
-
+#totalen, niet afstands afhankelijk
 pc4orisum =   (odinverplgr[odinverplgr['KAfstCluCode'] == ODINcatVNuse.landcod] .groupby (
     ['PC4','GeoInd'] ).agg('sum')).drop(columns=['index','MotiefV','isnaarhuis','KAfstCluCode'])
 pc4orisum =   deffactorvin(pc4orisum,  MainUseSelFactorV)
 pc4orisum
+
+
+def plotfactorVverdPC4(indf):
+    pc4tot= indf.groupby('PC4').agg('sum')
+    pc4tots =pc4tot.sort_values('FactorVGen').reset_index()
+    pc4tots['frac'] = pc4tots.index / len(pc4tots)
+    p=sns.lineplot(data=pc4tots,x='frac',y='FactorVGen')
+    #return (pc4tots)
+plotfactorVverdPC4(pc4orisum)    
 
 # +
 #ng zonder geoind: dan komt iedere PC precies een keer voor
@@ -337,18 +362,27 @@ odinverplgrmspec= ODINcatVNuse.deffactorv(ODINcatVNuse.odinverplgr_o,maskKAfstV,
 odinverplklinfomspec = ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplklinfo_o,maskKAfstV,MainUseSelFactorVmspec)
 odinverplflgsmspec =ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplflgs_o,maskKAfstV,MainUseSelFactorVmspec)
 
-datadiffcachemspec = ODINcatVNuse.mkdatadiff(odinverplgrmspec,ODINcatVNuse.fitgrpse,
-                                        ODINcatVNuse.infoflds,'PC4',ODINcatVNuse.landcod)
-datadiffcache = ODINcatVNuse.mkdatadiff(odinverplgr,ODINcatVNuse.fitgrpse,
-                                        ODINcatVNuse.infoflds,'PC4',ODINcatVNuse.landcod)
+odinverplgrmspec['FactorVInActive'] =odinverplgrmspec['FactorVGenActive'] + odinverplgrmspec['FactorVSpecActive']       
+odinverplgrmspec.columns
 
-o2=datadiffcachemspec.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief
+odinverplgr['FactorVInActive'] =odinverplgr['FactorVGenActive']   
+odinverplgr.columns
+
+#let op: deze caches hebben meer velden dan die in ODINcatVNuse
+infofldsma=ODINcatVNuse.infoflds+['FactorVInActive']
+datadiffcachemspec = ODINcatVNuse.mkdatadiff(odinverplgrmspec,ODINcatVNuse.fitgrpse,
+                                        infofldsma,'PC4',ODINcatVNuse.landcod)
+datadiffcache = ODINcatVNuse.mkdatadiff(odinverplgr,ODINcatVNuse.fitgrpse,
+                                        infofldsma,'PC4',ODINcatVNuse.landcod)
+
+o2=datadiffcachemspec.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief_unf
 #ODINcatVNuse.chkvalues(o2[['FactorV_v','FactorKm_v']],1.0, "datadiffcache FactorV_v")
+assertdbg(np.array(o2[['FactorV_v']]) ,1,"FactorV (origineel) behouden",marg=0)
 o2
 
-#was 69115694090
-totaalVgen=ODINcatVNuse.totaalmotief 
-datadiffcache.groupby(['GeoInd']).sum()/totaalVgen
+o2=datadiffcache.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief
+assertdbg(np.array(o2[['FactorV_v']]) ,1,"FactorV (gen) behouden",marg=0)
+o2
 
 datadiffcache.groupby(['KAfstCluCode','GeoInd']).sum()
 
@@ -367,6 +401,7 @@ def calcFactVPC4(ddc,perGeoInd):
                 columns=['MotiefV','isnaarhuis','KAfstCluCode'])
 calcFactVPC4(datadiffcache,False)
 calcFactVPC4(datadiffcache,True)
+
 
 
 # +
@@ -391,12 +426,16 @@ t2.T
 # -
 
 infotots2pcdiffmspec=mrgpcdiffr(calcFactVPC4(datadiffcachemspec,True),pc4orisum )
-t2= infotots2pcdiffmspec.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief
-t2.T
+o2= infotots2pcdiffmspec.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief_unf
+assertdbg(np.array(o2[['FactorV_v','FactorV']]) ,1,"FactorV (origineel) behouden",marg=0)
+o2= infotots2pcdiffmspec.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief
+assertdbg(np.array(o2[['FactorVGen','FactorVin']]) ,1,"FactorVGen behouden",marg=0)
+o2.T
 #/totaalVgen
 
+#infotots2pcdiffng zijn totalen per PC4 (dus niet per afstand)
 infotots2pcdiffng=mrgpcdiffr(calcFactVPC4(datadiffcache,False),pc4orisumng)
-infotots2pcdiffng.sum()/totaalVgen
+infotots2pcdiffng.sum()/ODINcatVNuse.totaalmotief
 
 #deze scatter plot ziet er goed uit
 minFactorVplot=5e6
@@ -425,7 +464,7 @@ def mkactpccmpfig(indf0,title):
     fig, ax = plt.subplots(figsize=(6, 4))
     indf['sizser'] = np.abs(indf['FactorVin']) 
     nlev=50
-    mybin=np.linspace(0,1,10)
+    mybin=np.linspace(0,1,nlev)
 #    print(mybin)
     indf['RatActiveVl']=np.round (indf['RatActiveV'] *nlev)*1.0/nlev
     indf['RatActiveVInl']=np.round (indf['RatActiveVIn'] *nlev)*1.0/nlev
@@ -460,8 +499,8 @@ def mkactpccmpfig1d(indf0,title):
     indf2=indf0[(indf0['FactorVin']>minFactorVplot ) ].copy(deep=False)
     fig, ax = plt.subplots(figsize=(6, 4))
     indf2['sizser'] = np.abs(indf2['FactorVin']) 
-    nlev=50
-    mybin=np.linspace(0,1,10)
+    nlev=100
+    mybin=np.linspace(0,1,nlev)
 #    print(mybin)
     indf2['RatActiveVl']=np.round (indf2['RatActiveV'] *nlev)*1.0/nlev
     indf2['nrec']=1
@@ -544,6 +583,7 @@ def fitactivem(indf,fitmode):
     diffs = indf['FitVActive'] - indf['FactorVInActive']    
     chisq = np.sum(diffs*diffs) / np.sum(indf['FactorVInActive']* indf['FactorVInActive'])
     indf['FitRatVActive'] = indf['FitVActive'] /indf['FactorVin']
+    indf['FitRatVActiveDiff'] = indf['FactorVInActive'] /indf['FactorVin'] - indf['FitRatVActive'] 
     print(chisq)
     return (chisq,rf)
 
@@ -558,6 +598,21 @@ r1=mkactpccmpfig1d(infotots2pcdiffng,'fitted VGenpara')
 # -
 
 infotots2pcdiffng [(infotots2pcdiffng ['RatActiveVIn']>.8 )& (infotots2pcdiffng['FactorV']>minFactorVplot ) ]
+
+
+# +
+def addratcats(indf2,detcols):
+    for lcat in detcols:
+        lout=lcat+'_Lev'
+#        indf2[lout]=indf2.index
+        indf2.sort_values(lcat,inplace=True,ignore_index=True)
+        indf2[lout]=indf2.index+1.0
+#        print (indf2[[lcat,lout]])
+    indf2.sort_values('PC4',inplace=True,ignore_index=True)    
+        
+    
+addratcats(infotots2pcdiffng,['FitRatVActive','FitRatVActiveDiff'])    
+infotots2pcdiffng               
 
 # +
 showgdir="../intermediate/showgrids"
@@ -580,7 +635,7 @@ def make1stgridgeorel (tifname,indf,usecols,nanval):
     grid = rasterio.open(tifname)
     return grid
 
-act1tifcols= ['RatActiveVIn','FitRatVActive']
+act1tifcols= ['RatActiveVIn','FitRatVActive','FitRatVActive_Lev','FitRatVActiveDiff_Lev']
 act1grid= make1stgridgeorel (act1tifname,cbspc4data.merge(infotots2pcdiffng,how='left',
                                 left_on=['postcode4'],right_on='PC4'),act1tifcols,999)
 # -
@@ -606,15 +661,17 @@ act1grid= rasterio.open(act1tifname)
 actcache={}
 actcache[3]= act1grid.read(3) 
 actcache[5]= act1grid.read(4) 
+actcache[6]= act1grid.read(5) 
+actcache[7]= act1grid.read(6) 
 act1grid.close()
 
 # +
 #code modified from Mkaddgrids
 nlextent=[0,280000,300000, 625000]
 def actpltland(ecache,fld,selextent,fname,txt,im1tit,im2tit,im3tit):
-    image1= ecache[3]
+    image1= ecache[3].copy()
     image1= np.where(image1<1, np.nan,image1-1)
-    image2= ecache[5]
+    image2= ecache[5].copy()
     image2= np.where(image2<1, np.nan,image2-1)
     nv = ecache[3] - ecache[5]    
     image3= nv
@@ -693,19 +750,91 @@ r1=actpltland(actcacheutr,3,utrextent,'actafstcmp-ut','actafstcmp-ut',
               'Aandeel actieve modes obv ODIN afstanden',
               'Rood: verder gefietst dan gemiddeld, Blauw: minder gefietst dan gemiddeld')
 
+# +
+#code modified from Mkaddgrids
+nlextent=[0,280000,300000, 625000]
+def actpltlandlev(ecache,fld,selextent,fname,txt,im1tit,im2tit):
+    nlev=4
+    image1= ecache[6].copy()
+    image1= np.where(np.isnan(image1), 0,image1)
+    i1div= image1.max()+1
+    image1= np.where(image1==0, 0,1+(nlev*image1) // (i1div))
+    image2= ecache[7].copy()
+    image2= np.where(np.isnan(image2), 0,image2)
+    i2div= image2.max()+1
+    image1= np.where(image2==0, 0,1+(nlev*image2) // (i2div))
+    
+    a4=(11.69,8.27)
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(20,8),dpi=150)
+    (ax1, ax2) = axes
+    #image = np.isnan(image)
+    im1= ax1.imshow(image1,cmap='jet',alpha=.6,extent=selextent,zorder=3)
+#                    vmin=0, vmax=nlev,zorder=3)
+    ax1.set_title(im1tit)
+    addbasemkmsch(ax1,cbspc4plot.prov0)
+
+    im2= ax2.imshow(image2,cmap='jet',alpha=.6,extent=selextent,zorder=3)
+#                    vmin=0, vmax=nlev,zorder=3)
+    ax2.set_title(im2tit)
+    addbasemkmsch(ax2,cbspc4plot.prov0)
+
+    # add space for colour bar
+    fig.subplots_adjust(right=0.83)
+    cbar_axbase = fig.add_axes([0.85, 0.2, 0.01, 0.6])
+    cbar_axlo  = fig.add_axes([0.88, 0.2, 0.01, 0.3])
+    cbar_axhi  = fig.add_axes([0.88, 0.5, 0.01, 0.3])
+    fig.colorbar(im2,cax=cbar_axbase)
+#    fig.colorbar(im3,cax=cbar_axhi )
+#    ax3.subtitle.set_text("Verschil: rood: links hoger, midden: rechts hoger")
+#    ax3.colorbar()
+#    ax3.imshow(image3,cmap='Greens',alpha=.6,extent=selextent)
+    grgem.boundary.plot(color='green',ax=ax1,alpha=.8)
+    grgem.boundary.plot(color='green',ax=ax2,alpha=.8)
+    figname = "../output/showgrids/fig_"+fname+'.png';
+    fig.savefig(figname,dpi=300) 
+    return fig
+
+r1=actpltlandlev(actcache,3,nlextent,'act-afstcmplev-nl','actafstcmplev-nl',              
+              '4 groepen Aandeel actieve modes obv ODIN afstanden' ,
+               '4 groepen  Verschilcat Aandeel actieve modes in ODIN')
+# -
+
 #goede check, maar geen actieve mode info:
 datadiffcache.groupby(['KAfstCluCode','GeoInd']).sum().rename(columns= {"FactorV_v":"FactorV" })
 
+odinverplflgs
+
 
 #bijdrage actieve mode per afstandsklasse, uit odinverplflgs (Gemaakt met VGen - dus zonder VSpec)
-def mkverplAsftsu(inflgs):
-    odinverplAsftsu=inflgs.groupby(['KAfstCluCode']).sum().reset_index()
+def mkverplAsftsu(inflgs,addlseps):
+    print (inflgs['FactorV'].sum()/ODINcatVNuse.totaalmotief)
+#    print (inflgs['FactorVGen'].sum()/ODINcatVNuse.totaalmotief)
+
+    odinverplAsftsu=inflgs.groupby(['KAfstCluCode']+addlseps).sum().reset_index()
     #.rename(       columns= {"KAfstCluCode":"Kafst"})
     odinverplAsftsu["FactorV"] = odinverplAsftsu["FactorV"] - odinverplAsftsu["FactorV"].shift(1,fill_value=0)
     odinverplAsftsu["FactorVActive"] = odinverplAsftsu["FactorVActive"] - odinverplAsftsu["FactorVActive"].shift(1,fill_value=0)
     odinverplAsftsu["ActFractOri"] = odinverplAsftsu["FactorVActive"] / odinverplAsftsu["FactorV"]
     return(odinverplAsftsu)
-odinverplAsftsu=mkverplAsftsu(odinverplflgs)
+if not suprtests:
+    odinverplAsftsu=mkverplAsftsu(odinverplflgs,[])
+    print (odinverplAsftsu['FactorV'].sum()/ODINcatVNuse.totaalmotief)
+    display(odinverplAsftsu)
+
+datadiffcache
+
+#nu zouden de FactorV sommen gelijk moeten zijn aan die in odinverplAsftsu
+if not suprtests:
+    d2=datadiffcache.rename(columns={'FactorV_v': 'FactorV','FactorVInActive_v': 'FactorVActive' })
+    odingeoverplAsftsu=mkverplAsftsu(d2,[])
+    display(odingeoverplAsftsu)
+
+c2=odinverplAsftsu.merge(odingeoverplAsftsu,how='left',on="KAfstCluCode") 
+c2
+
+o2=c2.sum()/ODINcatVNuse.totaalmotief
+#assertdbg(np.array(o2[['FactorV_v','FactorV']]) ,2,"FactorVGen behouden",marg=2e-4)
+o2.T
 
 
 # +
@@ -722,14 +851,16 @@ def prepactsdb(db1,myKAfstV):
                                             KafstActiveVori['MaxAfst'].map(lambda x:"%3g"%(x)) )
     return(KafstActiveVori)
 
-KafstActiveVori = prepactsdb(odinverplAsftsu,useKAfstV)
+if not suprtests:
+    KafstActiveVori = prepactsdb(odinverplAsftsu,useKAfstV)
 
 
 # +
 #neemt een database  myActiveVori en maakt standaard plot
 # gebruikt kolommen FactorVCum ,ActFractOri , FactorV en KAfstVFmt
 def pltactsdb(myActiveVori,savtag,title,uitleg):
-    KafstActiveVorid= myActiveVori.copy(deep=True)
+    pltusecols = ['FactorVCum' ,'ActFractOri' , 'FactorV','KAfstVFmt']
+    KafstActiveVorid= myActiveVori[pltusecols].copy(deep=True)
     KafstActiveVorid['FactorPCum']=KafstActiveVorid['FactorVCum']
     KafstActiveVorid = pd.concat([ myActiveVori,KafstActiveVorid] ) .sort_values(by='FactorPCum')                       
     KafstActiveVorid  
@@ -739,7 +870,8 @@ def pltactsdb(myActiveVori,savtag,title,uitleg):
     #fig=chart.fig
     #ax=chart.ax
     greencol="#004800"
-    plt.stackplot(KafstActiveVorid['FactorPCum'],KafstActiveVorid['ActFractOri'],alpha=0.3,color=greencol)
+    if uitleg:
+        plt.stackplot(KafstActiveVorid['FactorPCum'],KafstActiveVorid['ActFractOri'],alpha=0.3,color=greencol)
     plt.plot(KafstActiveVorid['FactorPCum'],KafstActiveVorid['ActFractOri'],color=greencol)
     totavgact= sum(myActiveVori['ActFractOri'] * myActiveVori['FactorV'] ) / \
                       sum( myActiveVori['FactorV'] )
@@ -775,9 +907,10 @@ clustr=""
 pltactsdb(KafstActiveVori,'orisel','ODIN data Gen - afstanden'+clustr, True)  
 # -
 
-odinverplAsftsumspec=mkverplAsftsu(odinverplflgsmspec)
+odinverplAsftsumspec=mkverplAsftsu(odinverplflgsmspec,[])
 KafstActiveVorimspec = prepactsdb(odinverplAsftsumspec,useKAfstV) 
 pltactsdb(KafstActiveVorimspec,'oriall','Originele ODIN data (incl Spec)'+clustr, False)  
+
 
 # +
 #OK , we weten nu dat we 
@@ -785,6 +918,24 @@ pltactsdb(KafstActiveVorimspec,'oriall','Originele ODIN data (incl Spec)'+clustr
 #b geo vergelijkingen active modes kunnen maken
 #nu op de manier van 
 # -
+
+#addratcats(infotots2pcdiffng,['FitRatVActive','FitRatVActiveDiff'])    
+def actmodcmpingrp(pc4df,grpvar):
+    grpvarlev=grpvar+"_Lev"
+    grpcol=grpvar+"_Grp"
+    nlev=4
+    gdf=pc4df[['PC4',grpvarlev]].copy(deep=False)
+    gdf[grpcol]=1+ (nlev* gdf[grpvarlev]) // (gdf[grpvarlev].max()+1)
+#    print(gdf)
+    grpverplflgs = odinverplflgs.merge(gdf,how='left')
+    verplAsftsu=mkverplAsftsu(grpverplflgs,[grpvarlev])
+    actdb = prepactsdb(verplAsftsu,useKAfstV)
+    print(actdb)
+    pltactsdb(actdb,'orisel','ODIN data Gen - afstanden'+clustr, False)  
+    for lev in range( 1 , nlev+1):
+        print (lev)
+#actmodcmpingrp(infotots2pcdiffng,'FitRatVActive');
+
 
 print("Finished")
 

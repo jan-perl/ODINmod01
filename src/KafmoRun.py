@@ -12,6 +12,15 @@
 #     name: python3
 # ---
 
+# +
+#run models, set up by mkaddgrids
+# -
+
+import RUDIbas
+
+myname='KafmoRun'
+
+RUDIbas.suprtests = RUDIbas.suprtests+['ODIN1lKAfmo']
 import ODIN1lKAfmo
 
 import glob

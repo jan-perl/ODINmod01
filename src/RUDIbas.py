@@ -52,3 +52,14 @@ if (os.path.isfile(uskafn)):
 fitgrps=['MotiefV','isnaarhuis']
 #SP tussen 0.3 en 1 per motief
 expdefs = {'LW':1.2, 'LO':1.0, 'OA':1.0,'CP' :1.0,'SP' :1.0, 'XAL':2.5}
+
+
+def assertdbg(val,ref,txt,marg=0):
+#    print(val.sum())
+    htest1= np.abs((val-ref)).sum()
+    if (htest1 >marg):
+        print ("Error in %s : %g" %(txt,htest1))
+        print (val)
+        assert (htest1 <=marg)
+
+

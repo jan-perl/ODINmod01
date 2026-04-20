@@ -78,7 +78,11 @@ import matplotlib.pyplot as plt
 
 import RUDIbas
 
-
+myname='ODIN1lKAfmo'
+suprtests= myname in RUDIbas.suprtests 
+suprdata= myname in RUDIbas.suprdata
+#suprtests=True
+print ('Suprtests',suprtests)
 
 import rasteruts1
 import rasterio
@@ -95,6 +99,10 @@ from numba.decorators import jit
 
 RUDIbas.suprtests = RUDIbas.suprtests+['cbspc4plot']
 import cbspc4plot
+
+#todo: move calling routines
+plot_crs = cbspc4plot.plot_crs
+prov0 = cbspc4plot.prov0
 
 cbspc4data= cbspc4plot.cbspc4data
 if 0==1:
@@ -135,6 +143,7 @@ if 0==1:
     print(useKAfstV)
 else:
     useKAfstV=RUDIbas.useKAfstV
+    xlatKAfstV=RUDIbas.xlatKAfstV
 
 if 0==1:
     useKAfstVQ  = useKAfstV [useKAfstV ["MaxAfst"] <4]
@@ -1705,6 +1714,10 @@ stQ
 #stQa
 # -
 print("Finished")
+
+
+
+
 
 
 

@@ -232,6 +232,8 @@ def pickAnrs(myspecvals,xvar,newmaxbndidx):
 useKAfstVo,xlatKAfstVo  = pickAnrs (specvaltab,'KAfstV',[1,2,3,4,5,6,7,8,-1] )
 print(xlatKAfstVo)   
 print(useKAfstVo)   
+landcod=useKAfstVo['KAfstCluCode'].max()
+#landcod
 # -
 
 kvallsel = list(i+1 for i in  range(np.max(useKAfstVo['KAfstCluCode']-1))) +[-1]
@@ -635,7 +637,9 @@ odinverplgr[['KAfstCluCode','GeoInd']].groupby('KAfstCluCode').agg('count')
 
 allodinyr[['KAfstV','Verpl']].groupby('KAfstV').agg('count')
 
-odinverplgr[FactorVincols].sum()
+#odinverplgr zijn comulatieven: 
+totaalmotief_unf  =   74170863993
+odinverplgr[odinverplgr ['KAfstCluCode']==landcod][FactorVincols].sum()/totaalmotief_unf/2
 
 odinverplgr[odinverplgr['PC4']==9711].groupby('MotiefV')[FactorVincols].sum()
 
