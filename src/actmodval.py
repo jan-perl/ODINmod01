@@ -16,9 +16,10 @@
 #Vergelijk valideer active mode modellen op originele data
 
 # +
-#beschrijf kenmerken
-#volledig additief
-# binnen cirkels
+#eerste deel: alle code voor MainUseSelFactorV='FactorVGen'
+#steeds in makkelijk aanroepbare eenheden
+#eind eerste deel: datzelfde in een subroutine incl checks
+#tweede deel : kijk ook naar ongefilterde en gefitte data
 # -
 
 import pandas as pd
@@ -217,96 +218,28 @@ def mkdatadiff2(verpl,fg,infof,grpind,landcod):
 odindiffflginfo= ODINcatVNuse.convert_diffgrpsidat(odinverplflgs,
                 ODINcatVNuse.fitgrpse,[],ODINcatVNuse.kflgsflds, [],"_c",ODINcatVNuse.landcod,False)
 
-#noot: dit is ingelezen data van een oude run, geen andere data van huidige set
-#ook berekend met Q instelling
-runnameo='Dbg01Q'
-lblo='origchk'
-fitdatverplgr = pd.read_pickle("../output/fitdf_"+runnameo+"_"+lblo+".pd")
+deel2=False
 
-fitdatverplgr.dtypes
+#let op: output caches hebben meer velden dan die in ODINcatVNuse
+odinverplgr['FactorVInActive'] =odinverplgr['FactorVGenActive'] 
+infofldsma=ODINcatVNuse.infoflds+['FactorVInActive']
+if deel2:
+    datadiffcachemspec = ODINcatVNuse.mkdatadiff(odinverplgrmspec,ODINcatVNuse.fitgrpse,
+                                            infofldsma,'PC4',ODINcatVNuse.landcod)
+datadiffcache = ODINcatVNuse.mkdatadiff(odinverplgr,ODINcatVNuse.fitgrpse,
+                                        infofldsma,'PC4',ODINcatVNuse.landcod)
+ddc_orig=datadiffcache
 
-#ddc_indat =  ODINcatVNuse.mkdatadiff(fitdatverplgr,ODINcatVNuse.fitgrpse,ODINcatVNuse.landcod)
-ddc_indat =  mkdatadiff2(fitdatverplgr,
-                         ODINcatVNuse.fitgrpse,ODINcatVNuse.infoflds,'mxigrp',ODINcatVNuse.landcod)
-totinf_indat = ODINcatVNuse.mkinfosums(ddc_indat,odindiffflginfo,
-                       ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,ODINcatVNuse.landcod)
-totinf_indat
-
-ddc_fitdat =  mkdatadiff2(fitdatverplgr.rename (
-       columns={'FactorV':'FactorO', 'FactorEst':'FactorV' }),
-            ODINcatVNuse.fitgrpse,  ODINcatVNuse.infoflds,'mxigrp',ODINcatVNuse.landcod)
-
-#noot: deze gebruik fitdata van een vorige run
-totinf_fitdat = ODINcatVNuse.mkinfosums(ddc_fitdat,odindiffflginfo,
-                       ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,ODINcatVNuse.landcod)
-o2=totinf_fitdat.groupby(["GeoInd"]).agg('sum')/ODINcatVNuse.totaalmotief
-o2
 
 
 # +
-#noot: gefit past nooit op oud totaal:
-#assertdbg(np.array(o2[['FactorV_v','FactorV']]) ,1,"FactorVGen behouden",marg=2e-4)
-#o2
+#fitdatverplgr.dtypes
 # -
 
-#let op dit kan niet, want hierover hebben we gesommeerd !
-def permotief(totin,totfit,kflgs):
-    renai = dict ( ( (flg,flg+"_i") for flg in kflgs) ) 
-    agrpi=totin.groupby(["MotiefV","GeoInd"])[kflgs].agg('sum') /1e6
-    agrpi['Gemafst_i'] = agrpi ['FactorKm'] /agrpi ['FactorV'] 
-
-    renaf = dict ( ( (flg,flg+"_f") for flg in kflgs) )
-    agrpf=totfit.groupby(["MotiefV","GeoInd"])[kflgs].agg('sum') /1e6
-    agrpf['Gemafst_f'] = agrpf ['FactorKm'] /agrpf ['FactorV'] 
-    agrp=pd.merge(agrpi.reset_index().rename(columns=renai),  
-                  agrpf.reset_index().rename(columns=renaf) )
-    return agrp
-motlst= permotief(totinf_indat,totinf_fitdat,ODINcatVNuse.kflgsflds)  
-motlst.to_excel("../output/orif_permot2.xlsx")
-
-
-def woonbalans1(totin,kflgs):
-    ause = totin[np.isin(totin['isnaarhuis'],[5,6]) &
-                 np.isin(totin['MotiefV'],[1]) ].copy(deep=False)
-    ause['Ri2']=np.where(ause['isnaarhuis']==5, 
-                        np.where(ause['GeoInd']=='AankPC', 'actzijde' , 'huiszijde' ),
-                        np.where(ause['GeoInd']!='AankPC', 'actzijde' , 'huiszijde' )    
-                           )
-    agrp = ause .groupby(['MotiefV','GeoInd','isnaarhuis'])[kflgs].agg('sum')    /1e6   
-    agrp ['Gemafst'] = agrp ['FactorKm'] /agrp ['FactorV'] 
-    agrp = agrp.reset_index()
-#    agrp ['gcol'] = "Mot_"+ np.array(agrp ['MotiefV'] .astype('string'))+"_nh_"+ np.array(agrp ['isnaarhuis'] .astype('string'))
-    agrp ['p1'] = "Mot_"
-    agrp ['p2'] = "_nh_"
-    mc= agrp['MotiefV'].astype(int).astype(str)
-    nc= agrp['isnaarhuis'].astype(str)
-    p1= agrp['p1'].astype(str)
-    p2= agrp['p2'].astype(str)
-    agrp ['gcol'] =p1 + mc +p2 + nc 
-    agrp2 = agrp.pivot(index="GeoInd", columns="gcol", values="FactorV")
-    return agrp2
-woonbalans1(totinf_indat,ODINcatVNuse.kflgsflds)                       
-
-
-def woonbalans(totin,kflgs):
-    iso=False
-    for mot in [1,7]:
-        for vn in [5,6]:
-            colnm = ('Mot_{}_nh_{}').format(mot,vn)
-            fruse= totin [(totin['MotiefV']==mot )&(totin['isnaarhuis']==vn*1.0 )]
-            fruse = fruse[['GeoInd','FactorV']].rename(columns={'FactorV': colnm})
-            fruse=fruse.copy()
-            if iso:
-                outf=outf.merge(fruse)
-            else:
-                outf=fruse
-            iso=True
-    return outf
-woonbalans(totinf_indat,ODINcatVNuse.kflgsflds)
-
-woonbalans(totinf_fitdat,ODINcatVNuse.kflgsflds).reset_index() # .drop(columns='gcol')    
-
-rdf00=fitdatverplgr
+if True:
+    totinf_orig = ODINcatVNuse.mkinfosums(ddc_orig,odindiffflginfo,
+                           ODINcatVNuse.fitgrpse,ODINcatVNuse.kflgsflds,ODINcatVNuse.landcod)
+    totinf_orig
 
 # einde van poging om fitdatres te herhalen
 # nu weer naar oorspronkelijke data en ative mode vergelijingken
@@ -351,34 +284,40 @@ def avgpc4geoind(df):
 
 pc4orisumngtst= pc4orisumng- avgpc4geoind(pc4orisum)
 pc4orisumngtst.abs().max()
+
+# +
+#was al gebeurd
+#odinverplgr= ODINcatVNuse.deffactorv(ODINcatVNuse.odinverplgr_o,maskKAfstV,MainUseSelFactorV )
+#odinverplklinfo = ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplklinfo_o,maskKAfstV,MainUseSelFactorV)
+#odinverplflgs =ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplflgs_o,maskKAfstV,MainUseSelFactorV)
 # -
 
-odinverplgr= ODINcatVNuse.deffactorv(ODINcatVNuse.odinverplgr_o,maskKAfstV,MainUseSelFactorV )
-odinverplklinfo = ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplklinfo_o,maskKAfstV,MainUseSelFactorV)
-odinverplflgs =ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplflgs_o,maskKAfstV,MainUseSelFactorV)
+if deel2:
+    MainUseSelFactorVmspec='FactorV'
+    odinverplgrmspec= ODINcatVNuse.deffactorv(ODINcatVNuse.odinverplgr_o,maskKAfstV,MainUseSelFactorVmspec )
+    odinverplklinfomspec = ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplklinfo_o,maskKAfstV,MainUseSelFactorVmspec)
+    odinverplflgsmspec =ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplflgs_o,maskKAfstV,MainUseSelFactorVmspec)
 
-MainUseSelFactorVmspec='FactorV'
-odinverplgrmspec= ODINcatVNuse.deffactorv(ODINcatVNuse.odinverplgr_o,maskKAfstV,MainUseSelFactorVmspec )
-odinverplklinfomspec = ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplklinfo_o,maskKAfstV,MainUseSelFactorVmspec)
-odinverplflgsmspec =ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplflgs_o,maskKAfstV,MainUseSelFactorVmspec)
-
-odinverplgrmspec['FactorVInActive'] =odinverplgrmspec['FactorVGenActive'] + odinverplgrmspec['FactorVSpecActive']       
-odinverplgrmspec.columns
+if deel2:
+    odinverplgrmspec['FactorVInActive'] =odinverplgrmspec['FactorVGenActive'] + odinverplgrmspec['FactorVSpecActive']       
+    odinverplgrmspec.columns
 
 odinverplgr['FactorVInActive'] =odinverplgr['FactorVGenActive']   
 odinverplgr.columns
 
 #let op: deze caches hebben meer velden dan die in ODINcatVNuse
 infofldsma=ODINcatVNuse.infoflds+['FactorVInActive']
-datadiffcachemspec = ODINcatVNuse.mkdatadiff(odinverplgrmspec,ODINcatVNuse.fitgrpse,
-                                        infofldsma,'PC4',ODINcatVNuse.landcod)
+if deel2:
+    datadiffcachemspec = ODINcatVNuse.mkdatadiff(odinverplgrmspec,ODINcatVNuse.fitgrpse,
+                                            infofldsma,'PC4',ODINcatVNuse.landcod)
 datadiffcache = ODINcatVNuse.mkdatadiff(odinverplgr,ODINcatVNuse.fitgrpse,
                                         infofldsma,'PC4',ODINcatVNuse.landcod)
 
-o2=datadiffcachemspec.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief_unf
-#ODINcatVNuse.chkvalues(o2[['FactorV_v','FactorKm_v']],1.0, "datadiffcache FactorV_v")
-assertdbg(np.array(o2[['FactorV_v']]) ,1,"FactorV (origineel) behouden",marg=0)
-o2
+if deel2:
+    o2=datadiffcachemspec.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief_unf
+    #ODINcatVNuse.chkvalues(o2[['FactorV_v','FactorKm_v']],1.0, "datadiffcache FactorV_v")
+    assertdbg(np.array(o2[['FactorV_v']]) ,1,"FactorV (origineel) behouden",marg=0)
+    o2
 
 o2=datadiffcache.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief
 assertdbg(np.array(o2[['FactorV_v']]) ,1,"FactorV (gen) behouden",marg=0)
@@ -425,12 +364,13 @@ t2.T
 #/totaalVgen
 # -
 
-infotots2pcdiffmspec=mrgpcdiffr(calcFactVPC4(datadiffcachemspec,True),pc4orisum )
-o2= infotots2pcdiffmspec.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief_unf
-assertdbg(np.array(o2[['FactorV_v','FactorV']]) ,1,"FactorV (origineel) behouden",marg=0)
-o2= infotots2pcdiffmspec.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief
-assertdbg(np.array(o2[['FactorVGen','FactorVin']]) ,1,"FactorVGen behouden",marg=0)
-o2.T
+if deel2:
+    infotots2pcdiffmspec=mrgpcdiffr(calcFactVPC4(datadiffcachemspec,True),pc4orisum )
+    o2= infotots2pcdiffmspec.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief_unf
+    assertdbg(np.array(o2[['FactorV_v','FactorV']]) ,1,"FactorV (origineel) behouden",marg=0)
+    o2= infotots2pcdiffmspec.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief
+    assertdbg(np.array(o2[['FactorVGen','FactorVin']]) ,1,"FactorVGen behouden",marg=0)
+    o2.T
 #/totaalVgen
 
 #infotots2pcdiffng zijn totalen per PC4 (dus niet per afstand)
@@ -810,12 +750,12 @@ def mkverplAsftsu(inflgs,addlseps):
     print (inflgs['FactorV'].sum()/ODINcatVNuse.totaalmotief)
 #    print (inflgs['FactorVGen'].sum()/ODINcatVNuse.totaalmotief)
 
-    odinverplAsftsu=inflgs.groupby(['KAfstCluCode']+addlseps).sum().reset_index()
+    rv=inflgs.groupby(['KAfstCluCode']+addlseps).sum().reset_index()
     #.rename(       columns= {"KAfstCluCode":"Kafst"})
-    odinverplAsftsu["FactorV"] = odinverplAsftsu["FactorV"] - odinverplAsftsu["FactorV"].shift(1,fill_value=0)
-    odinverplAsftsu["FactorVActive"] = odinverplAsftsu["FactorVActive"] - odinverplAsftsu["FactorVActive"].shift(1,fill_value=0)
-    odinverplAsftsu["ActFractOri"] = odinverplAsftsu["FactorVActive"] / odinverplAsftsu["FactorV"]
-    return(odinverplAsftsu)
+    rv["FactorV"] = rv["FactorV"] - rv["FactorV"].shift(1,fill_value=0)
+    rv["FactorVActive"] = rv["FactorVActive"] - rv["FactorVActive"].shift(1,fill_value=0)
+    rv["ActFractOri"] = rv["FactorVActive"] / rv["FactorV"]
+    return(rv)
 if not suprtests:
     odinverplAsftsu=mkverplAsftsu(odinverplflgs,[])
     print (odinverplAsftsu['FactorV'].sum()/ODINcatVNuse.totaalmotief)
@@ -842,14 +782,14 @@ o2.T
 #neemt een database db1, gesommeerd naar KAfstV en tabel myKAfstV
 #voegt samen, en maakt velden voor berekende waarden en labels
 def prepactsdb(db1,myKAfstV):
-    KafstActiveVori = db1.merge(myKAfstV,how='left')
-    KafstActiveVori['FactorVr'] = KafstActiveVori['FactorV'] / np.max(KafstActiveVori['FactorV'] )
-    KafstActiveVori['FactorVCum'] = KafstActiveVori['FactorV'].cumsum()
-    KafstActiveVori['FactorVCum'] = KafstActiveVori['FactorVCum']/ np.max( KafstActiveVori['FactorVCum'])
-    KafstActiveVori['FactorPCum'] = KafstActiveVori['FactorVCum'].shift(1,fill_value=0)+1e-6
-    KafstActiveVori['KAfstVFmt'] = np.where(KafstActiveVori['MaxAfst'] ==0,"verder",
-                                            KafstActiveVori['MaxAfst'].map(lambda x:"%3g"%(x)) )
-    return(KafstActiveVori)
+    rv = db1.merge(myKAfstV,how='left')
+    rv['FactorVr'] = rv['FactorV'] / np.max(rv['FactorV'] )
+    rv['FactorVCum'] = rv['FactorV'].cumsum()
+    rv['FactorVCum'] = rv['FactorVCum']/ np.max( rv['FactorVCum'])
+    rv['FactorPCum'] = rv['FactorVCum'].shift(1,fill_value=0)+1e-6
+    rv['KAfstVFmt'] = np.where(rv['MaxAfst'] ==0,"verder",
+                                            rv['MaxAfst'].map(lambda x:"%3g"%(x)) )
+    return(rv)
 
 if not suprtests:
     KafstActiveVori = prepactsdb(odinverplAsftsu,useKAfstV)
@@ -907,9 +847,10 @@ clustr=""
 pltactsdb(KafstActiveVori,'orisel','ODIN data Gen - afstanden'+clustr, True)  
 # -
 
-odinverplAsftsumspec=mkverplAsftsu(odinverplflgsmspec,[])
-KafstActiveVorimspec = prepactsdb(odinverplAsftsumspec,useKAfstV) 
-pltactsdb(KafstActiveVorimspec,'oriall','Originele ODIN data (incl Spec)'+clustr, False)  
+if deel2:
+    odinverplAsftsumspec=mkverplAsftsu(odinverplflgsmspec,[])
+    KafstActiveVorimspec = prepactsdb(odinverplAsftsumspec,useKAfstV) 
+    pltactsdb(KafstActiveVorimspec,'oriall','Originele ODIN data (incl Spec)'+clustr, False)  
 
 
 # +
@@ -936,6 +877,60 @@ def actmodcmpingrp(pc4df,grpvar):
         print (lev)
 #actmodcmpingrp(infotots2pcdiffng,'FitRatVActive');
 
+
+print("Finished part 1")
+
+
+deel2=True
+
+if deel2:
+    MainUseSelFactorVmspec='FactorV'
+    odinverplgrmspec= ODINcatVNuse.deffactorv(ODINcatVNuse.odinverplgr_o,maskKAfstV,MainUseSelFactorVmspec )
+    odinverplklinfomspec = ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplklinfo_o,maskKAfstV,MainUseSelFactorVmspec)
+    odinverplflgsmspec =ODINcatVNuse.selKafst_odin_o(ODINcatVNuse.odinverplflgs_o,maskKAfstV,MainUseSelFactorVmspec)
+
+if deel2:
+    odinverplgrmspec['FactorVInActive'] =odinverplgrmspec['FactorVGenActive'] + odinverplgrmspec['FactorVSpecActive']       
+    odinverplgrmspec.columns
+
+#let op: deze caches hebben meer velden dan die in ODINcatVNuse
+infofldsma=ODINcatVNuse.infoflds+['FactorVInActive']
+if deel2:
+    datadiffcachemspec = ODINcatVNuse.mkdatadiff(odinverplgrmspec,ODINcatVNuse.fitgrpse,
+                                        infofldsma,'PC4',ODINcatVNuse.landcod)
+datadiffcache = ODINcatVNuse.mkdatadiff(odinverplgr,ODINcatVNuse.fitgrpse,
+                                        infofldsma,'PC4',ODINcatVNuse.landcod)
+
+if deel2:
+    o2=datadiffcachemspec.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief_unf
+    #ODINcatVNuse.chkvalues(o2[['FactorV_v','FactorKm_v']],1.0, "datadiffcache FactorV_v")
+    assertdbg(np.array(o2[['FactorV_v']]) ,1,"FactorV (origineel) behouden",marg=0)
+    o2
+
+
+
+infotots2pcdiffmspec=mrgpcdiffr(calcFactVPC4(datadiffcachemspec,True),pc4orisum )
+o2= infotots2pcdiffmspec.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief_unf
+assertdbg(np.array(o2[['FactorV_v','FactorV']]) ,1,"FactorV (origineel) behouden",marg=0)
+o2= infotots2pcdiffmspec.groupby(['GeoInd']).sum()/ODINcatVNuse.totaalmotief
+assertdbg(np.array(o2[['FactorVGen','FactorVin']]) ,1,"FactorVGen behouden",marg=0)
+o2.T
+#/totaalVgen
+
+o2=c2.sum()/ODINcatVNuse.totaalmotief
+#assertdbg(np.array(o2[['FactorV_v','FactorV']]) ,2,"FactorVGen behouden",marg=2e-4)
+o2.T
+
+odinverplAsftsumspec=mkverplAsftsu(odinverplflgsmspec,[])
+KafstActiveVorimspec = prepactsdb(odinverplAsftsumspec,useKAfstV) 
+pltactsdb(KafstActiveVorimspec,'oriall','Originele ODIN data (incl Spec)'+clustr, False)  
+
+# +
+#OK , we weten nu dat we 
+#a fitdatres2- kunnen maken, gelijk aan fitdatres-
+#b geo vergelijkingen active modes kunnen maken
+#nu op de manier van 
+# -
 
 print("Finished")
 
