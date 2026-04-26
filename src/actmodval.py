@@ -61,6 +61,7 @@ import ODiN2readpkl
 
 from sklearn.linear_model import LinearRegression
 from scipy.optimize import nnls
+from scipy.optimize import lsq_linear
 from sklearn import linear_model
 import seaborn
 
@@ -474,6 +475,7 @@ def _regressgrp(indf, yvar, xvars,pcols):
             rv=np.zeros(len(xvars))
         else:
             fit1 = nnls(X_train, y_train)    
+            #fit1 = lsq_linear(X_train, y_train)    
             rv=pd.DataFrame(fit1[0],index=pcols).T
         return(rv)
 
@@ -857,20 +859,20 @@ def pltactsdb(myActiveVori,savtag,title,dofill,uitlegfunc,grpsdb):
     #ax=chart.ax
     refcolor="#004800"
     reflab=""
+    totavgact= sum(myActiveVori['ActFractOri'] * myActiveVori['FactorV'] ) / \
+                      sum( myActiveVori['FactorV'] )
     if dofill:
         plt.stackplot(KafstActiveVorid['FactorPCum'],KafstActiveVorid['ActFractOri'],alpha=0.3,color=refcolor)
     else:
         sns.lineplot(data=grpsdbd,x= 'FactorPCum',y='ActFractOri',ax=ax, hue='grplbl',
                     estimator=None)
         refcolor="#202020"
-        reflab="reference"
+        reflab="reference (Act= %5.1f%%, Deel = 100%%"%(100*totavgact)
         plt.grid(axis='both')
     sns.lineplot(data=KafstActiveVorid,x= 'FactorPCum',y='ActFractOri',ax=ax, 
                   color=refcolor,label=reflab,  estimator=None)    
     #plt.plot(KafstActiveVorid['FactorPCum'],KafstActiveVorid['ActFractOri'],
     #         color=refcolor,label=reflab)
-    totavgact= sum(myActiveVori['ActFractOri'] * myActiveVori['FactorV'] ) / \
-                      sum( myActiveVori['FactorV'] )
     #totavgact= sum( KafstActiveVori['FactorVr'] )
     fig.suptitle(title)
     #chart.fig.suptitle('Totaal aandeel actieve mobiliteit %.3f'%(totavgact))            
@@ -940,14 +942,11 @@ pltactsdbgrps(KafstActiveVori,'oriselmotief','ODIN data Gen - afstanden'+clustr,
 
 # +
 nlev=5
-infotots2pcdiffng ['FitRatVActive_Grp'] = infotots2pcdiffng ['FitRatVActive_Lev'] * nlev // (
-   infotots2pcdiffng ['FitRatVActive_Lev'].max() +1 )
-infotots2pcdiffng ['FitRatVActive_Grp'] = np.where(infotots2pcdiffng ['FitRatVActive_Grp'] <0,0,
-                                                  infotots2pcdiffng ['FitRatVActive_Grp'])
-infotots2pcdiffng ['FitRatVActiveDiff_Grp'] = infotots2pcdiffng ['FitRatVActiveDiff_Lev'] * nlev // (
-   infotots2pcdiffng ['FitRatVActiveDiff_Lev'].max() +1 )
-infotots2pcdiffng ['FitRatVActiveDiff_Grp'] = np.where(infotots2pcdiffng ['FitRatVActiveDiff_Grp'] <0,0,
-                                                  infotots2pcdiffng ['FitRatVActiveDiff_Grp'])
+def setlevs (df,colin,colgrp,mynlev):
+    df[colgrp]= (df[colin]* mynlev // ( df[colin].max() +1 ) )+1
+    df[colgrp]= np.where(df[colgrp]<0,0,df[colgrp])
+setlevs (infotots2pcdiffng ,'FitRatVActive_Lev', 'FitRatVActive_Grp', nlev)
+setlevs (infotots2pcdiffng ,'FitRatVActiveDiff_Lev', 'FitRatVActive_Grp', nlev)
 
 act1grpcols = ['FitRatVActive_Grp', 'FitRatVActiveDiff_Grp','PC4' ]
 
@@ -968,6 +967,120 @@ pltactsdbgrps(KafstActiveVori,'oriselRatActSel','ODIN data Gen - afstanden'+clus
 pltactsdbgrps(KafstActiveVori,'oriselRatActDiff','ODIN data Gen - afstanden'+clustr, False, geenuitleg,
         ddc_actpcgrps,[ 'FitRatVActiveDiff_Grp'])
 
+
+# +
+def getafstdepdata(ddcin, infototraw,mygrps,mynlev):
+    infotot_local= infototraw.copy(deep=True)
+    setlevs (infotot_local ,'FitRatVActive_Lev', 'FitRatVActive_Grp', mynlev)
+    setlevs (infotot_local,'FitRatVActiveDiff_Lev', 'FitRatVActive_Grp', mynlev)
+
+    ddc_local= datadiffcache.merge(infotot_local [ act1grpcols ],
+         how='left',    on='PC4')  
+    d2=ddc_local.copy(deep=False).rename(columns={'FactorV_v': 'FactorV','FactorVInActive_v': 'FactorVActive' })
+    myverplAsftsu=mkverplAsftsu(d2,mygrps)
+    cmpKafstActiveVori = prepactsdbgrps(myverplAsftsu,useKAfstV,mygrps)
+    cmpKafstActiveVoriOK= cmpKafstActiveVori[cmpKafstActiveVori[mygrps[0]] >0]
+    return cmpKafstActiveVoriOK
+
+def afstdepplot(ddcin, infototraw,mygrps,mynlev):
+    cmpKafstActiveVoriOK =getafstdepdata(ddcin, infototraw,mygrps,mynlev)
+    #print (cmpKafstActiveVori.dtypes)
+    fig, ax = plt.subplots()
+    sns.lineplot(data=cmpKafstActiveVoriOK,x= 'grpapct',y='ActFractOri',ax=ax, hue='KAfstVFmt',
+                    estimator=None,marker='o')
+    ax.grid(axis='both')
+    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+
+    
+afstdepplot(datadiffcache,infotots2pcdiffng ,[ 'FitRatVActive_Grp'],nlev)
+
+
+# +
+#doe eerst regressie op geclusterde waarden, ook voor visualisatie, nnls om rare uitkomsten te vermijden
+def _regressgrp(indf, yvar, xvars,pcols):  
+#        reg_nnls = LinearRegression(fit_intercept=False )
+        y_train=indf[yvar]
+        X_train=indf[xvars]
+#        print(('o',len(indf),X_train.sum(),y_train.sum()) )
+        if 1==1:
+            #smask = ~ (np.isnan(y_train) | np.isnan(np.sum(X_train)) )
+            #smask = np.where(False== np.isnan(y_train) ,
+            #                  (y_train >0) & (np.sum(X_train,axis=1) >0) ,0)
+            smask = (y_train >0) & (np.sum(X_train,axis=1) >0)
+            indf= indf[smask]
+            y_train=indf[yvar]
+            X_train=indf[xvars]
+#            print(('f', len(indf)))
+        else:
+            y_train[np.isnan(y_train)]=0.1
+        if(len(indf)==0) :
+            rv=np.zeros(len(xvars))
+        else:
+            #print(('lr',len(indf),X_train.sum(),y_train.sum()) )
+            fit1 = nnls(X_train, y_train)    
+            rv=pd.DataFrame(fit1[0],index=pcols).T
+        return(rv)
+
+
+#@jit(parallel=True)
+def _fitsub_c(indf,fitgrp,_regressgrp_c,  colvacols2, colpacols2):
+    rf= indf.groupby(fitgrp ).apply( _regressgrp, 'FactorVActiveW', colvacols2, colpacols2)
+    return rf
+
+def fit_adistall_parameters(datf):
+    debug=True
+#    print(indf.dtypes)
+    indf=datf.copy(deep=False)
+    maxfitfrac=.95    
+    fitmask= np.where(indf["FactorV"] * maxfitfrac  > indf['FactorVActive'],1,
+                     (indf['FactorVActive'] - indf["FactorV"]) / (indf["FactorV"] * (1-maxfitfrac)) )
+    #print (fitmask)
+    indf["FactorVW"] = indf["FactorV"] *fitmask
+    indf["Ones"] = 1
+    indf["FactorVActiveW"] = indf["FactorVActive"] *fitmask    
+    indf["GrpCentered"] = (indf["grpapct"]*0.01 -.5)
+    indf["ActFractOriW"] = indf["FactorVW"] *indf["GrpCentered"] 
+    #print(indf)
+    colvacols2 = ["FactorVW","ActFractOriW"]
+    colpacols2 = ["Init","OriCorr"]
+    fitgrp='KAfstVFmt'
+    rf= _fitsub_c(indf,fitgrp,_regressgrp,  colvacols2, colpacols2).reset_index()
+    #indf["ActFractOri_est2"] = 
+    outdf = indf.merge(rf,how='left')
+    estarr = (np.array( outdf[["Ones","GrpCentered"]]) * np.array( outdf[colpacols2]) ).sum(axis=1)
+    datf["ActFractOriCorr"] =  np.where(estarr>1,1,estarr)
+    #print (datf["ActFractOriCorr"])
+    #print(estarr)
+    datfs=indf[[fitgrp,"grpapct"]].groupby(fitgrp).agg('mean').reset_index()
+    print(datfs)
+    rf2 = rf.merge(datfs,how='left')
+    return rf2
+
+def afstdepgrpfitplot(cmpKafstActiveVoriOK):
+    #print (cmpKafstActiveVori.dtypes)
+    fig, ax = plt.subplots()
+    sns.lineplot(data=cmpKafstActiveVoriOK,x= 'grpapct',y='ActFractOriCorr',ax=ax, hue='KAfstVFmt',
+                    estimator=None)
+    sns.scatterplot(data=cmpKafstActiveVoriOK,x= 'grpapct',y='ActFractOri',ax=ax, hue='KAfstVFmt',
+                    estimator=None,marker='o')
+    ax.grid(axis='both')
+    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+
+def afstdepgrpfit(ddcin, infototraw,mygrps,mynlev):
+    cmpKafstActiveVoriOK =getafstdepdata(ddcin, infototraw,mygrps,mynlev)
+    rf= fit_adistall_parameters(cmpKafstActiveVoriOK)
+    afstdepgrpfitplot(cmpKafstActiveVoriOK)
+    return rf
+
+corrvals=afstdepgrpfit(datadiffcache,infotots2pcdiffng ,[ 'FitRatVActive_Grp'],10*nlev)
+#afstdepplot(datadiffcache,infotots2pcdiffng ,[ 'FitRatVActive_Grp'],nlev,True)
+# -
+
+#let op: dit is een gemiddelde van alle motieven
+# per motief zal de curve er verschillend uit zien
+corrvals
+sns.lineplot(data=corrvals,x='Init',y='OriCorr',marker='o')
+#sns.lineplot(data=corrvals,x='grpapct',y='OriCorr')
 
 # +
 #OK , we weten nu dat we 
@@ -1035,7 +1148,8 @@ if deel2:
     d2=datadiffcachemspec.copy(deep=False).rename(columns={'FactorV_v': 'FactorV','FactorVInActive_v': 'FactorVActive' })
     odinverplAsftsumspec=mkverplAsftsu(d2,[])
     KafstActiveVorimspec = prepactsdb(odinverplAsftsumspec,useKAfstV) 
-    pltactsdb(KafstActiveVorimspec,'oriall','Originele ODIN data (incl Spec)'+clustr, False,geenuitleg)  
+    pltactsdb(KafstActiveVorimspec,'oriall','Originele ODIN data (incl Spec) vs spec'+clustr, 
+              False,geenuitleg,KafstActiveVorigeo)  
 
 # +
 #OK , we weten nu dat we 
