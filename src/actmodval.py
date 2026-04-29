@@ -355,14 +355,16 @@ t2.T
 #/totaalVgen
 # -
 
-#infotots2pcdiffng zijn totalen per PC4 (dus niet per afstand)
+#infotots2pcdiffng zijn totalen per PC4 en  (dus niet per afstand)
 infotots2pcdiffng=mrgpcdiffr(calcFactVPC4(datadiffcache,False),pc4orisumng)
 infotots2pcdiffng.sum()/ODINcatVNuse.totaalmotief
+
+infotots2pcdiffng.sort_values('FitRatVActive').to_excel("../output/actmodval-ests.xlsx")
 
 
 #deze scatter plot ziet er goed uit
 #nu berekend minFactorVplot=2e6
-def mkactpccmpfig(indf0,title,huecol):
+def mkactpccmpfigssiz(indf0,title,huecol):
 #    indf0['RatActiveVSc'] = 1.75*indf0['RatActiveV']**2 +.05
     indf=indf0[(indf0['FactorVin']>minFactorVplot ) & (indf0['RatActiveVIn']>1e-2)].copy(deep=False)
     fig, ax = plt.subplots(figsize=(6, 4))
@@ -374,8 +376,8 @@ def mkactpccmpfig(indf0,title,huecol):
     ax.set_ylabel('Punten: aandeel active per PC4')
 #    ax.set_xscale('log')
 #    ax.set_yscale('log')
-    return(fig)
-r1=mkactpccmpfig(infotots2pcdiffng,'Data center functions excluded','FactorVin')
+    return(fig)   
+r1=mkactpccmpfigssiz(infotots2pcdiffng,'Data center functions excluded','FactorVin')
 
 
 # +
@@ -472,12 +474,14 @@ def _regressgrp(indf, yvar, xvars,pcols):
         else:
             y_train[np.isnan(y_train)]=0.1
         if(len(indf)==0) :
-            rv=np.zeros(len(xvars))
+            rv0=np.zeros(len(xvars))            
         else:
+            #print(('lr',len(indf),X_train.sum(),y_train.sum()) )
             fit1 = nnls(X_train, y_train)    
-            #fit1 = lsq_linear(X_train, y_train)    
-            rv=pd.DataFrame(fit1[0],index=pcols).T
+            rv0=fit1[0]
+        rv=pd.DataFrame(rv0,index=pcols).T            
         return(rv)
+
 
 #fit op 'FactorVInActive': weeg naar indf['FactorVin']
 
@@ -565,7 +569,9 @@ def make1stgridgeorel (tifname,indf,usecols,nanval):
     grid = rasterio.open(tifname)
     return grid
 
-act1tifcols= ['RatActiveVIn','FitRatVActive','FitRatVActive_Lev','FitRatVActiveDiff_Lev']
+#FitRatAvtiveV is de curve fit van RatActiveV; op zit nu nuttig, maar niet verder mee rekenen
+#omdat fuctie monotoon is, is RatVActive_Lev niet nodig
+act1tifcols= ['RatActiveVIn','FitRatVActive','FitRatVActive_Lev','FitRatVActiveDiff_Lev','RatActiveV']
 act1grid= make1stgridgeorel (act1tifname,cbspc4data.merge(infotots2pcdiffng,how='left',
                                 left_on=['postcode4'],right_on='PC4'),act1tifcols,999)
 # -
@@ -946,14 +952,14 @@ def setlevs (df,colin,colgrp,mynlev):
     df[colgrp]= (df[colin]* mynlev // ( df[colin].max() +1 ) )+1
     df[colgrp]= np.where(df[colgrp]<0,0,df[colgrp])
 setlevs (infotots2pcdiffng ,'FitRatVActive_Lev', 'FitRatVActive_Grp', nlev)
-setlevs (infotots2pcdiffng ,'FitRatVActiveDiff_Lev', 'FitRatVActive_Grp', nlev)
+setlevs (infotots2pcdiffng ,'FitRatVActiveDiff_Lev', 'FitRatVActiveDiff_Grp', nlev)
 
 act1grpcols = ['FitRatVActive_Grp', 'FitRatVActiveDiff_Grp','PC4' ]
 
-r1=mkactpccmpfig(infotots2pcdiffng,'Data center functions excluded','FitRatVActive_Grp')
+r1=mkactpccmpfigssiz(infotots2pcdiffng,'Data center functions excluded','FitRatVActive_Grp')
 # -
 
-r1=mkactpccmpfig(infotots2pcdiffng,'Data center functions excluded','FitRatVActiveDiff_Grp')
+r1=mkactpccmpfigssiz(infotots2pcdiffng,'Data center functions excluded','FitRatVActiveDiff_Grp')
 
 ddc_actpcgrps= datadiffcache.merge(infotots2pcdiffng [ act1grpcols ],
    how='left',    on='PC4')                                   
@@ -972,7 +978,7 @@ pltactsdbgrps(KafstActiveVori,'oriselRatActDiff','ODIN data Gen - afstanden'+clu
 def getafstdepdata(ddcin, infototraw,mygrps,mynlev):
     infotot_local= infototraw.copy(deep=True)
     setlevs (infotot_local ,'FitRatVActive_Lev', 'FitRatVActive_Grp', mynlev)
-    setlevs (infotot_local,'FitRatVActiveDiff_Lev', 'FitRatVActive_Grp', mynlev)
+    setlevs (infotot_local,'FitRatVActiveDiff_Lev', 'FitRatVActiveDiff_Grp', mynlev)
 
     ddc_local= datadiffcache.merge(infotot_local [ act1grpcols ],
          how='left',    on='PC4')  
@@ -1014,11 +1020,12 @@ def _regressgrp(indf, yvar, xvars,pcols):
         else:
             y_train[np.isnan(y_train)]=0.1
         if(len(indf)==0) :
-            rv=np.zeros(len(xvars))
+            rv0=np.zeros(len(xvars))            
         else:
             #print(('lr',len(indf),X_train.sum(),y_train.sum()) )
             fit1 = nnls(X_train, y_train)    
-            rv=pd.DataFrame(fit1[0],index=pcols).T
+            rv0=fit1[0]
+        rv=pd.DataFrame(rv0,index=pcols).T            
         return(rv)
 
 
@@ -1027,13 +1034,13 @@ def _fitsub_c(indf,fitgrp,_regressgrp_c,  colvacols2, colpacols2):
     rf= indf.groupby(fitgrp ).apply( _regressgrp, 'FactorVActiveW', colvacols2, colpacols2)
     return rf
 
-def fit_adistall_parameters(datf):
+def fit_adistallgrp_parameters(datf):
     debug=True
 #    print(indf.dtypes)
     indf=datf.copy(deep=False)
     maxfitfrac=.95    
     fitmask= np.where(indf["FactorV"] * maxfitfrac  > indf['FactorVActive'],1,
-                     (indf['FactorVActive'] - indf["FactorV"]) / (indf["FactorV"] * (1-maxfitfrac)) )
+                     (indf["FactorV"] - indf['FactorVActive'] ) / (indf["FactorV"] * (1-maxfitfrac)) )
     #print (fitmask)
     indf["FactorVW"] = indf["FactorV"] *fitmask
     indf["Ones"] = 1
@@ -1068,7 +1075,7 @@ def afstdepgrpfitplot(cmpKafstActiveVoriOK):
 
 def afstdepgrpfit(ddcin, infototraw,mygrps,mynlev):
     cmpKafstActiveVoriOK =getafstdepdata(ddcin, infototraw,mygrps,mynlev)
-    rf= fit_adistall_parameters(cmpKafstActiveVoriOK)
+    rf= fit_adistallgrp_parameters(cmpKafstActiveVoriOK)
     afstdepgrpfitplot(cmpKafstActiveVoriOK)
     return rf
 
@@ -1081,6 +1088,115 @@ corrvals=afstdepgrpfit(datadiffcache,infotots2pcdiffng ,[ 'FitRatVActive_Grp'],1
 corrvals
 sns.lineplot(data=corrvals,x='Init',y='OriCorr',marker='o')
 #sns.lineplot(data=corrvals,x='grpapct',y='OriCorr')
+
+# +
+def fit_adistalldat_parameters(datf,tofitxin,mygrps,pclu):
+    debug=True
+#    print(datf.dtypes)
+    indf=datf.copy(deep=False)
+    maxfitfrac=.95
+    m2=1e-6
+    fitmask= np.where(indf["FactorV"] * maxfitfrac  > indf['FactorVActive'],1.0,
+               (indf["FactorV"]- indf['FactorVActive'] +m2)  / (indf["FactorV"] * (1-maxfitfrac)) )
+    fitmask= np.where((indf["FactorV"] ==0.0) | (indf[pclu]==0), 0,fitmask)
+#    print (fitmask.sum())
+    indf["FactorVW"] = indf["FactorV"] *fitmask
+    indf["Ones"] = 1
+    indf["FactorVActiveW"] = indf["FactorVActive"] *fitmask
+    #errs= (indf["FactorVActive"] > indf["FactorV"])
+    #print (['input y errors u: ',errs.astype(int).sum()] )
+    
+    #errs= (indf["FactorVActiveW"] > indf["FactorVW"]*(1+1e-9))
+    #print (['input y errors w: ',errs.sum().astype(int)] )
+    #display( indf[errs])
+
+    
+    indf["GrpCentered"] = (indf[tofitxin] -.5)
+    indf["ActFractOriW"] = indf["FactorVW"] *indf["GrpCentered"] 
+    #print(indf)
+    colvacols2 = ["FactorVW","ActFractOriW"]
+    colpacols2 = ["Init","OriCorr"]
+    fitgrps=mygrps+['KAfstCluCode']
+    rf= _fitsub_c(indf,fitgrps,_regressgrp,  colvacols2, colpacols2)
+    rf= np.clip(rf,0,2) .reset_index()
+    #indf["ActFractOri_est2"] = 
+    outdf = indf.merge(rf,how='left')
+    estarr = (np.array( outdf[["Ones","GrpCentered"]]) * np.array( outdf[colpacols2]) ).sum(axis=1)
+    datf["ActFractOriCorr"] =  np.clip(estarr,0,1)
+    #print (datf["ActFractOriCorr"])
+    #print(estarr)
+    datfs=indf[fitgrps+[tofitxin]].groupby(fitgrps).agg('mean').reset_index()
+    #print(datfs)
+    
+    rf2 = rf.merge(datfs,how='left')
+    return rf2
+
+def afstdepdatfitplot(dplot,tofitxin,mygrps):
+    #print (cmpKafstActiveVori.dtypes)
+    fig, ax = plt.subplots()
+    huecols= ['KAfstCluCode']+mygrps
+    huevals = dplot[huecols].astype(str).T.agg(','.join)
+    sns.lineplot(data=dplot,x= tofitxin,y='ActFractOriCorr',ax=ax, hue=huevals,
+                    estimator=None)
+    sns.scatterplot(data=dplot,x= tofitxin,y='ActFractOri',ax=ax, hue=huevals,
+                    estimator=None,marker='o')
+    ax.grid(axis='both')
+    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+
+    
+    
+def afstdepdatfit(ddcin, infototraw,mygrps,mynlev):
+    infotot_local= infototraw.copy(deep=True)
+    pclu='PC4'
+    origratcol='RatActiveV'
+    if mynlev!=0:
+        setlevs (infotot_local ,'FitRatVActive_Lev', 'FitRatVActive_Grp', mynlev)
+        pclu='FitRatVActive_Grp'
+        pgrps=['FitRatVActive_Grp']
+        infotot_local['FactorVs'] =  infotot_local[['FactorV']+pgrps].groupby(pgrps).transform('sum')
+        infotot_local['FactorVas'] =  infotot_local[['FactorVActive']+pgrps].groupby(pgrps).transform('sum')
+        infotot_local[origratcol] = infotot_local['FactorVas'] / infotot_local['FactorVs'] 
+        #infotot_local.to_excel("../output/actmodval-cd3-itl.xlsx")
+
+    ddc_local= ddcin.merge(infotot_local[ [ 'PC4',origratcol, pclu ] ],
+         how='left',    on='PC4')  
+    awfields= [pclu,'KAfstCluCode',origratcol]
+    ddckeeps= awfields + [ 'FactorV_v','FactorVInActive_v']
+    ddsums = ddc_local[ mygrps+ ddckeeps] .groupby( mygrps+ awfields).agg('sum').reset_index()
+#    print(len(ddsumall))
+    d2=ddsums.rename(columns=
+                {'FactorV_v': 'FactorV','FactorVInActive_v': 'FactorVActive' })
+    d2['ActFractOri'] =  d2['FactorVActive'] /  d2['FactorV'] 
+#    display(d2)
+#    errs= (d2["FactorVActive"] > d2["FactorV"]).astype(int)
+#    print (['input y errors u: ',errs.sum()] )
+#    print (d2['GrpExpl'].str[:5])
+    d3=d2[d2['GrpExpl'].str[:5] != "x1.0 6"].copy()
+    #d3.to_excel("../output/actmodval-cd3.xlsx")
+    #print (d3.dtypes)
+    rf= fit_adistalldat_parameters(d3,origratcol,mygrps,pclu)
+    afstdepdatfitplot(d3,origratcol,mygrps)
+    return rf
+
+#corrvalsdat=afstdepdatfit(datadiffcache,infotots2pcdiffng ,['GrpExpl'])
+corrvalsdat=afstdepdatfit(datadiffcache,infotots2pcdiffng ,['GrpExpl','GeoInd'],2*nlev)
+#corrvalsdat=afstdepdatfit(datadiffcache,infotots2pcdiffng ,['GeoInd'])
+#afstdepplot(datadiffcache,infotots2pcdiffng ,[ 'FitRatVActive_Grp'],nlev,True)
+#corrvalsdat
+# -
+
+datadiffcache.dtypes
+
+# +
+#let op: dit is een gemiddelde van alle motieven
+# per motief zal de curve er verschillend uit zien
+corrvalsdat.to_excel("../output/actmodval-cvd.xlsx")
+corrvalsdat
+huecols= ['GrpExpl','GeoInd']
+huevals = corrvalsdat[huecols].astype(str).T.agg(','.join)
+
+sns.lineplot(data=corrvalsdat,x='Init',y='OriCorr',marker='o',hue=huevals,estimator=None)
+
 
 # +
 #OK , we weten nu dat we 

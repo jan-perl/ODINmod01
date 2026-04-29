@@ -572,12 +572,14 @@ def _regressgrp(indf, yvar, xvars,pcols):
         else:
             y_train[np.isnan(y_train)]=0.1
         if(len(indf)==0) :
-            rv=np.zeros(len(xvars))
+            rv0=np.zeros(len(xvars))            
         else:
-#            print(('lr',len(indf),X_train.sum(),y_train.sum()) )
+            #print(('lr',len(indf),X_train.sum(),y_train.sum()) )
             fit1 = nnls(X_train, y_train)    
-            rv=pd.DataFrame(fit1[0],index=pcols).T
+            rv0=fit1[0]
+        rv=pd.DataFrame(rv0,index=pcols).T            
         return(rv)
+
 
 
 #@jit(parallel=True)
