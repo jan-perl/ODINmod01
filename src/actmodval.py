@@ -511,6 +511,7 @@ def fitactivem(indf,fitmode):
     diffs = indf['FitVActive'] - indf['FactorVInActive']    
     chisq = np.sum(diffs*diffs) / np.sum(indf['FactorVInActive']* indf['FactorVInActive'])
     indf['FitRatVActive'] = indf['FitVActive'] /indf['FactorVin']
+    indf['FitVActiveDiff'] =diffs
     indf['FitRatVActiveDiff'] = indf['FactorVInActive'] /indf['FactorVin'] - indf['FitRatVActive'] 
     print(chisq)
     return (chisq,rf)
@@ -526,6 +527,43 @@ r1=mkactpccmpfig1d(infotots2pcdiffng,'fitted VGenpara')
 # -
 
 infotots2pcdiffng [(infotots2pcdiffng ['RatActiveVIn']>.8 )& (infotots2pcdiffng['FactorV']>minFactorVplot ) ]
+
+
+# +
+#nu kentallen per kolom, in volgorde van opbouw
+def mkkental(indf,col):
+    pcols=['mean','std']
+    rdf=pd.DataFrame(indf[col].agg(pcols)).T
+    rdf = rdf/ (indf['FactorV_v'].agg('mean'))
+    rdf['var'] = rdf['std'] *rdf['std']
+#    print(rdf.T)
+    return rdf
+
+
+def mkkental2 (indf,col):
+    """
+    Based on http://stackoverflow.com/a/2415343/190597 (EOL)
+    """    
+    weights = indf['FactorV_v']
+    values = indf[col]/weights
+    average = np.ma.average(values, weights=weights, axis=0)
+    variance = np.dot(weights, (values - average) ** 2) / weights.sum()
+    std = np.sqrt(variance)
+    return pd.DataFrame({'mean':average, 'var':variance, 'std':std}, index=[col])
+
+
+def mkfitcomp(indf):
+    dfc=indf.copy()
+    #mkkental(dfc,'FactorVInActive_v')
+    rv = pd.concat ([mkkental2 (dfc,c) for c in
+                 ['FactorVInActive_v','EstActiveV', 'FitVActive','FitVActiveDiff' ] ] )
+    totsq=rv.loc['FactorVInActive_v','var']
+    print(totsq)
+    rv['remvar'] = totsq- rv['var']
+    return rv
+
+kentalfit = mkfitcomp(infotots2pcdiffng)
+kentalfit    
 
 
 # +
@@ -1195,7 +1233,17 @@ corrvalsdat
 huecols= ['GrpExpl','GeoInd']
 huevals = corrvalsdat[huecols].astype(str).T.agg(','.join)
 
-sns.lineplot(data=corrvalsdat,x='Init',y='OriCorr',marker='o',hue=huevals,estimator=None)
+sns.scatterplot(data=corrvalsdat,x='Init',y='OriCorr',marker='o',hue=huevals,estimator=None)
+# -
+
+corrvalsdat.dtypes
+
+corrvalsdat['pividx'] = corrvalsdat[huecols].astype(str).T.agg(','.join)
+corrvalspiv=corrvalsdat.pivot(index='pividx',columns='KAfstCluCode',values=['Init','OriCorr'] )
+fig, ax = plt.subplots()
+sns.heatmap(corrvalspiv, linewidth=0.5,ax=ax)
+figname = "../output/actmodval_perkaclu.png"
+fig.savefig(figname,dpi=300) 
 
 
 # +

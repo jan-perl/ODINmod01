@@ -240,6 +240,20 @@ addparscol(naarhuis,"AankPC/rudifun/S_MXI22_BB").dtypes
 # maak groepen op aantallen postcodes (of oppervlakken ?)
 #1 plot punt per PC4 -> middelen gaat in regressie
 
+def addgrpexpl (pstatsn,myspecvals,pltgrp):
+    grplrv = len(myspecvals [ (myspecvals ['Code'] ==largranval) & 
+                            (myspecvals ['Variabele_naam'] ==pltgrp) ] ) !=0    
+    if not grplrv:
+        explhere = myspecvals [myspecvals['Variabele_naam'] == pltgrp].copy()
+        if (len(explhere) >1 ):
+            explhere['Code'] = pd.to_numeric(explhere['Code'],errors='coerce')
+    #   print(explhere)
+            pstatsn=pstatsn.merge(explhere,left_on=pltgrp, right_on='Code', how='left')    
+            pstatsn[pltgrp] = pstatsn[pltgrp].astype(str)  + " : " + pstatsn['Code_label']    
+            pstatsn= pstatsn.drop(columns=['Code','Code_label'])
+    return pstatsn
+
+
 def mkpltverplxypc4 (df,myspecvals,xvar,pltgrp,selstr,ngrp):
     xsrcarr=  xvar.split ('/')
     xvarPC = xsrcarr[0]
@@ -269,15 +283,7 @@ def mkpltverplxypc4 (df,myspecvals,xvar,pltgrp,selstr,ngrp):
                             (myspecvals ['Variabele_naam'] ==xvar) ] ) !=0
 #    print(vardescr,heeftlrv)
 
-    grplrv = len(myspecvals [ (myspecvals ['Code'] ==largranval) & 
-                            (myspecvals ['Variabele_naam'] ==pltgrp) ] ) !=0
-    if ~grplrv:
-        explhere = myspecvals [myspecvals['Variabele_naam'] == pltgrp].copy()
-        explhere['Code'] = pd.to_numeric(explhere['Code'],errors='coerce')
-#   print(explhere)
-        pstatsn=pstatsn.merge(explhere,left_on=pltgrp, right_on='Code', how='left')    
-        pstatsn[pltgrp] = pstatsn[pltgrp].astype(str)  + " : " + pstatsn['Code_label']    
-        pstatsn= pstatsn.drop(columns=['Code','Code_label'])
+    pstatsn= addgrpexpl (pstatsn,myspecvals,pltgrp)
 
     ylab="Percentage of FractV in group"
     xlab=xvar + " : "+ vardescr 
@@ -344,15 +350,7 @@ def mkfitverplxypc4 (df,myspecvals,xvar,pltgrp,selstr,ngrp):
                             (myspecvals ['Variabele_naam'] ==xvar) ] ) !=0
 #    print(vardescr,heeftlrv)
 
-    grplrv = len(myspecvals [ (myspecvals ['Code'] ==largranval) & 
-                            (myspecvals ['Variabele_naam'] ==pltgrp) ] ) !=0
-    if ~grplrv:
-        explhere = myspecvals [myspecvals['Variabele_naam'] == pltgrp].copy()
-        explhere['Code'] = pd.to_numeric(explhere['Code'],errors='coerce')
-#   print(explhere)
-        pstatsn=pstatsn.merge(explhere,left_on=pltgrp, right_on='Code', how='left')    
-        pstatsn[pltgrp] = pstatsn[pltgrp].astype(str)  + " : " + pstatsn['Code_label']    
-        pstatsn= pstatsn.drop(columns=['Code','Code_label'])
+    pstatsn= addgrpexpl (pstatsn,myspecvals,pltgrp)
 
     ylab="Percentage of FractV in group"
     xlab=xvar + " : "+ vardescr 
@@ -402,9 +400,11 @@ def mkpltverplp (df,myspecvals,collvar,normgrp,selstr):
     #print(pstats)
     denoms= pstats [[normgrp, 'FactorV']].groupby([normgrp]).sum().reset_index().rename(columns={'FactorV':'Denom'} )
     #print(denoms)
+    #na merge is er copie ontstaan
     pstatsn = pstats.merge(denoms,how='left')
     pstatsn['FractV'] = pstatsn['FactorV'] *100.0/ pstatsn['Denom']
     vardescr = dbk_2022_cols [dbk_2022_cols['Variabele_naam_ODiN_2022'] == collvar] ['Variabele_label_ODiN_2022']
+    grpdescr = dbk_2022_cols [dbk_2022_cols['Variabele_naam_ODiN_2022'] == normgrp] ['Variabele_label_ODiN_2022']
 #    print(vardescr)
     if len(vardescr) ==0:
         vardescr = ""        
@@ -413,6 +413,9 @@ def mkpltverplp (df,myspecvals,collvar,normgrp,selstr):
         vardescr = vardescr.item()
         heeftlrv = len(myspecvals [ (myspecvals ['Code'] ==largranval) & 
                             (myspecvals ['Variabele_naam'] ==collvar) ] ) !=0
+        
+    pstatsn= addgrpexpl (pstatsn,myspecvals,normgrp)    
+    
 #    print(vardescr,heeftlrv)
     xlab="Percentage of FractV in group"
     ylab=collvar + " : "+ vardescr 
@@ -431,7 +434,7 @@ def mkpltverplp (df,myspecvals,collvar,normgrp,selstr):
 #        print(explhere)
         pstatsn=pstatsn.merge(explhere,left_on=collvar, right_on='Code', how='left')
 #        print(pstatsn)
-        pstatsn['Code_label'] = pstatsn[collvar].astype(str)  + " : " + pstatsn['Code_label']
+        pstatsn['Clu_label'] = pstatsn[collvar].astype(str)  + " : " + pstatsn['Code_label']
         chart= sns.catplot(data=pstatsn, x='FractV', y='Code_label', hue=normgrp, kind="bar",orient="h",height=5, aspect=2.2)            
     chart.fig.suptitle(selstr)
     chart.set_xlabels(xlab)
@@ -495,5 +498,19 @@ datpltverplp = mkpltverplp (naarwerk,specvaltab,'KHvm','AankPC/rudifun/S_MXI22_G
 
 #neem alleen ritten naar werk, Aankomst is dan werken: 
 datpltverplp = mkpltverplp (naarwerk,specvaltab,'KAfstV','AankPC/rudifun/S_MXI22_GB','Naar werk')
+
+datpltverplp = mkpltverplp (allodinyr,specvaltab,'KHvm','Sted','Alle ritten')
+
+datpltverplp = mkpltverplp (allodinyr,specvaltab,'KHvm','KLeeft','Alle ritten')
+
+datpltverplp = mkpltverplp (allodinyr,specvaltab,'KHvm','HHSam','Alle ritten')
+
+datpltverplp = mkpltverplp (allodinyr,specvaltab,'KHvm','Opleiding','Alle ritten')
+
+datpltverplp = mkpltverplp (allodinyr,specvaltab,'KHvm','BetWerk','Alle ritten')
+
+datpltverplp = mkpltverplp (allodinyr,specvaltab,'KHvm','HHWelvG','Alle ritten')
+
+datpltverplp = mkpltverplp (allodinyr,specvaltab,'KHvm','Herkomst','Alle ritten')
 
 
