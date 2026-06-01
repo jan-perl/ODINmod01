@@ -140,7 +140,8 @@ geolst = [
     'https://download.cbs.nl/regionale-kaarten/wijkbuurtkaart_2022_v2.zip',
     'https://geodata.cbs.nl/files/Wijkenbuurtkaart/WijkBuurtkaart_2023_v3.zip',
     'https://geodata.cbs.nl/files/Wijkenbuurtkaart/WijkBuurtkaart_2024_v2.zip',
-    'https://geodata.cbs.nl/files/Wijkenbuurtkaart/WijkBuurtkaart_2025_v1.zip'    
+    'https://geodata.cbs.nl/files/Wijkenbuurtkaart/WijkBuurtkaart_2025_v1.zip' ,
+    'https://geodata.cbs.nl/files/Wijkenbuurtkaart/WijkBuurtkaart_2026_v0.zip'
 ]
 if fetchweb:
     for link in geolst:
@@ -183,6 +184,7 @@ if  fetchweb:
 #wijkendata.fields
 # -
 os.system("./download_RUDIFUN.sh")
+
 
 
 

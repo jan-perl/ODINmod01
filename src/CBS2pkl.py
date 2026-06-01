@@ -123,22 +123,21 @@ def cnvgwb(year):
         g = geopandas.read_file("../data/CBS/wijkbuurt/gemeenten_2023_v1.dbf")
         w = geopandas.read_file("../data/CBS/wijkbuurt/wijken_2023_v1.dbf")
         b = geopandas.read_file("../data/CBS/wijkbuurt/buurten_2023_v1.dbf")
-        b.replace(to_replace=-99999999,value=pd.NA,inplace=True)
     elif year==2022:
         g = geopandas.read_file("../data/CBS/wijkbuurt/gemeenten_2022_v2.dbf")
         w = geopandas.read_file("../data/CBS/wijkbuurt/wijken_2022_v2.dbf")
         b = geopandas.read_file("../data/CBS/wijkbuurt/buurten_2022_v2.dbf")
-        b.replace(to_replace=-99999999,value=pd.NA,inplace=True)
     elif year==2021:
         g = geopandas.read_file("../data/CBS/wijkbuurt/gemeenten_2021_v3.dbf")
         w = geopandas.read_file("../data/CBS/wijkbuurt/wijken_2021_v3.dbf")
         b = geopandas.read_file("../data/CBS/wijkbuurt/buurten_2021_v3.dbf")
-        b.replace(to_replace=-99999999,value=pd.NA,inplace=True)
     elif year==2020:
         g = geopandas.read_file("../data/CBS/WijkBuurtkaart_2020_v3/gemeente_2020_v3.dbf")
         w = geopandas.read_file("../data/CBS/WijkBuurtkaart_2020_v3/wijk_2020_v3.dbf")
         b = geopandas.read_file("../data/CBS/WijkBuurtkaart_2020_v3/buurt_2020_v3.dbf")
-        b.replace(to_replace=-99999999,value=pd.NA,inplace=True)  
+    b.replace(to_replace=-99999999,value=pd.NA,inplace=True)
+    w.replace(to_replace=-99999999,value=pd.NA,inplace=True)
+    g.replace(to_replace=-99999999,value=pd.NA,inplace=True)
     stryear=str(year)    
     g.to_pickle("../intermediate/CBS/gwb_gem_"+stryear+".pkl")    
     w.to_pickle("../intermediate/CBS/gwb_wijk_"+stryear+".pkl") 
@@ -148,9 +147,41 @@ def cnvgwb(year):
 gemeentendata ,  wijkgrensdata ,    buurtendata = cnvgwb(2020)    
 # -
 
-for year in range(2021,2024):
+for year in range(2021,2023):
     print(year)
     gemeentendata_c ,  wijkgrensdata_c ,    buurtendata_c = cnvgwb(year)    
+
+
+# +
+def cnvgwbnew(year):
+    if year==2023:
+        fn="../data/CBS/wijkbuurt/WijkBuurtkaart_2023_v3/wijkenbuurten_2023_v3.gpkg"
+    if year==2024:
+        fn="../data/CBS/wijkbuurt/WijkBuurtkaart_2024_v2/wijkenbuurten_2024_v2.gpkg"
+    if year==2025:
+        fn="../data/CBS/wijkbuurt/WijkBuurtkaart_2025_v1/wijkenbuurten_2025_v1.gpkg"
+    if year==2026:
+        fn="../data/CBS/wijkbuurt/WijkBuurtkaart_2026_v0/WijkBuurtkaart_2026_v0.gpkg"
+    w = geopandas.read_file(fn,layer=0)
+    b = geopandas.read_file(fn,layer=1)
+    g = geopandas.read_file(fn,layer=2)
+    b.replace(to_replace=-99997,value=pd.NA,inplace=True)
+    w.replace(to_replace=-99997,value=pd.NA,inplace=True)
+    g.replace(to_replace=-99997,value=pd.NA,inplace=True)
+    stryear=str(year)    
+    g.to_pickle("../intermediate/CBS/gwb_gem_"+stryear+".pkl")    
+    w.to_pickle("../intermediate/CBS/gwb_wijk_"+stryear+".pkl") 
+    b.to_pickle("../intermediate/CBS/gwb_buurt_"+stryear+".pkl") 
+    return ([g,w,b])
+
+gemeentendata ,  wijkgrensdata ,    buurtendata  =cnvgwbnew(2020)
+# -
+
+for year in range(2024,2027):
+    print(year)
+    gemeentendata_c ,  wijkgrensdata_c ,    buurtendata_c = cnvgwbnew(year)   
+
+buurtendata.to_excel("../intermediate/CBS/gwb_gem_2023a.xlsx")
 
 
 # +

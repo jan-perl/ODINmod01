@@ -29,6 +29,14 @@ import contextily as cx
 import xyzservices.providers as xyz
 import matplotlib.pyplot as plt
 
+import RUDIbas
+
+myname='ODIN1stexplore'
+suprtests= myname in RUDIbas.suprtests 
+suprdata= myname in RUDIbas.suprdata
+#suprtests=True
+print ('Suprtests',suprtests)
+
 if 1==0:
     cbspc4data = geopandas.read_file("../data/CBS/PC4STATS/cbs_pc4_2022_v1.gpkg")
     cbspc4data['postcode4'] = pd.to_numeric(cbspc4data['postcode4'])
