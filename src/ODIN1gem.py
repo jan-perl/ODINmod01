@@ -39,19 +39,28 @@ print ('Suprtests',suprtests)
 
 import ODiN2readpkl
 
+
+
 #set Houten als target
 targgem =321
-targgemcode = 'GM0321'
+targgemcode = 'GM%04.0f'%targgem
 targpc4=range(3990,4000)
+targgemcode
 
 
 def getgemyrs():
     gems1= [ ODiN2readpkl.getgwb(year)[0].assign(jaar=year) for year in range(2020,2026)]
+    print ([len (d) for d in gems1])
     rv=pd.concat(gems1)
     rv=geopandas.GeoDataFrame(rv, geometry=rv['geometry'])
 #    rv= rv.mask(rv==-99999999.0, np.nan)
     return rv
 allgem=getgemyrs()
+
+#tabel regio
+regtab=allgem[(allgem['GM_CODE']>"GM0305") & 
+              (allgem['GM_CODE']<"GM0357") & (allgem['jaar']==2020)]
+regtab[["GM_CODE","GM_NAAM","jaar","H2O"]].reset_index()
 
 
 def selgemyrs(iv,gemcode):
@@ -61,6 +70,7 @@ def selgemyrs(iv,gemcode):
         sv[c]="rest_NL"
     rv=mv.append(sv)
     rv=rv.copy().reset_index()
+    rv.to_pickle("../intermediate/gem1sum_"+gemcode+".pkl")    
     return rv
 allgem_sum=selgemyrs(allgem,targgemcode)
 allgem_sum
@@ -168,7 +178,7 @@ def addgrpexpl (pstatsn,myspecvals,pltgrp,ext=""):
     return pstatsn
 
 
-keepexplclasses=['KHvm','MotiefV','KAfstV' ]
+keepexplclasses=['KHvm','MotiefV','KAfstV' ,'Weekdag']
 def addexp(df, lst):
     for c in lst:
         addgrpexpl (df,specvaltab, c,ext="_expl" )
@@ -190,12 +200,9 @@ maskgems(odindatamask,gemeentefields,targgem,9999)
 odindatamask.groupby(gemeentefields)['FactorV'].agg('sum')
 # -
 
-gfields=gemeentefields+keepclasses+keepexplclasses+keepeplcs
+gfields=gemeentefields+keepclasses+keepexplclasses+keepexplcs
 summ1gemdata=odindatamask.groupby(gfields)[kflgsflds].agg('sum').reset_index()
 
-
-# +
-#summ1gemdata
 
 # +
 def addverplricht(df,keepval, onbval):
@@ -204,46 +211,97 @@ def addverplricht(df,keepval, onbval):
               onbval*sep+keepval : 'in',onbval*sep+onbval : 'buiten'  }
     df['verplricht'] = (df['VertGem']*sep+df['AankGem']).map(ridict)
     
-addverplricht(summ1gemdata,targgem,9999)    
+#addverplricht(summ1gemdata,targgem,9999)    
+
+
 # -
 
-rscalet={'in':1,'uit':1, 'binnen': 0.5, 'buiten' : 20000000 / 18000000000}
-def pltjr4gr(dat,txt,rscale):
-    inuittot=summ1gemdata.groupby(['verplricht','Jaar'])['FactorV'].agg('sum').reset_index()
-    inuittot['FactorVs'] = inuittot['FactorV'] * (inuittot['verplricht'].map(rscale))
-    #display(inuittot)
-    p=sns.lineplot(data=inuittot,x='Jaar',y='FactorVs',hue='verplricht')
-    p.set_title(txt)
-pltjr4gr(summ1gemdata,'totaal aantal verplaatsingen',rscalet)
+def mkodgemsum(indf,selgem):
+    gemcode = 'GM%04.0f'%selgem
+    odindatamask=indf.copy(deep=True)
+    maskgems(odindatamask,gemeentefields,selgem,9999)
+    odindatamask.groupby(gemeentefields)['FactorV'].agg('sum')
+    gfields=gemeentefields+keepclasses+keepexplclasses+keepexplcs
+    rv=odindatamask.groupby(gfields)[kflgsflds].agg('sum').reset_index()
+    addverplricht(rv,selgem,9999)    
+    rv.to_pickle("../intermediate/gem1odin_"+gemcode+".pkl")
+    return rv
+summ1gemdata=  mkodgemsum(ODiN2readpkl.allodinyr,targgem)
 
-rscalew={'in':1/365,'uit':1/365, 'binnen': 0.5/365, 'buiten' : 20000000 / 18000000000/365}
-#auto bestuurders
-pltjr4gr(summ1gemdata[summ1gemdata['KHvm']==1],
-         'aantal verplaatsingen als auto bestuurder per dag',         rscalew)
+  
 
-rscalea={'in':1/365,'uit':1/365, 'binnen': 0.05/365, 'buiten' : 5000000 / 18000000000/365}
-def pltjr4gra(dat,txt,rscale):
-    inuittot=dat.groupby(['verplricht','Jaar'])['FactorVActive'].agg('sum').reset_index()
-    inuittot['FactorVs'] = inuittot['FactorVActive'] * (inuittot['verplricht'].map(rscale))
+rscalea={'in':1/365,'uit':1/365, 'binnen': 1/365, 'buiten' : 20000000 / 18000000000/365}
+def pltjr4gra(dat,xfield,field,txt,rscale,normfactorV):
+    fieldexpl= {"FactorVActive":{False:"aantal loop+fiets (buiten rel)",True:"deel loop+fiets"},
+                "FactorV":{False:"aantal ritten (buiten rel)",True:"een"},
+                "FactorKm":{False:"totale reisafstand (km) (buiten rel)",True:"gemiddelde afstand (km)"}
+               }
+    #['VertGem','AankGem','WoGem']
+    gemfield=min(dat['VertGem'])
+    addfv=[] if (field=='FactorV') or not normfactorV else ['FactorV']
+    inuittot=dat.groupby(['verplricht',xfield])[[field]+addfv].agg('sum').reset_index()
+    
+    if normfactorV:
+        inuittot['FactorVs'] = inuittot[field] / inuittot['FactorV'] 
+    else:
+        inuittot['FactorVs'] = inuittot[field] * (inuittot['verplricht'].map(rscale)) 
     #display(inuittot)
-    p=sns.lineplot(data=inuittot,x='Jaar',y='FactorVs',hue='verplricht')
+    inuittot['richting'] = inuittot['verplricht'] + " " + ("%.0f" %gemfield)
+    p=sns.lineplot(data=inuittot,x=xfield,y='FactorVs',hue='richting')
+    if normfactorV & (field =="FactorVActive"):
+        p.set_ylim(bottom=0,top=1)
+    else:
+        p.set_ylim(bottom=0)
+    ylab=fieldexpl[field][normfactorV]
+    p.set_ylabel(ylab)     
     p.set_title(txt)
-pltjr4gra(summ1gemdata,'totaal aantal verplaatsingen actieve modes',rscalea)    
+pltjr4gra(summ1gemdata,"Jaar",'FactorVActive','totaal aantal verplaatsingen actieve modes',
+          rscalea,False)    
 
 # +
-gemtxt={targgem:'eigen',9999:'rest_nl',19999:'bezoeker'}
+#summ1gemdata
+# -
+
+rscalet={'in':1,'uit':1, 'binnen': 1, 'buiten' : 20000000 / 18000000000}
+def pltjr4gr(dat,txt,rscale):
+    pltjr4gra(dat,'FactorV',txt,rscale,False)
+pltjr4gra(summ1gemdata,'Jaar','FactorV','verplaatsingen per jaar ODIN',rscalet,False)
+
+rscalew={'in':1/365,'uit':1/365, 'binnen': 1/365, 'buiten' : 20000000 / 18000000000/365}
+#auto bestuurders
+pltjr4gra(summ1gemdata[summ1gemdata['KHvm']==1],'Jaar','FactorV',
+         'auto bestuurders per dag Houten',         rscalea,False)
+
+pltjr4gra(summ1gemdata,'Jaar','FactorVActive','actieve modes Houten',rscalea,True)    
+
+pltjr4gra(summ1gemdata,'VertUur','FactorVActive','actieve modes Houten',rscalea,True)    
+
+pltjr4gra(summ1gemdata[summ1gemdata['KHvm']==1],'Jaar','FactorKm',
+         'Veplaatsingafstand als auto bestuurder per dag',  rscalea,False)
+
+pltjr4gra(summ1gemdata[summ1gemdata['KHvm']==1],'Jaar','FactorKm',
+         'Gemiddelde afstand als auto bestuurder per dag',  rscalea,True)
+
+summ1gemdata.groupby(['VertGem','AankGem','WoGem'] )[['FactorV']].agg('sum')
+
+
+# +
+
 def __pltjr3gms(dat,field,txt,ri):    
-        dat['gc']= dat[gemeentefields].sum(axis=1)== len(gemeentefields) *19999 
+        gemtxt={9998:'rest_nl',9999:'bezoeker'}
+        dat['gc']= dat[gemeentefields].sum(axis=1)== len(gemeentefields) *9999 
         #print(dat['gc'])
         dat['gc'] = np.where(dat['gc'] ,9998,dat[ri])
         inuittot=dat.groupby(['gc','Jaar'])[['FactorV',field]].agg('sum').reset_index()
         inuittot['FactorVr'] = inuittot[field] /inuittot['FactorV'] 
-        inuittot['gemexpl'] = ri+ " = "+(inuittot['gc'].map(gemtxt) )
+        inuittot['gemexpl'] = ri+ " = "+(inuittot['gc'].map(lambda x: gemtxt.get(x,'eigen')) )
+        inuittot['opdel'] = ri
         return inuittot
 
 def pltjr3gms(dat,field,txt,ris):
     inuittot= pd.concat([ __pltjr3gms(dat,field,txt,ri) for ri in ris])
-    p=sns.lineplot(data=inuittot,x='Jaar',y='FactorVr',hue='gemexpl')
+    p=sns.lineplot(data=inuittot,x='Jaar',y='FactorVr',hue='gemexpl',alpha=0.5,style='opdel')
+    p.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
     p.set_title(txt)
 pltjr3gms(summ1gemdata,'FactorVActive','deel van ritten Actieve modes',['VertGem','AankGem','WoGem'])  
 # -
@@ -254,5 +312,17 @@ pltjr3gms(summ1gemdata,'FactorKm','gemiddelde afstanden',['VertGem','AankGem','W
 #print(allodinyr2)
 #allodinyr = allodinyr2
 # -
+allgem_sum352=selgemyrs(allgem,'GM0352')
+allgem_sum352
+
+
+summ1gemdata352=  mkodgemsum(ODiN2readpkl.allodinyr,352)
+
+selrgroei352=mkgroei(allgem_sum352,2022)
+sns.lineplot(data=selrgroei352.reset_index(),x='jaar',y='AANT_INW',style='GM_CODE')
+
+pltjr4gra(summ1gemdata352,'Jaar','FactorV','totaal aantal verplaatsingen',rscalet,False)
+
+print("klaar")
 
 
