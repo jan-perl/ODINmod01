@@ -62,6 +62,11 @@ regtab=allgem[(allgem['GM_CODE']>"GM0305") &
               (allgem['GM_CODE']<"GM0357") & (allgem['jaar']==2020)]
 regtab[["GM_CODE","GM_NAAM","jaar","H2O"]].reset_index()
 
+#tabel regio
+regtab2=allgem[(allgem['GM_NAAM'].str.contains("embo" ) ) & 
+                (allgem['jaar']==2020)]
+regtab2[["GM_CODE","GM_NAAM","jaar","H2O"]].reset_index()
+
 
 def selgemyrs(iv,gemcode):
     mv=iv[iv['GM_CODE'] == gemcode]
@@ -70,7 +75,7 @@ def selgemyrs(iv,gemcode):
         sv[c]="rest_NL"
     rv=mv.append(sv)
     rv=rv.copy().reset_index()
-    rv.to_pickle("../intermediate/gem1sum_"+gemcode+".pkl")    
+    rv.to_pickle("../intermediate/gemdata/gem1sum_"+gemcode+".pkl")    
     return rv
 allgem_sum=selgemyrs(allgem,targgemcode)
 allgem_sum
@@ -173,8 +178,8 @@ def addgrpexpl (pstatsn,myspecvals,pltgrp,ext=""):
             explhere['Code'] = pd.to_numeric(explhere['Code'],errors='coerce')
             explheres= explhere.set_index('Code').to_dict()['Code_label'] 
     #   print(explhere)            
-            pstatsn[pltgrp+ext] = pstatsn[pltgrp].astype(str)  + " : " + \
-                 (pstatsn[pltgrp].map(explheres) )
+            pstatsn[pltgrp+ext] = (pstatsn[pltgrp].apply(lambda x: "%4.0f : "%x) )  + \
+                 (pstatsn[pltgrp].map(explheres) ) 
     return pstatsn
 
 
@@ -187,20 +192,24 @@ keepclasses=['Jaar','AankUur','VertUur','isnaarhuis','isnaarhuis_expl']
 kflgsflds=['FactorV',"FactorKm","FactorKmActive","FactorVActive"]
 keepexplcs=addexp(allodinyr,keepexplclasses)
 
+# +
+#allodinyr['KAfstV_expl']
+# -
+
 allodinyr.columns
 
 # +
-gemeentefields= ['WoGem' , 'VertGem', 'AankGem' ]
+ODINgemeentefields= ['WoGem' , 'VertGem', 'AankGem' ]
 def maskgems(df,lst,keepval, onbval):
     for c in lst:
         df[c].mask(df[c]!=keepval, onbval,inplace=True)
 
 odindatamask=ODiN2readpkl.allodinyr.copy(deep=True)
-maskgems(odindatamask,gemeentefields,targgem,9999)
-odindatamask.groupby(gemeentefields)['FactorV'].agg('sum')
+maskgems(odindatamask,ODINgemeentefields,targgem,9999)
+odindatamask.groupby(ODINgemeentefields)['FactorV'].agg('sum')
 # -
 
-gfields=gemeentefields+keepclasses+keepexplclasses+keepexplcs
+gfields=ODINgemeentefields+keepclasses+keepexplclasses+keepexplcs
 summ1gemdata=odindatamask.groupby(gfields)[kflgsflds].agg('sum').reset_index()
 
 
@@ -219,12 +228,12 @@ def addverplricht(df,keepval, onbval):
 def mkodgemsum(indf,selgem):
     gemcode = 'GM%04.0f'%selgem
     odindatamask=indf.copy(deep=True)
-    maskgems(odindatamask,gemeentefields,selgem,9999)
-    odindatamask.groupby(gemeentefields)['FactorV'].agg('sum')
-    gfields=gemeentefields+keepclasses+keepexplclasses+keepexplcs
+    maskgems(odindatamask,ODINgemeentefields,selgem,9999)
+    odindatamask.groupby(ODINgemeentefields)['FactorV'].agg('sum')
+    gfields=ODINgemeentefields+keepclasses+keepexplclasses+keepexplcs
     rv=odindatamask.groupby(gfields)[kflgsflds].agg('sum').reset_index()
     addverplricht(rv,selgem,9999)    
-    rv.to_pickle("../intermediate/gem1odin_"+gemcode+".pkl")
+    rv.to_pickle("../intermediate/gemdata/gem1odin_"+gemcode+".pkl")
     return rv
 summ1gemdata=  mkodgemsum(ODiN2readpkl.allodinyr,targgem)
 
@@ -286,10 +295,9 @@ summ1gemdata.groupby(['VertGem','AankGem','WoGem'] )[['FactorV']].agg('sum')
 
 
 # +
-
 def __pltjr3gms(dat,field,txt,ri):    
         gemtxt={9998:'rest_nl',9999:'bezoeker'}
-        dat['gc']= dat[gemeentefields].sum(axis=1)== len(gemeentefields) *9999 
+        dat['gc']= dat[ODINgemeentefields].sum(axis=1)== len(ODINgemeentefields) *9999 
         #print(dat['gc'])
         dat['gc'] = np.where(dat['gc'] ,9998,dat[ri])
         inuittot=dat.groupby(['gc','Jaar'])[['FactorV',field]].agg('sum').reset_index()
@@ -312,16 +320,54 @@ pltjr3gms(summ1gemdata,'FactorKm','gemiddelde afstanden',['VertGem','AankGem','W
 #print(allodinyr2)
 #allodinyr = allodinyr2
 # -
-allgem_sum352=selgemyrs(allgem,'GM0352')
-allgem_sum352
+#wijk bij duurstede
+targgem =352
+targgemcode = 'GM%04.0f'%targgem
+allgem_sumexp=selgemyrs(allgem,targgemcode)
+summ1gemdataexp=  mkodgemsum(ODiN2readpkl.allodinyr,targgem)
+allgem_sumexp
 
 
-summ1gemdata352=  mkodgemsum(ODiN2readpkl.allodinyr,352)
+pland=allgem_sumexp.boundary.plot(color='green',alpha=0.1)
+cx.add_basemap(pland, source= prov0,crs=plot_crs)
 
-selrgroei352=mkgroei(allgem_sum352,2022)
-sns.lineplot(data=selrgroei352.reset_index(),x='jaar',y='AANT_INW',style='GM_CODE')
+selrgroeiexp=mkgroei(allgem_sumexp,2022)
+sns.lineplot(data=selrgroeiexp.reset_index(),x='jaar',y='AANT_INW',style='GM_CODE')
 
-pltjr4gra(summ1gemdata352,'Jaar','FactorV','totaal aantal verplaatsingen',rscalet,False)
+pltjr4gra(summ1gemdataexp,'Jaar','FactorV','totaal aantal verplaatsingen',rscalet,False)
+
+# +
+#Utrechtse Heuvelrug
+
+targgem =1581
+targgemcode = 'GM%04.0f'%targgem
+allgem_sumexp=selgemyrs(allgem,targgemcode)
+summ1gemdataexp=  mkodgemsum(ODiN2readpkl.allodinyr,targgem)
+allgem_sumexp
+# -
+
+pland=allgem_sumexp.boundary.plot(color='green',alpha=0.1)
+cx.add_basemap(pland, source= prov0,crs=plot_crs)
+
+#IJsselstein
+targgem =353
+targgemcode = 'GM%04.0f'%targgem
+allgem_sumexp=selgemyrs(allgem,targgemcode)
+summ1gemdataexp=  mkodgemsum(ODiN2readpkl.allodinyr,targgem)
+allgem_sumexp
+
+pland=allgem_sumexp.boundary.plot(color='green',alpha=0.1)
+cx.add_basemap(pland, source= prov0,crs=plot_crs)
+
+#Culemborg
+targgem =216
+targgemcode = 'GM%04.0f'%targgem
+allgem_sumexp=selgemyrs(allgem,targgemcode)
+summ1gemdataexp=  mkodgemsum(ODiN2readpkl.allodinyr,targgem)
+allgem_sumexp
+
+pland=allgem_sumexp.boundary.plot(color='green',alpha=0.1)
+cx.add_basemap(pland, source= prov0,crs=plot_crs)
 
 print("klaar")
 
