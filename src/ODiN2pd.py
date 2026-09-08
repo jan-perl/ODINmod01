@@ -57,7 +57,13 @@ df_2018 = pd.read_csv("../data/ODiN2018_Databestand_v2.0.csv", encoding = "ISO-8
 df_2019 = pd.read_csv("../data/ODiN2019_Databestand_v2.0.csv", encoding = "ISO-8859-1", sep=";")  
 df_2020 = pd.read_csv("../data/ODiN2020_Databestand_v2.0.csv", encoding = "ISO-8859-1", sep=";")  
 df_2021 = pd.read_csv("../data/ODiN2021_Databestand.csv", encoding = "ISO-8859-1", sep=";")  
-df_2022 = pd.read_csv("../data/ODiN2022_Databestand.csv", encoding = "ISO-8859-1", sep=";")  
+df_2022 = pd.read_csv("../data/ODiN2022_Databestand.csv", encoding = "ISO-8859-1", sep=";")   
+
+df_2023 = pd.read_excel("../data/ODiN_2023/ODiN2023_Databestand.xlsx")  
+
+df_2023
+
+df_2023.dtypes
 
 df_2019
 
@@ -91,7 +97,8 @@ def miscols(df,jaar,dbk,vnamcol):
         if (nas !=0) & False:
             print(chkcol,"has nas:",nas)        
     print(jaar,acols.size,acols,len(mcols),mcols,ocols.size,ocols.index)
-    
+
+miscols(df_2023,2023,dbk_2022_cols,'Variabele_naam_ODiN_2022')
 miscols(df_2022,2022,dbk_2022_cols,'Variabele_naam_ODiN_2022')
 miscols(df_2021,2021,dbk_2022_cols,'Variabele_naam_ODiN_2022')
 miscols(df_2020,2020,dbk_2022_cols,'Variabele_naam_ODiN_2022')
@@ -106,7 +113,7 @@ miscols(df_2018,2018,dbk_2022_cols,'Variabele_naam_ODiN_2022')
 #TODO parse ook data labels
 # -
 
-allodinyr=pd.concat([df_2018,df_2019,df_2020,df_2021,df_2022], ignore_index=True)
+allodinyr=pd.concat([df_2018,df_2019,df_2020,df_2021,df_2022,df_2023], ignore_index=True)
 len(allodinyr.index)
 
 

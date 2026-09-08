@@ -92,15 +92,83 @@ def mkgroei(dfin,idxjr):
     #print(refjr)
     rv= dfidx.merge(refjr,how='left').set_index(idxs+['jaar'])
     rv = dfsum / rv
+    rv=rv.where(rv!=0,np.NaN)
     return rv.reset_index()
     
 selrgroei=mkgroei(allgem_sum,2022)
-# -
 
-sns.lineplot(data=selrgroei.reset_index(),x='jaar',y='AANT_INW',style='GM_CODE')
 
 # +
-#eens wat vergelijkings plaatjes maken; deze blijken grotendeels geen zit te hebben  
+#selrgroei
+
+# +
+def pltecongroei(grtab,tit,pltpref):
+    sns.lineplot(data=grtab.reset_index(),x='jaar',y='AANT_INW',style='GM_CODE',
+                 color='blue',marker='o',label='inwoners')
+    sns.lineplot(data=grtab.reset_index(),x='jaar',y='Banen van werknemers',
+                 style='GM_CODE',color='green',marker='x',label='banen werknemers')
+    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    plt.title("Economische groei "+tit)
+    figname = "../output/"+pltpref+"_econgr.svg";
+    plt.savefig(figname,dpi=300, bbox_inches='tight')
+
+pltecongroei(selrgroei, 'Houten' ,'htn')  
+
+
+# -
+
+#echte functie in ODIN1gemvis
+#bekijk statistiek per jaar
+def mksampletab(dat, fieldsplit):
+    dat2=dat.copy().rename(columns={fieldsplit:'GM_CODE'})
+#    print(dat2)
+    repflds=['Nwaarn','FactorV','FactorKm']
+    rt=dat2.groupby(['GM_CODE','Jaar'])[repflds].agg('sum').reset_index()
+    rt['gemwgtdag'] = rt['FactorV'] / rt['Nwaarn'] /365
+    rt['gemafst'] = rt['FactorKm'] / rt['FactorV']
+    return rt.assign(opdeling=fieldsplit)
+def mksamplegopd(dat):
+    t2 = [ mksampletab(dat, gf) for gf  in ODINgemeentefields ] 
+    rv = pd.concat(t2).reset_index()
+    return rv
+sampletab= mksamplegopd(summ1gemdata)
+#sampletab
+
+sns.lineplot(data=sampletab,x='Jaar',y='gemwgtdag',hue='opdeling',style='GM_CODE', marker= 'o')
+
+sns.lineplot(data=sampletab,x='Jaar',y='gemafst',hue='opdeling',style='GM_CODE', marker= 'o')
+
+targgem
+
+
+# +
+def datplotcum(dat, fieldsplit,selgem,valfield):
+    dsel= dat[dat [fieldsplit] == selgem] 
+    dagg = dsel.groupby (['Jaar' ,'KHvm'] )[[valfield]].agg('sum')
+    dagg = dagg*1/365
+    dagg= dagg.reset_index().sort_values('KHvm')
+    dagg[valfield]=dagg.groupby(['Jaar'])[valfield].cumsum()
+    dagg['opdeling'] =fieldsplit
+    return dagg
+    
+def modplotopd(dat, fieldsplit,selgem,valfield):
+    d2=[datplotcum(dat, f2,selgem,valfield ) for f2 in fieldsplit.keys() ]    
+    dagg=pd.concat(d2)
+    dagg['Jaar'] += dagg['opdeling'] .map(fieldsplit)
+
+    hues=dagg['KHvm'].unique()
+    print(hues[::-1])
+    sns.barplot(data=dagg,x='Jaar', y= valfield , hue='KHvm',dodge=0,hue_order=hues[::-1])
+    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    plt.title('Opdeling is links Vertgem en rechts Aankgem' )
+    #return daggcum
+modplotopd(summ1gemdata,{'VertGem':0, 'AankGem':0.25 } ,targgem,'FactorV')
+# -
+
+modplotopd(summ1gemdata,{'VertGem':0, 'AankGem':0.25 } ,targgem,'FactorKm')
+
+# +
+#eens wat vergelijkings plaatjes maken; deze blijken grotendeels geen zin te hebben  
 # -
 
 fieldexpl= {"FactorVActive":{False:"aantal loop+fiets (buiten rel)",True:"deel loop+fiets"},
@@ -279,7 +347,18 @@ pland=allgem_sumexp.boundary.plot(color='green',alpha=0.1)
 cx.add_basemap(pland, source= prov0,crs=plot_crs)
 
 selrgroei=mkgroei(allgem_sumexp,2022)
-sns.lineplot(data=selrgroei.reset_index(),x='jaar',y='AANT_INW',style='GM_CODE')
+pltecongroei(selrgroei, 'Wijk bij Duurstede' ,'wijk') 
+
+# +
+#ODIN sampling
+# -
+
+sampletab= mksamplegopd(summ1gemdataexp)
+sns.lineplot(data=sampletab,x='Jaar',y='gemwgtdag',hue='opdeling',style='GM_CODE', marker= 'o')
+
+modplotopd(summ1gemdataexp,{'VertGem':0, 'AankGem':0.25 } ,targgem,'FactorV')
+
+modplotopd(summ1gemdataexp,{'VertGem':0, 'AankGem':0.25 } ,targgem,'FactorKm')
 
 pltjr4gra(summ1gemdataexp,'Jaar','FactorV','totaal aantal verplaatsingen',rscalet,False)
 
@@ -301,7 +380,7 @@ pland=allgem_sumexp.boundary.plot(color='green',alpha=0.1)
 #cx.add_basemap(pland, sourexpe= prov0,crs=plot_crs)
 
 selrgroei=mkgroei(allgem_sumexp,2022)
-sns.lineplot(data=selrgroei.reset_index(),x='jaar',y='AANT_INW',style='GM_CODE')
+pltecongroei(selrgroei, 'Utrechtse Heuvelrug' ,'hrg') 
 
 pltjr4gra(summ1gemdataexp,'Jaar','FactorV','totaal aantal verplaatsingen',rscalet,False)
 
@@ -313,7 +392,7 @@ pland=allgem_sumexp.boundary.plot(color='green',alpha=0.1)
 cx.add_basemap(pland, source= prov0,crs=plot_crs)
 
 selrgroei=mkgroei(allgem_sumexp,2022)
-sns.lineplot(data=selrgroei.reset_index(),x='jaar',y='AANT_INW',style='GM_CODE')
+pltecongroei(selrgroei, 'Ijsselstein' ,'ijst') 
 
 pltjr4gra(summ1gemdataexp,'Jaar','FactorV','totaal aantal verplaatsingen',rscalet,False)
 
@@ -325,7 +404,18 @@ pland=allgem_sumexp.boundary.plot(color='green',alpha=0.1)
 cx.add_basemap(pland, source= prov0,crs=plot_crs)
 
 selrgroei=mkgroei(allgem_sumexp,2022)
-sns.lineplot(data=selrgroei.reset_index(),x='jaar',y='AANT_INW',style='GM_CODE')
+pltecongroei(selrgroei, 'Culemborg' ,'cl') 
+
+# +
+#ODIN sampling
+# -
+
+sampletab= mksamplegopd(summ1gemdataexp)
+sns.lineplot(data=sampletab,x='Jaar',y='gemwgtdag',hue='opdeling',style='GM_CODE', marker= 'o')
+
+modplotopd(summ1gemdataexp,{'VertGem':0, 'AankGem':0.25 } ,targgem,'FactorV')
+
+modplotopd(summ1gemdataexp,{'VertGem':0, 'AankGem':0.25 } ,targgem,'FactorKm')
 
 pltjr4gra(summ1gemdataexp,'Jaar','FactorV','totaal aantal verplaatsingen',rscalet,False)
 

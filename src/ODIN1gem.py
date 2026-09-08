@@ -55,7 +55,38 @@ def getgemyrs():
     rv=geopandas.GeoDataFrame(rv, geometry=rv['geometry'])
 #    rv= rv.mask(rv==-99999999.0, np.nan)
     return rv
-allgem=getgemyrs()
+allgemoo=getgemyrs()
+
+allgemo=ODiN2readpkl.getgemyrs(range(2020,2027),True) 
+#print(len(allgemo))
+allgemo
+
+# +
+#toevoegen wernemers banen
+# -
+
+dat_85481 = pd.read_csv('../data/CBS/85481NED/Observations.csv',sep=';')
+dat_85481_mc = pd.read_csv('../data/CBS/85481NED/MeasureCodes.csv',sep=';')
+dat_85481['Value'] = pd.to_numeric(dat_85481['Value'].str.replace(",","."))
+#dat_85481['Value'] = dat_85481['Value'] *1000
+
+dat_85481_mc
+
+dat_8548nl=dat_85481[(dat_85481['WoonregioS']=="NL00" ) & 
+                      ((dat_85481['WerkregioS'].str[0:2])=="GM" )  ].merge(dat_85481_mc, 
+            left_on='Measure',right_on='Identifier')
+dat_8548nl['jaar']=dat_8548nl['Perioden'].str[0:4].astype('int')
+dat_8548nltb=dat_8548nl.pivot_table(columns='Title',
+                              index=['WerkregioS','jaar'],values='Value').reset_index()
+
+dat_8548nltb
+
+allgem=allgemoo.merge(dat_8548nltb,left_on=['GM_CODE','jaar'],right_on=['WerkregioS','jaar'],
+                     how='left').drop(columns=['WerkregioS'])
+
+# +
+#for debugging allgem=allgemoo
+# -
 
 #tabel regio
 regtab=allgem[(allgem['GM_CODE']>"GM0305") & 
@@ -111,12 +142,22 @@ def mkgroei(dfin,idxjr):
     #print(refjr)
     rv= dfidx.merge(refjr,how='left').set_index(idxs+['jaar'])
     rv = dfsum / rv
+    rv=rv.where(rv!=0,np.NaN)
     return rv.reset_index()
     
 selrgroei=mkgroei(allgem_sum,2022)
 # -
 
-sns.lineplot(data=selrgroei.reset_index(),x='jaar',y='AANT_INW',style='GM_CODE')
+selrgroei
+
+#echte functie in ODIN1gemvis
+sns.lineplot(data=selrgroei.reset_index(),x='jaar',y='AANT_INW',style='GM_CODE',
+             color='blue',marker='o',label='inwoners')
+sns.lineplot(data=selrgroei.reset_index(),x='jaar',y='Banen van werknemers',
+             style='GM_CODE',color='green',marker='x',label='banen werknemers')
+plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+
+
 
 ODiN2readpkl.allodinyr.dtypes
 
@@ -189,14 +230,17 @@ def addexp(df, lst):
         addgrpexpl (df,specvaltab, c,ext="_expl" )
     return [c+"_expl" for c in lst]
 keepclasses=['Jaar','AankUur','VertUur','isnaarhuis','isnaarhuis_expl']
-kflgsflds=['FactorV',"FactorKm","FactorKmActive","FactorVActive"]
+kflgsflds=['Nwaarn','FactorV',"FactorKm","FactorKmActive","FactorVActive"]
 keepexplcs=addexp(allodinyr,keepexplclasses)
 
 # +
 #allodinyr['KAfstV_expl']
 # -
 
+allodinyr['Nwaarn']=1
 allodinyr.columns
+
+allodinyr[['OP','FactorV']]
 
 # +
 ODINgemeentefields= ['WoGem' , 'VertGem', 'AankGem' ]
@@ -237,7 +281,61 @@ def mkodgemsum(indf,selgem):
     return rv
 summ1gemdata=  mkodgemsum(ODiN2readpkl.allodinyr,targgem)
 
-  
+
+#echte functie in ODIN1gemvis
+#bekijk statistiek per jaar
+def mksampletab(dat, fieldsplit):
+    dat2=dat.copy().rename(columns={fieldsplit:'GM_CODE'})
+#    print(dat2)
+    repflds=['Nwaarn','FactorV','FactorKm']
+    rt=dat2.groupby(['GM_CODE','Jaar'])[repflds].agg('sum').reset_index()
+    rt['gemwgtdag'] = rt['FactorV'] / rt['Nwaarn'] /365
+    rt['gemafst'] = rt['FactorKm'] / rt['FactorV']
+    return rt.assign(opdeling=fieldsplit)
+def mksamplegopd(dat):
+    t2 = [ mksampletab(dat, gf) for gf  in ODINgemeentefields ] 
+    rv = pd.concat(t2).reset_index()
+    return rv
+sampletab= mksamplegopd(summ1gemdata)
+sampletab
+
+sns.lineplot(data=sampletab,x='Jaar',y='gemwgtdag',hue='opdeling',style='GM_CODE', marker= 'o')
+
+sns.lineplot(data=sampletab,x='Jaar',y='gemafst',hue='opdeling',style='GM_CODE', marker= 'o')
+
+
+# +
+#wat betekent dit voor modale totalen ?
+# -
+
+def modplotopd(dat, fieldsplit,selgem,valfield):
+    dsel= dat[dat [fieldsplit] == selgem] 
+    dagg = dsel.groupby (['Jaar' ,'KHvm'] )[[valfield]].agg('sum')
+    dagg = dagg*1/365
+    dagg= dagg.reset_index().sort_values('KHvm')
+    dagg[valfield]=dagg.groupby(['Jaar'])[valfield].cumsum()
+    sns.barplot(data=dagg,x='Jaar', y= valfield , hue='KHvm',dodge=0,hue_order=[7,6,5,4,3,2,1])
+    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    plt.title('Opdeling is '+fieldsplit)
+    #return daggcum
+modplotopd(summ1gemdata,'VertGem',321,'FactorV')
+
+modplotopd(summ1gemdata,'AankGem',321,'FactorV')
+
+#Meeste kms auto en OV
+modplotopd(summ1gemdata,'VertGem',321,'FactorKm')
+
+# +
+#pendel deel in ODIN1gemVis programma
+# -
+
+
+
+
+
+# +
+#check opdeling: in / uit /binnen/buiten ; alle dagen van de week
+# -
 
 rscalea={'in':1/365,'uit':1/365, 'binnen': 1/365, 'buiten' : 20000000 / 18000000000/365}
 def pltjr4gra(dat,xfield,field,txt,rscale,normfactorV):
@@ -269,6 +367,9 @@ pltjr4gra(summ1gemdata,"Jaar",'FactorVActive','totaal aantal verplaatsingen acti
 
 # +
 #summ1gemdata
+
+# +
+#nu wat relatieve grafieken; niet zo nuttig want deze groepen vertekenen ze
 # -
 
 rscalet={'in':1,'uit':1, 'binnen': 1, 'buiten' : 20000000 / 18000000000}
@@ -315,6 +416,10 @@ pltjr3gms(summ1gemdata,'FactorVActive','deel van ritten Actieve modes',['VertGem
 # -
 
 pltjr3gms(summ1gemdata,'FactorKm','gemiddelde afstanden',['VertGem','AankGem','WoGem'])  
+
+
+
+
 
 # +
 #print(allodinyr2)
@@ -368,6 +473,10 @@ allgem_sumexp
 
 pland=allgem_sumexp.boundary.plot(color='green',alpha=0.1)
 cx.add_basemap(pland, source= prov0,crs=plot_crs)
+
+
+
+
 
 print("klaar")
 

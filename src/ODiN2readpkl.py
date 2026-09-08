@@ -22,6 +22,8 @@ import numpy as np
 import os as os
 import io as io
 
+import geopandas
+
 # +
 #TODO hernoem wat kolommen
 
@@ -336,8 +338,26 @@ def getgwb(year,dbfnames=True):
     return ([g,w,b])
 #test code
 gemeentendata ,  wijkgrensdata ,    buurtendata = getgwb(2023)    
+
+
 # -
 
+
+def getgemonly(year,dbfnames=True):
+    stryear=str(year)    
+    g=getgwbxlat(year,dbfnames,"../intermediate/CBS/gwb_gem_"+stryear+".pkl") .assign(jaar=year)  
+    return (g)
+def getgemyrs(yearlist,dbfnames=True):
+    ydl = [ getgemonly(year,dbfnames) for year in yearlist]
+    print ([len (d) for d in ydl])
+    rv=pd.concat(ydl).reset_index().drop(columns=[ 'gm_code', 'gm_naam'])
+    rv=geopandas.GeoDataFrame(rv, geometry=rv['geometry'])
+    return (rv)
+#test code
+gemyrs = getgemyrs(range(2020,2027),False) 
+yrshtn=gemyrs[gemyrs['gemeentecode']=="GM0321"]
+#yrshtn[['aantal_inwoners','jaar']]
+yrshtn.columns
 
 buurtendata.columns
 

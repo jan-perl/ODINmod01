@@ -519,8 +519,25 @@ def mktagrds(grid,bdf,selbase,r1):
         
 
 mktagrds(smftg1,buurtendata,smscs,ctrxform)
+# +
+#wernemersbanen
 # -
+
+dat_85481 = pd.read_csv('../data/CBS/85481NED/Observations.csv',sep=';')
+dat_85481_mc = pd.read_csv('../data/CBS/85481NED/MeasureCodes.csv',sep=';')
+dat_85481['Value'] = pd.to_numeric(dat_85481['Value'].str.replace(",","."))
+#dat_85481['Value'] = dat_85481['Value'] *1000
+
+dat_85481_mc
+
+htnwrk=dat_85481[(dat_85481['WerkregioS']=="GM0321") & (dat_85481['WoonregioS']=="NL00") ]
+#htnwrk.to_excel("../output/htnwrk01.xlsx")
+htnwrk
+
+
+
 print("Finished")
+
 
 
 

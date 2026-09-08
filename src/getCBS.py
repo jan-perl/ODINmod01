@@ -116,6 +116,10 @@ if fetchweb:
 if fetchweb:
     getcbsset("https://datasets.cbs.nl/CSV/CBS/nl/84718NED")
 
+#Banen werknemers
+if fetchweb:
+    getcbsset("https://datasets.cbs.nl/CSV/CBS/nl/85481NED")
+
 #wijken en buurten kaarten komen via
 #https://www.cbs.nl/nl-nl/dossier/nederland-regionaal/geografische-data/wijk-en-buurtkaart-2023
 #https://download.cbs.nl/regionale-kaarten/wijkbuurtkaart_2023_v1.zip
@@ -184,6 +188,8 @@ if  fetchweb:
 #wijkendata.fields
 # -
 os.system("./download_RUDIFUN.sh")
+
+
 
 
 
