@@ -48,6 +48,7 @@ targpc4=range(3990,4000)
 targgemcode
 
 
+
 def getgemyrs():
     gems1= [ ODiN2readpkl.getgwb(year)[0].assign(jaar=year) for year in range(2020,2026)]
     print ([len (d) for d in gems1])
@@ -55,11 +56,30 @@ def getgemyrs():
     rv=geopandas.GeoDataFrame(rv, geometry=rv['geometry'])
 #    rv= rv.mask(rv==-99999999.0, np.nan)
     return rv
-allgemoo=getgemyrs()
+allgemoog=getgemyrs()
 
-allgemo=ODiN2readpkl.getgemyrs(range(2020,2027),True) 
-#print(len(allgemo))
-allgemo
+if False:
+    allgemog=ODiN2readpkl.getgemyrs(range(2020,2027),True) 
+    #print(len(allgemo))
+    allgemog
+
+aant1819=pd.read_excel("../data/bevaant_201819.xlsx",skiprows=3)
+aant1819
+
+aant1819['H2O']="NEE"
+aant1819=aant1819.rename(columns={'Jaar':'jaar'})
+cods2020= allgemoog[(allgemoog['jaar']==2020) & (allgemoog['H2O']=='NEE')][["GM_CODE","GM_NAAM"]]
+addl1819= aant1819.merge(cods2020,how='left')
+addl1819=addl1819 [ False == ( addl1819['GM_CODE'].isna() | addl1819['AANT_INW'].isna() ) ]
+addl1819['GM_CODE'].fillna("GM7000",inplace=True) 
+addl1819
+
+rv=pd.concat([allgemoog,addl1819])
+allgemoo=geopandas.GeoDataFrame(rv, geometry=rv['geometry'])
+
+inw_piv=allgemoo[allgemoo['H2O']=='NEE'].pivot(columns = 'jaar',index="GM_NAAM", values='AANT_INW')
+inw_piv
+#inw_reccnt=allgemoo.groupby('H2O','')
 
 # +
 #toevoegen wernemers banen
@@ -303,13 +323,15 @@ sns.lineplot(data=sampletab,x='Jaar',y='gemwgtdag',hue='opdeling',style='GM_CODE
 
 sns.lineplot(data=sampletab,x='Jaar',y='gemafst',hue='opdeling',style='GM_CODE', marker= 'o')
 
+summ1gemdata.groupby('KHvm')['FactorV'].agg('sum')
+
 
 # +
 #wat betekent dit voor modale totalen ?
 # -
 
 def modplotopd(dat, fieldsplit,selgem,valfield):
-    dsel= dat[dat [fieldsplit] == selgem] 
+    dsel= dat[dat [fieldsplit] < 9000] 
     dagg = dsel.groupby (['Jaar' ,'KHvm'] )[[valfield]].agg('sum')
     dagg = dagg*1/365
     dagg= dagg.reset_index().sort_values('KHvm')

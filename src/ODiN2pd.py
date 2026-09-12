@@ -57,9 +57,21 @@ df_2018 = pd.read_csv("../data/ODiN2018_Databestand_v2.0.csv", encoding = "ISO-8
 df_2019 = pd.read_csv("../data/ODiN2019_Databestand_v2.0.csv", encoding = "ISO-8859-1", sep=";")  
 df_2020 = pd.read_csv("../data/ODiN2020_Databestand_v2.0.csv", encoding = "ISO-8859-1", sep=";")  
 df_2021 = pd.read_csv("../data/ODiN2021_Databestand.csv", encoding = "ISO-8859-1", sep=";")  
-df_2022 = pd.read_csv("../data/ODiN2022_Databestand.csv", encoding = "ISO-8859-1", sep=";")   
+df_2022 = pd.read_csv("../data/ODiN2022_Databestand.csv", encoding = "ISO-8859-1", sep=";")  
+
+#df_2024 = pd.read_csv("../data/ODiN_2024/ODiN2024_DANS_Databestand_v2.0.csv", encoding = "ISO-8859-1", sep=";") 
+df_2024 = pd.read_excel("../data/ODiN_2024/ODiN2024_DANS_Databestand_v2.0.xlsx")  
+
+df_2024
+
+df_2024.columns
+
+df_2024_co= [re.sub('_DANS24$','',t) for t in df_2024.columns ]
+df_2024.columns = df_2024_co
 
 df_2023 = pd.read_excel("../data/ODiN_2023/ODiN2023_Databestand.xlsx")  
+
+
 
 df_2023
 
@@ -113,7 +125,7 @@ miscols(df_2018,2018,dbk_2022_cols,'Variabele_naam_ODiN_2022')
 #TODO parse ook data labels
 # -
 
-allodinyr=pd.concat([df_2018,df_2019,df_2020,df_2021,df_2022,df_2023], ignore_index=True)
+allodinyr=pd.concat([df_2018,df_2019,df_2020,df_2021,df_2022,df_2023,df_2024], ignore_index=True)
 len(allodinyr.index)
 
 
@@ -121,6 +133,11 @@ allodinyr.to_pickle("../intermediate/allodinyr.pkl")
 
 dbk_2022.to_pickle("../intermediate/dbk_allyr.pkl")
 
+dtdf=pd.DataFrame(df_2024.dtypes )
+dtdf.to_excel("../intermediate/dtyp1.xlsx")
+
 print ("Finished")
+
+
 
 
