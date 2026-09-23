@@ -1,6 +1,6 @@
 #!/bin/bash
 #file  ../DANS-API-Token.txt should contain API key
-grep -v -e "^#" ../inputs/DANSlnks01.txt|head -100 | while read dset link
+grep -v -e "^#" ../inputs/DANSlnks01.txt| grep 2024 | head -100 | while read dset link
 do
 l2=$(echo $link | sed -e 's+dataset.xhtml+api/access/dataset/:persistentId/+')
 curl -L -O -J -H "X-Dataverse-key:$(cat ../../DANS-API-Token.txt)"   $l2
