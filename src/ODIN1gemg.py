@@ -19,6 +19,7 @@
 #draai minimaal 1 maal rasteruts in docker container om geopandas te laden
 # -
 
+import math
 import pandas as pd
 import numpy as np
 import seaborn as sns
@@ -117,6 +118,7 @@ regtab[["GM_CODE","GM_NAAM","jaar","H2O","STED","AANT_INW"]].reset_index()
 addl=["GM1904","GM0632","GM1581","GM0216","GM1961","GM1960","GM0214","GM0736"]
 rs=regtab[(regtab['AANT_INW'] >20000 ) & (regtab['AANT_INW'] <100000 )]
 rbm=(list(rs['GM_CODE'].unique()) ) +addl
+print ( len(regtab[regtab['GM_CODE'].isin(rbm)])  )
 rbm
 
 rbmlrg=list (regtab[(regtab['AANT_INW'] >100000 ) & (regtab['AANT_INW'] <10000000 )]['GM_CODE'].unique() )
@@ -165,6 +167,8 @@ for index, row in rbmgeo.iterrows():
              alpha=0.5,size =10)
 #was cx.add_basemap(pland, source= prov0,crs=plot_crs)    
 addbasemkmsch (axs, prov0)
+figname = "../output/reg_gempop_"+'utr'+"_"+'m1.svg';
+fig.savefig(figname, dpi=300, bbox_inches="tight")
 
 
 
@@ -505,6 +509,7 @@ g = sns.FacetGrid(iginuurt1, col="Werkdag",hue='WaarWoon')
 g.map(sns.lineplot ,'VertUur','FactorV',marker='o')
 
 
+
 def igipergem(dfin,gdbin,jrs):
     dfs= dfin[(dfin['Jaar'].isin(jrs)) & (dfin['KHvm']==1)]
     dfp = [ dfs.rename(columns={gg:'Gem'}).groupby(['Gem','Jaar'])[['FactorV']].\
@@ -658,6 +663,58 @@ autoallrecs=mkautoall(allvgrp)
 
 autointergemrecs
 
+allgem
+
+
+def modplotopdfacet(aig,bm,usegem, savnam,facets,valfield,grpfield):
+    dsel=aig [(aig['GM_CODE'].isin(bm)) & (aig['Jaar']>=2018)]
+    d2 = dsel.groupby (['Jaar' ,grpfield,'GM_CODE'] )[[valfield]].agg('sum').reset_index()
+    allgemn= usegem[usegem['H2O']=='NEE']
+    dagg=d2.merge(allgemn.rename(columns={'jaar':'Jaar'}),how='left' )
+    dagg[valfield] = dagg[valfield]*7/365
+    dagg= dagg.reset_index().sort_values(grpfield)
+    dagg[valfield]=dagg.groupby(['Jaar',facets])[valfield].cumsum()
+    dagg[valfield]/=dagg['AANT_INW']
+    print(dagg[['Jaar',valfield,'GM_CODE','GM_NAAM','AANT_INW']])
+    #print(dagg[['Jaar' ,grpfield,'GM_CODE','GM_NAAM',valfield,'AANT_INW']])
+    hues=dagg[grpfield].unique()
+    gemslen=len(bm)
+    gemslensqrt = max(3,int(math.sqrt(gemslen)+1))
+    #print ((gemslensqrt,gemslen))
+    #print(hues)
+    g=sns.FacetGrid(dagg, col=facets,col_wrap=gemslensqrt, hue=grpfield,hue_order=hues[::-1] )
+    #g.map_dataframe(sns.lineplot, x='Jaar', y=valfield )
+    #g.map_dataframe(sns.lineplot, x='Jaar', y=valfield )
+    g.map(sns.barplot, 'Jaar', valfield )
+    #,dodge=0,               hue_order=hues[::-1])
+    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    figname = "../output/reg_jrcmp_"+savnam+"_"+'m1.svg';
+    g.savefig(figname, dpi=300, bbox_inches="tight")
+    #plt.title('Opdeling is '+fieldsplit)
+    #return daggcum
+modplotopdfacet(allvgrp,rbmlrg,allgem,'rbmlrg-V','GM_NAAM','FactorV','KHvm_expl')
+
+modplotopdfacet(allvgrp,rbm,allgem,'rbm-V','GM_NAAM','FactorV','KHvm_expl')
+
+modplotopdfacet(autointergemrecs,rbm,allgem,'rbm-pcat1-V','GM_NAAM','FactorV','pendelcat')
+
+autointergemrecsrbmtot= autointergemrecs[autointergemrecs['GM_CODE'].isin(rbm)] .copy()
+rmb_rep_code="GM_RAND_20_100"
+autointergemrecsrbmtot['GM_CODE']=rmb_rep_code
+allgemrbmtot=allgem[allgem['GM_CODE'].isin(rbm)].groupby(['jaar','H2O'])[[
+     'AANT_INW','Banen van werknemers']].agg('sum').reset_index()
+allgemrbmtot['GM_CODE']=rmb_rep_code
+allgemrbmtot['GM_NAAM']="Gemeenten 20-100k"
+print(allgemrbmtot)
+modplotopdfacet(autointergemrecsrbmtot,[rmb_rep_code],allgemrbmtot,'VertGem','GM_NAAM','FactorV','pendelcat')
+
+modplotopdfacet(pd.concat([autointergemrecs,autointergemrecsrbmtot]),
+        rbmlrg+[rmb_rep_code],pd.concat([allgem,allgemrbmtot]),
+                'VertGem','GM_NAAM','FactorV','pendelcat')
+
+rt2024=pd.concat([allgem[allgem['GM_CODE'].isin(rbmlrg)],allgemrbmtot])
+rt2024[rt2024['jaar']==2024]
+
 modplotopd(autointergemrecs [autointergemrecs['Gem'] ==321],'Gem',321,'FactorV','pendelcat')
 
 modplotopd(autointergemrecs [autointergemrecs['Gem'] ==321],'Gem',321,'FactorV','MotiefV_expl')
@@ -671,29 +728,67 @@ modplotopdcatwo(fig,axs,autointergemrecs [autointergemrecs['Gem'] ==321]
                 ,'MotiefV_expl', 'Alle verplaatsingen per dag','FactorV',True)
 
 
-def refjaarvarwidx(aig,bm,lbl,tit):
+def refjaarvarwidx(aig,bm,usegem,lbl,tit):
     fig, axs = plt.subplots(1, 1)    
     a2=aig [aig['GM_CODE'].isin(bm)]
-    d2=a2.groupby(['Jaar','GM_CODE'])[['FactorV']].agg('sum').reset_index()
-    d2=d2.merge(allgem.rename(columns={'jaar':'Jaar'}),how='left' )
+    d2=a2.groupby(['Jaar','GM_CODE'])[['FactorV','Nwaarn']].agg('sum').reset_index()
+    d2=d2.merge(usegem.rename(columns={'jaar':'Jaar'}),how='left' )
     d2['Widx'] = d2['FactorV']/d2['AANT_INW']*(7/365)
-    sns.lineplot(data=d2,x='Jaar',y='Widx',hue='GM_NAAM')
+    d2['Nwid'] = d2['Widx']/np.sqrt(d2['Nwaarn'])
+    sns.lineplot(ax=axs,data=d2,x='Jaar',y='Widx',hue='GM_NAAM',marker='o')
+#    sns.scatterplot(ax=axs,data=d2,x='Jaar',y='Widx',hue='GM_NAAM',marker='o')
+    axs.errorbar(x=d2['Jaar'],y=d2['Widx'],yerr=d2['Nwid'],fmt='none',color='grey')
     axs.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
     axs.set_title('jaarvariatie ODIN autoritten '+tit)
     axs.set_ylabel('autobewegingen van/naar gemeente / inw/week')
-refjaarvarwidx(autointergemrecs,klasgem,'kg1','sted 2, 46-54 k inw')    
+refjaarvarwidx(autointergemrecs,klasgem,allgem,'kg1','sted 2, 46-54 k inw')    
 
-refjaarvarwidx(autointergemrecs,rbm,'rbm01','Omgeving Utrecht 20k+ inw')
+refjaarvarwidx(autointergemrecs,rbmlrg,allgem,'rbm01','Omgeving Utrecht 20k+ inw')
 
-refjaarvarwidx(autointergemrecs,rbmlrg,'rbmlrg01','Gemeenten Utrecht 100k+ inw')
+refjaarvarwidx(autointergemrecs,rbmlrg,allgem,'rbmlrg01','Gemeenten Utrecht 100k+ inw')
 
 
 # +
-def refrichtvarwidx(aig,bm,gn,grpfield,valfield,lbl,tit):
+def errorbar_plot_refjaarvarwidxfacet(x,y,yerr, **kwargs): 
+    plt.errorbar( x=x,y=y,yerr=yerr,**kwargs ) 
+
+def refjaarvarwidxfacet(aig,bm,usegem,opd2,lbl,tit):
+#    fig, axs = plt.subplots(1, 1)    
+    a2=aig [aig['GM_CODE'].isin(bm)]
+    d2=a2.groupby(['Jaar','GM_CODE']+opd2)[['FactorV','Nwaarn']].agg('sum').reset_index()
+    d2['H2O']='NEE'
+    d2=d2.merge(usegem.rename(columns={'jaar':'Jaar'}),how='left' )
+    d2['Widx'] = d2['FactorV']/d2['AANT_INW']*(7/365)
+    d2['Nwid'] = d2['Widx']/np.sqrt(d2['Nwaarn']/2)
+#    print(d2[['Jaar','Widx','Nwid','GM_CODE','GM_NAAM','AANT_INW']])
+    gemslen=len(bm)
+    gemslensqrt = max(3,int(math.sqrt(gemslen)+1))    
+
+    if (len (opd2)==0):
+        g=sns.FacetGrid(d2,col='GM_NAAM',col_wrap=gemslensqrt)
+    else:
+        g=sns.FacetGrid(d2,col='GM_NAAM',hue=opd2[0],col_wrap=gemslensqrt)
+    g.map(errorbar_plot_refjaarvarwidxfacet,'Jaar','Widx','Nwid',marker="o", fmt='o-', capsize=4)
+    if (len (opd2)!=0):
+        g.add_legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+
+    plt.tight_layout() 
+
+refjaarvarwidxfacet(autointergemrecs,klasgem,allgem,['pendelcat'],'kg1','sted 2, 46-54 k inw',)    
+# -
+
+refjaarvarwidxfacet(autointergemrecs,rbm,allgem,[],'kg1','sted 2, 46-54 k inw')    
+
+refjaarvarwidxfacet(pd.concat([autointergemrecs,autointergemrecsrbmtot]),
+        rbmlrg+[rmb_rep_code], pd.concat([allgem,allgemrbmtot]), [],'rbm-v','rbm clustered')                    
+
+
+# +
+def refrichtvarwidx(aig,bm,usegem,gn,grpfield,valfield,lbl,tit):
     fig, axs = plt.subplots(1, 1)    
     a2=a2=aig [aig['GM_CODE'].isin(bm)]
     d2=a2.groupby(['Jaar',grpfield,'GM_CODE'])[[valfield]].agg('sum').reset_index()
-    d2=d2.merge(allgem.rename(columns={'jaar':'Jaar'}),how='left' )
+    d2=d2.merge(usegem.rename(columns={'jaar':'Jaar'}),how='left' )
     d3=d2.groupby([grpfield,'GM_CODE','GM_NAAM'])[[valfield,'AANT_INW']].agg('sum').reset_index()
     valfieldn='Widx'
     d3['Widx'] = d3[valfield]/d3['AANT_INW']*(7/365)    
@@ -711,27 +806,27 @@ def refrichtvarwidx(aig,bm,gn,grpfield,valfield,lbl,tit):
     axs.set_xlabel(xlmap[valfield])
     axs.set_ylabel('Gemeente')
 
-refrichtvarwidx(autointergemrecs,klasgem,'GM_NAAM','pendelcat','FactorV','kg1','sted 2, 46-54 k inw')    
+refrichtvarwidx(autointergemrecs,klasgem,allgem,'GM_NAAM','pendelcat','FactorV','kg1','sted 2, 46-54 k inw')    
 # -
 
-refrichtvarwidx(autointergemrecs,rbm,'GM_NAAM','pendelcat','FactorV','rmb01','Omgeving Utrecht 20-100 k inw')
+refrichtvarwidx(autointergemrecs,rbm,allgem,'GM_NAAM','pendelcat','FactorV','rmb01','Omgeving Utrecht 20-100 k inw')
 
-refrichtvarwidx(autointergemrecs,rbm,'GM_NAAM','pendelcat','FactorKm','rbm01','Omgeving Utrecht 20-100 k inw')
+refrichtvarwidx(autointergemrecs,rbm,allgem,'GM_NAAM','pendelcat','FactorKm','rbm01','Omgeving Utrecht 20-100 k inw')
 
-refrichtvarwidx(autointergemrecs,rbm,'GM_NAAM','MotiefV_expl','FactorV','rbm01','Omgeving Utrecht 20-100 k inw')
+refrichtvarwidx(autointergemrecs,rbm,allgem,'GM_NAAM','MotiefV_expl','FactorV','rbm01','Omgeving Utrecht 20-100 k inw')
 
-refrichtvarwidx(autointergemrecs,rbm+rbmlrg,'GM_NAAM','WoGemCat','FactorV','rbm01','Omgeving Utrecht 20-100 k inw')
+refrichtvarwidx(autointergemrecs,rbm+rbmlrg,allgem,'GM_NAAM','WoGemCat','FactorV','rbm01','Omgeving Utrecht 20-100 k inw')
 
 autoallrecs['inwofbinnen'] = autoallrecs['WoGemCat']  
 autoallrecs['inwofbinnen'].where(autoallrecs['pendelcat']!=lokaallabel,'rit lokaal',inplace=True)
-refrichtvarwidx(autoallrecs,rbm+rbmlrg,'GM_NAAM','inwofbinnen','FactorV','rbm01','Omgeving Utrecht 20-100 k inw')
+refrichtvarwidx(autoallrecs,rbm+rbmlrg,allgem,'GM_NAAM','inwofbinnen','FactorV','rbm01','Omgeving Utrecht 20-100 k inw')
 
-refrichtvarwidx(autoallrecs,rbm+rbmlrg,'GM_NAAM','inwofbinnen','FactorKm','rbm01','Omgeving Utrecht 20k+ inw')
+refrichtvarwidx(autoallrecs,rbm+rbmlrg,allgem,'GM_NAAM','inwofbinnen','FactorKm','rbm01','Omgeving Utrecht 20k+ inw')
 
 maphhg={1:"0-30%",2:"0-30%",3:"0-30%",4:"30-60%",5:"30-60%",6:"30-60%",
          7:"60-80%",8:"60-80%",9:"80-100%",10:"80-100%",11:"onbek"}
 autointergemrecs['HHGestInkGR']= autointergemrecs['HHGestInkG'].map(maphhg)
-refrichtvarwidx(autointergemrecs,rbm,'GM_NAAM','HHGestInkGR','FactorV','rmb01','Omgeving Utrecht 20-100 k inw')
+refrichtvarwidx(autointergemrecs,rbm,allgem,'GM_NAAM','HHGestInkGR','FactorV','rmb01','Omgeving Utrecht 20-100 k inw')
 
 print("klaar")
 
