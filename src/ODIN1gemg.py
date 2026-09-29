@@ -515,7 +515,7 @@ def igipergem(dfin,gdbin,jrs):
     dfp = [ dfs.rename(columns={gg:'Gem'}).groupby(['Gem','Jaar'])[['FactorV']].\
                         agg('sum').reset_index().assign(GrpGem=gg) \
            for gg in ['VertGem', 'AankGem' ] ]
-    df=pd.concat(dfp)
+    df=pd.concat(dfp,copy=False)
     df ['GM_CODE'] = df ['Gem'] .apply(lambda x: 'GM%04.0f'%(x))
     gdb=gdbin[ (gdbin['jaar'].isin(jrs)) & (gdbin['H2O']=='NEE') ].rename(columns={'jaar':'Jaar'})
 #    print(gdb)
@@ -563,7 +563,7 @@ def odinyrallgem(indf):
     dd2= indf.copy(deep=False)
     dd2['Gem']=dd2['VertGem']
     dd2['verplricht'] = (dd2['AankGem']==dd2['Gem']) .map(map2)
-    rv= pd.concat([dd1,dd2])
+    rv= pd.concat([dd1,dd2],copy=False)
     mapw={True:'inwoner',False:'niet-inwoner'}
     rv['WoGemCat']= (rv['WoGem']==rv['Gem']) .map(mapw)
     rv['GM_CODE'] = rv ['Gem'] .apply(lambda x: 'GM%04.0f'%(x))
@@ -603,7 +603,17 @@ allvtot=allvgrp.groupby(['pendelcat','Jaar'])['FactorV'].agg('sum').reset_index(
 
 sns.lineplot(data=allvtot,x='Jaar',y='FactorV',hue='pendelcat')
 
+allvgrp.groupby(['MotiefV_expl'])['FactorV'].agg('sum')
 
+motiefcl={"  12 : Diensten/persoonlijke verzorging":"  13 : Ander motief",
+          "   2 : Zakelijk bezoek in werksfeer":"  13 : Ander motief",
+          "   3 : Beroepsmatig":"  13 : Ander motief",
+          "   5 : Afhalen/brengen goederen":"   5 : Afhalen/brengen goederen of personen",
+          "   4 : Afhalen/brengen personen":"   5 : Afhalen/brengen goederen of personen",
+          " nan : missing indien geen verplaatsing":"  13 : Ander motief",
+         }
+allvgrp['MotiefV_clean']=allvgrp['MotiefV_expl'].replace(motiefcl)
+allvgrp.groupby(['MotiefV_clean'])['FactorV'].agg('sum')
 
 pc2htn=allvgrp[allvgrp['Gem']==321]
 
@@ -634,7 +644,7 @@ def modplotopdcatwo(fig,ax,dat, fieldsplit,title,valfield,jaarnorm):
 #    print(hues[::-1])
     sns.barplot(ax=ax,data=dagg,x='pendelcat', y= valfield , 
                 hue=fieldsplit,dodge=0,hue_order=hues[::-1])
-    leglabels= {'WoGemCat':'Woongemeente','MotiefV_expl':'Reismotief',
+    leglabels= {'WoGemCat':'Woongemeente','MotiefV_clean':'Reismotief',
                 'GM_CODE':'Gemeente',
                 'KHvm_expl' : 'Hoofdvervoermiddel'}
     ax.legend(title=leglabels[fieldsplit], bbox_to_anchor=(1.01, 0.95), loc=2, borderaxespad=0.,framealpha=0)
@@ -642,10 +652,48 @@ def modplotopdcatwo(fig,ax,dat, fieldsplit,title,valfield,jaarnorm):
     #return daggcum
 fig, axs = plt.subplots(1, 1)    
 modplotopdcatwo(fig,axs,pc2htn,'WoGemCat', 'Alle verplaatsingen per week','FactorV',True)
+# +
+#def modplotopdcatwofacet(fig,ax,dat, fieldsplit,title,valfield,jaarnorm):
+def uniquelist (l):
+    return list(set(l))
+def modplotopdcatwofacet(aig,bm,usegem, savnam,facets,valfield,grpfield,pcfield):    
+    dsel=aig [(aig['GM_CODE'].isin(bm)) & (aig['Jaar']>=2018)]
+    d2 = dsel.groupby (uniquelist (['Jaar', pcfield ,grpfield,'GM_CODE'] ) )[[valfield]].agg('sum').reset_index()
+    d2.to_excel("../intermediate/modplotopdcatwofacet_d2.xlsx");
+    d2['H2O']='NEE'
+    d3=d2.merge(usegem.rename(columns={'jaar':'Jaar'}),how='left' )
+    d3 =d3[d3['AANT_INW']>0]
+    dagg = d3.groupby (uniquelist ([ pcfield ,grpfield,facets] ) )[[valfield,'AANT_INW']].agg('sum').reset_index()
+    d3.to_excel("../intermediate/modplotopdcatwofacet_d3.xlsx");
+    dagg[valfield] = dagg[valfield]*7/365
+    dagg= dagg.reset_index().sort_values(grpfield)
+    dagg[valfield]=dagg.groupby([pcfield,facets])[valfield].cumsum()
+    dagg['AANT_INW2']=dagg.groupby([facets])['AANT_INW'].transform('max')
+    dagg[valfield]/=dagg['AANT_INW2']
+    dagg= dagg.reset_index().sort_values([pcfield,grpfield,facets])
+    dagg.to_excel("../intermediate/modplotopdcatwofacet_dagg.xlsx");
+    #print(dagg[['Jaar',valfield,'GM_CODE','GM_NAAM','AANT_INW']])
+    #print(dagg[['Jaar' ,grpfield,'GM_CODE','GM_NAAM',valfield,'AANT_INW']])
+    hues=dagg[grpfield].unique()
+    gemslen=len(bm)
+    gemslensqrt = max(3,int(math.sqrt(gemslen)+1))    
+    g=sns.FacetGrid(dagg, col=facets,col_wrap=gemslensqrt, hue=grpfield,hue_order=hues[::-1] )
+    #g.map_dataframe(sns.lineplot, x='Jaar', y=valfield )
+    #g.map_dataframe(sns.lineplot, x='Jaar', y=valfield )
+    g.map(sns.barplot, valfield, pcfield ,order=dagg[pcfield].unique())
+    #,dodge=0,               hue_order=hues[::-1])
+    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    figname = "../output/reg_grpcmp_"+pcfield+"_"+savnam+"_"+'m1.svg';
+    g.savefig(figname, dpi=300, bbox_inches="tight")    
+    
+modplotopdcatwofacet(allvgrp,rbm+rbmlrg,allgem,'rbm-all-wogemh','GM_NAAM','FactorV','WoGemCat','pendelcat')
 # -
+
+modplotopdcatwofacet(allvgrp,rbm+rbmlrg,allgem,'rbm-all-wogema','GM_NAAM','FactorV','pendelcat','WoGemCat')
+
 fig, axs = plt.subplots(1, 1)    
 pc2htni= pc2htn[pc2htn['pendelcat'] !=lokaallabel]
-modplotopdcatwo(fig,axs,pc2htni,'MotiefV_expl', 'Alle verplaatsingen per dag','FactorV',True)
+modplotopdcatwo(fig,axs,pc2htni,'MotiefV_clean', 'Alle verplaatsingen per dag','FactorV',True)
 
 modplotopd(pc2htn,'VertGem',321,'FactorV','KHvm_expl')
 
@@ -661,21 +709,24 @@ def mkautoall(indb):
     return indb [(indb ['KHvm'] ==1 )  ] .copy(deep=False)
 autoallrecs=mkautoall(allvgrp)
 
-autointergemrecs
 
-allgem
+# +
+#autointergemrecs
 
+# +
+#allgem
+# -
 
 def modplotopdfacet(aig,bm,usegem, savnam,facets,valfield,grpfield):
     dsel=aig [(aig['GM_CODE'].isin(bm)) & (aig['Jaar']>=2018)]
     d2 = dsel.groupby (['Jaar' ,grpfield,'GM_CODE'] )[[valfield]].agg('sum').reset_index()
     allgemn= usegem[usegem['H2O']=='NEE']
-    dagg=d2.merge(allgemn.rename(columns={'jaar':'Jaar'}),how='left' )
+    dagg=d2.merge(allgemn.rename(columns={'jaar':'Jaar'}),how='left' )    
     dagg[valfield] = dagg[valfield]*7/365
     dagg= dagg.reset_index().sort_values(grpfield)
     dagg[valfield]=dagg.groupby(['Jaar',facets])[valfield].cumsum()
     dagg[valfield]/=dagg['AANT_INW']
-    print(dagg[['Jaar',valfield,'GM_CODE','GM_NAAM','AANT_INW']])
+    #print(dagg[['Jaar',valfield,'GM_CODE','GM_NAAM','AANT_INW']])
     #print(dagg[['Jaar' ,grpfield,'GM_CODE','GM_NAAM',valfield,'AANT_INW']])
     hues=dagg[grpfield].unique()
     gemslen=len(bm)
@@ -712,26 +763,38 @@ modplotopdfacet(pd.concat([autointergemrecs,autointergemrecsrbmtot]),
         rbmlrg+[rmb_rep_code],pd.concat([allgem,allgemrbmtot]),
                 'VertGem','GM_NAAM','FactorV','pendelcat')
 
+modplotopdcatwofacet(pd.concat([autointergemrecs,autointergemrecsrbmtot]),
+        rbmlrg+[rmb_rep_code],pd.concat([allgem,allgemrbmtot]),'rbm-3g-wogem','GM_NAAM','FactorV','WoGemCat','pendelcat')
+
+modplotopdcatwofacet(pd.concat([autointergemrecs,autointergemrecsrbmtot]),
+        rbmlrg+[rmb_rep_code],pd.concat([allgem,allgemrbmtot]),'rbm-3g-GM_CODE','GM_NAAM','FactorV','GM_CODE','pendelcat')
+
+
+
+modplotopdcatwofacet(pd.concat([autointergemrecs,autointergemrecsrbmtot]),
+        rbmlrg+[rmb_rep_code],pd.concat([allgem,allgemrbmtot]),'rbm-3g-motiefV','GM_NAAM','FactorV','MotiefV_clean','pendelcat')
+
 rt2024=pd.concat([allgem[allgem['GM_CODE'].isin(rbmlrg)],allgemrbmtot])
 rt2024[rt2024['jaar']==2024]
 
 modplotopd(autointergemrecs [autointergemrecs['Gem'] ==321],'Gem',321,'FactorV','pendelcat')
 
-modplotopd(autointergemrecs [autointergemrecs['Gem'] ==321],'Gem',321,'FactorV','MotiefV_expl')
+modplotopd(autointergemrecs [autointergemrecs['Gem'] ==321],'Gem',321,'FactorV','MotiefV_clean')
 
 fig, axs = plt.subplots(1, 1)    
 modplotopdcatwo(fig,axs,autointergemrecs [autointergemrecs['Gem'] ==321]
-                ,'MotiefV_expl', 'Alle verplaatsingen per dag','FactorV',True)
+                ,'MotiefV_clean', 'Alle verplaatsingen per dag','FactorV',True)
 
 fig, axs = plt.subplots(1, 1)    
 modplotopdcatwo(fig,axs,autointergemrecs [autointergemrecs['Gem'] ==321]
-                ,'MotiefV_expl', 'Alle verplaatsingen per dag','FactorV',True)
+                ,'MotiefV_clean', 'Alle verplaatsingen per dag','FactorV',True)
 
 
 def refjaarvarwidx(aig,bm,usegem,lbl,tit):
     fig, axs = plt.subplots(1, 1)    
     a2=aig [aig['GM_CODE'].isin(bm)]
     d2=a2.groupby(['Jaar','GM_CODE'])[['FactorV','Nwaarn']].agg('sum').reset_index()
+    d2['H2O']="NEE"    
     d2=d2.merge(usegem.rename(columns={'jaar':'Jaar'}),how='left' )
     d2['Widx'] = d2['FactorV']/d2['AANT_INW']*(7/365)
     d2['Nwid'] = d2['Widx']/np.sqrt(d2['Nwaarn'])
@@ -768,13 +831,18 @@ def refjaarvarwidxfacet(aig,bm,usegem,opd2,lbl,tit):
         g=sns.FacetGrid(d2,col='GM_NAAM',col_wrap=gemslensqrt)
     else:
         g=sns.FacetGrid(d2,col='GM_NAAM',hue=opd2[0],col_wrap=gemslensqrt)
-    g.map(errorbar_plot_refjaarvarwidxfacet,'Jaar','Widx','Nwid',marker="o", fmt='o-', capsize=4)
+    if (len (opd2)==2):    
+        d2vals = d2[opd2[0]].unique()
+        for sty in range (0 , len(d2vals)):
+            g.map(errorbar_plot_refjaarvarwidxfacet,'Jaar','Widx','Nwid',marker="o", fmt='o-', capsize=4)
+    else:
+        g.map(errorbar_plot_refjaarvarwidxfacet,'Jaar','Widx','Nwid',marker="o", fmt='o-', capsize=4)
     if (len (opd2)!=0):
         g.add_legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
 
     plt.tight_layout() 
 
-refjaarvarwidxfacet(autointergemrecs,klasgem,allgem,['pendelcat'],'kg1','sted 2, 46-54 k inw',)    
+refjaarvarwidxfacet(autointergemrecs,klasgem,allgem,['pendelcat','KHvm'],'kg1','sted 2, 46-54 k inw')    
 # -
 
 refjaarvarwidxfacet(autointergemrecs,rbm,allgem,[],'kg1','sted 2, 46-54 k inw')    
@@ -783,50 +851,109 @@ refjaarvarwidxfacet(pd.concat([autointergemrecs,autointergemrecsrbmtot]),
         rbmlrg+[rmb_rep_code], pd.concat([allgem,allgemrbmtot]), [],'rbm-v','rbm clustered')                    
 
 
-# +
-def refrichtvarwidx(aig,bm,usegem,gn,grpfield,valfield,lbl,tit):
-    fig, axs = plt.subplots(1, 1)    
+def refrichtvarwidx(figl,axsl,aig,bm,usegem,gn,grpfield,valfield,lbl,tit,shval=False):
     a2=a2=aig [aig['GM_CODE'].isin(bm)]
     d2=a2.groupby(['Jaar',grpfield,'GM_CODE'])[[valfield]].agg('sum').reset_index()
+    d2['H2O']='NEE'
     d2=d2.merge(usegem.rename(columns={'jaar':'Jaar'}),how='left' )
     d3=d2.groupby([grpfield,'GM_CODE','GM_NAAM'])[[valfield,'AANT_INW']].agg('sum').reset_index()
     valfieldn='Widx'
     d3['Widx'] = d3[valfield]/d3['AANT_INW']*(7/365)    
+    if shval:
+        print(d3)
 #    dagg = d3.groupby ([gn ,grpfield] )[[valfieldn]].agg('sum')
     dagg=d3
     dagg= dagg.reset_index().sort_values(grpfield)
     dagg[valfieldn]=dagg.groupby([gn])[valfieldn].cumsum()
     hues=dagg[grpfield].unique()
-    sns.barplot(data=dagg,y=gn, x= valfieldn , hue=grpfield,dodge=0,
+    sns.barplot(ax=axsl,data=dagg,y=gn, x= valfieldn , hue=grpfield,dodge=0,
                 hue_order=hues[::-1])    
-    axs.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-    axs.set_title('groepering ODIN autoritten 2018-2024 '+tit)
+    axsl.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    axsl.set_title('ODIN autoverplaatsingen 2018-2024 '+tit)
     xlmap={'FactorV': 'autobewegingen van/naar gemeente / inw/week',
            'FactorKm': 'autokilometers van/naar gemeente / inw/week'}
-    axs.set_xlabel(xlmap[valfield])
-    axs.set_ylabel('Gemeente')
+    axsl.set_xlabel(xlmap[valfield])
+    axsl.set_ylabel('Gemeente')
+fig, axs = plt.subplots(1, 1)    
+refrichtvarwidx(fig, axs,autointergemrecs,klasgem,allgem,'GM_NAAM','pendelcat','FactorV','kg1','sted 2, 46-54 k inw')    
 
-refrichtvarwidx(autointergemrecs,klasgem,allgem,'GM_NAAM','pendelcat','FactorV','kg1','sted 2, 46-54 k inw')    
-# -
+fig, axs = plt.subplots(1, ncols=2, figsize=(12, 4))  
+fig.subplots_adjust(hspace=1.5,wspace=1.2)
+refrichtvarwidx(fig,axs[0],autointergemrecs,rbm,allgem,'GM_NAAM','pendelcat','FactorV','rmb01','Omgeving Utrecht 20-100 k inw')
+refrichtvarwidx(fig,axs[1],autointergemrecs,rbm,allgem,'GM_NAAM','pendelcat','FactorKm','rbm01','Omgeving Utrecht 20-100 k inw')
 
-refrichtvarwidx(autointergemrecs,rbm,allgem,'GM_NAAM','pendelcat','FactorV','rmb01','Omgeving Utrecht 20-100 k inw')
+fig, axs = plt.subplots(1, 1)  
+refrichtvarwidx(fig, axs,autointergemrecs,rbm,allgem,'GM_NAAM','MotiefV_clean','FactorV','rbm01','Omgeving Utrecht 20-100 k inw')
 
-refrichtvarwidx(autointergemrecs,rbm,allgem,'GM_NAAM','pendelcat','FactorKm','rbm01','Omgeving Utrecht 20-100 k inw')
+fig, axs = plt.subplots(1, 1)  
+refrichtvarwidx(fig, axs,autointergemrecs,rbm+rbmlrg,allgem,'GM_NAAM','WoGemCat','FactorV','rbm01','Omgeving Utrecht 20-100 k inw')
 
-refrichtvarwidx(autointergemrecs,rbm,allgem,'GM_NAAM','MotiefV_expl','FactorV','rbm01','Omgeving Utrecht 20-100 k inw')
+autoallrecs['inwofbinnen'] = "extra-gemeente verplaatsing"
+autoallrecs['inwofbinnen'].where(autoallrecs['pendelcat']!=lokaallabel,'binnen verplaating',inplace=True)
+autoallrecs['inwofbinnen'] =autoallrecs['inwofbinnen']  +' / '+ autoallrecs['WoGemCat']  
+fig, axs = plt.subplots(1, ncols=2, figsize=(12, 4))  
+fig.subplots_adjust(hspace=1.5,wspace=0.6)
+refrichtvarwidx(fig, axs[0],autoallrecs,rbm+rbmlrg,allgem,'GM_NAAM','inwofbinnen','FactorV', 'rbm01','Omgeving Utrecht 20k+ inw')
+axs[0].get_legend().remove()
+refrichtvarwidx(fig, axs[1],autoallrecs,rbm+rbmlrg,allgem,'GM_NAAM','inwofbinnen','FactorKm','rbm01','Omgeving Utrecht 20k+ inw')
+figname = "../output/auto_vpl4g_km_"+'rbm01'+"_"+'m1.svg';
+fig.savefig(figname, dpi=300, bbox_inches="tight")
 
-refrichtvarwidx(autointergemrecs,rbm+rbmlrg,allgem,'GM_NAAM','WoGemCat','FactorV','rbm01','Omgeving Utrecht 20-100 k inw')
+autoallrecs[autoallrecs['GM_CODE'].isin(rbm)].groupby(['inwofbinnen'])['FactorV','FactorKm'].agg('sum')
 
-autoallrecs['inwofbinnen'] = autoallrecs['WoGemCat']  
-autoallrecs['inwofbinnen'].where(autoallrecs['pendelcat']!=lokaallabel,'rit lokaal',inplace=True)
-refrichtvarwidx(autoallrecs,rbm+rbmlrg,allgem,'GM_NAAM','inwofbinnen','FactorV','rbm01','Omgeving Utrecht 20-100 k inw')
+allgem[allgem['GM_CODE'].isin(rbm)].groupby(['jaar'])[['AANT_INW']].sum()
 
-refrichtvarwidx(autoallrecs,rbm+rbmlrg,allgem,'GM_NAAM','inwofbinnen','FactorKm','rbm01','Omgeving Utrecht 20k+ inw')
+#Cluster ritten rbm
+autoallrecstot= autoallrecs[autoallrecs['GM_CODE'].isin(rbm)] .copy()
+autoallrecstot['GM_CODE']=rmb_rep_code
+fig, axs = plt.subplots(1, ncols=2, figsize=(12, 4))  
+fig.subplots_adjust(hspace=1.5,wspace=0.6)
+refrichtvarwidx(fig,axs[0],pd.concat([autoallrecs,autoallrecstot]),rbmlrg+[rmb_rep_code], pd.concat([allgem,allgemrbmtot]),
+                'GM_NAAM','inwofbinnen','FactorV','rbm-V-V','Omgeving Utrecht 20k+ inw',shval=True)
+axs[0].get_legend().remove()
+refrichtvarwidx(fig,axs[1],pd.concat([autoallrecs,autoallrecstot]),rbmlrg+[rmb_rep_code], pd.concat([allgem,allgemrbmtot]),
+                'GM_NAAM','inwofbinnen','FactorKm','rbm-V-km','Omgeving Utrecht 20k+ inw',shval=True)
+figname = "../output/auto_vpl4g_km_"+'rbm-v'+"_"+'m1.svg';
+fig.savefig(figname, dpi=300, bbox_inches="tight")
+
+autoallrecstot[autoallrecstot['GM_CODE']!="a"].groupby(['Jaar','inwofbinnen'])['FactorV','FactorKm'].agg('sum')
+
+allgemrbmtot.groupby('jaar')[['AANT_INW']].sum()
 
 maphhg={1:"0-30%",2:"0-30%",3:"0-30%",4:"30-60%",5:"30-60%",6:"30-60%",
          7:"60-80%",8:"60-80%",9:"80-100%",10:"80-100%",11:"onbek"}
 autointergemrecs['HHGestInkGR']= autointergemrecs['HHGestInkG'].map(maphhg)
-refrichtvarwidx(autointergemrecs,rbm,allgem,'GM_NAAM','HHGestInkGR','FactorV','rmb01','Omgeving Utrecht 20-100 k inw')
+fig, axs = plt.subplots(1, 1)  
+refrichtvarwidx(fig, axs,autointergemrecs,rbm,allgem,'GM_NAAM','HHGestInkGR','FactorV','rmb01','Omgeving Utrecht 20-100 k inw')
+
+
+
+# +
+#nu vergelijken met teldata
+# -
+
+telvalidated= pd.read_pickle('../intermediate/telpend.pkl')
+telgems=telvalidated['GM_CODE'].unique()
+telgems
+
+autointergemrecs['databron']='ODIN'
+refjaarvarwidxfacet(autointergemrecs,telgems,allgem,['databron'],'kg1','sted 2, 46-54 k inw') 
+
+refjaarvarwidxfacet(autointergemrecs,telgems,allgem,['pendelcat'],'kg1','sted 2, 46-54 k inw') 
+
+telvalidated['databron']='NDWopen'
+telvalidated['FactorV']=telvalidated['Intensiteit']*(365)
+telvalidated['Nwaarn']=telvalidated['Intensiteit']*(365)
+refjaarvarwidxfacet(telvalidated,telgems,allgem,['databron'],'kg1','sted 2, 46-54 k inw') 
+
+telvalidated['databron']='NDWopen'
+telvalidated['FactorV']=telvalidated['WeekIntensiteit']*(365/7)
+telvalidated['Nwaarn']=telvalidated['WeekIntensiteit']*(365/7)
+refjaarvarwidxfacet(telvalidated,telgems,allgem,['pendelcat'],'kg1','sted 2, 46-54 k inw') 
+
+refjaarvarwidxfacet(telvalidated,telgems,allgem,['richting'],'kg1','sted 2, 46-54 k inw') 
+
+refjaarvarwidxfacet(pd.concat([autointergemrecs,telvalidated]),telgems,allgem,['databron'],'kg1','sted 2, 46-54 k inw') 
 
 print("klaar")
 

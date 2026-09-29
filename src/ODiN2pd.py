@@ -68,6 +68,7 @@ df_2024.columns
 
 df_2024_co= [re.sub('_DANS24$','',t) for t in df_2024.columns ]
 df_2024.columns = df_2024_co
+df_2024=df_2024.rename(columns={'Wogem':'WoGem'})
 
 df_2023 = pd.read_excel("../data/ODiN_2023/ODiN2023_Databestand.xlsx")  
 
@@ -110,6 +111,7 @@ def miscols(df,jaar,dbk,vnamcol):
             print(chkcol,"has nas:",nas)        
     print(jaar,acols.size,acols,len(mcols),mcols,ocols.size,ocols.index)
 
+miscols(df_2024,2023,dbk_2022_cols,'Variabele_naam_ODiN_2022')
 miscols(df_2023,2023,dbk_2022_cols,'Variabele_naam_ODiN_2022')
 miscols(df_2022,2022,dbk_2022_cols,'Variabele_naam_ODiN_2022')
 miscols(df_2021,2021,dbk_2022_cols,'Variabele_naam_ODiN_2022')
@@ -125,7 +127,7 @@ miscols(df_2018,2018,dbk_2022_cols,'Variabele_naam_ODiN_2022')
 #TODO parse ook data labels
 # -
 
-allodinyr=pd.concat([df_2018,df_2019,df_2020,df_2021,df_2022,df_2023,df_2024], ignore_index=True)
+allodinyr=pd.concat([df_2018,df_2019,df_2020,df_2021,df_2022,df_2023,df_2024], ignore_index=True,copy=False)
 len(allodinyr.index)
 
 
