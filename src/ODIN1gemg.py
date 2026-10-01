@@ -158,13 +158,17 @@ fig, axs = plt.subplots(1, 1,figsize=(14,10))
 plot_crs=3857
 plot_crs="epsg:28992"
 rbmgeo.set_crs(crs="epsg:28992")
-pland=rbmgeo.plot(ax=axs,alpha=1,column='AANT_INW',legend=True, cmap='OrRd') 
+pland=rbmgeo.plot(ax=axs,alpha=0.2,column='AANT_INW',legend=True, cmap='icefire',
+                 legend_kwds={"alpha":0.2},vmin=20000) 
+#                 legend_kwds={"loc":2, "borderaxespad": 0.,"framealpha":0.3}) 
 #             legend_kwds={"label": "Aantal_inwoners"})
-#cbar=pland.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.,alpha=0.3)
+#cbar=pland.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.,framealpha=0.3)
+#cbar=fig.colorbar(pland.axis[0],ax=axs,alpha=0.3)
 plandb=rbmgeo.boundary.plot(ax=axs,color='green',alpha=0.3)
 for index, row in rbmgeo.iterrows(): 
-    axs.text(row['center'].x,row['center'].y,row['GM_NAAM'], ha='center', va='center',
-             alpha=0.5,size =10)
+    axs.text(row['center'].x,row['center'].y,
+             "%s\n%.0f"%(row['GM_NAAM'],row['AANT_INW']), ha='center', va='center',
+             alpha=0.7,size =10)
 #was cx.add_basemap(pland, source= prov0,crs=plot_crs)    
 addbasemkmsch (axs, prov0)
 figname = "../output/reg_gempop_"+'utr'+"_"+'m1.svg';
@@ -581,8 +585,11 @@ def pendelcODIN(gemdat):
     df= gemdat[(gemdat['verplricht'] !='buiten')].copy(deep=False);
     rscalea={'in':1/365,'uit':1/365, 'binnen': 1/365, 'buiten' : 20000000 / 18000000000/365}
     #gemfield=min(df['VertGem'])
-    df['Uur'] = df['AankUur']
-    df['Uur'] .where(False== (df['verplricht']=="uit"), df['VertUur'],inplace=True )
+    df['Uur'] = df['AankUur'] %24
+    df['Uur'] .where(False== (df['verplricht']=="uit"), df['VertUur'] %24 ,inplace=True )
+    df['UurCat'] = df['Uur'].map(lambda x:"%2g "%(x )) 
+    df['UurCat'] .where(df['Uur']>6 , " 6-",inplace=True )
+    df['UurCat'] .where(df['Uur']<22, "22+",inplace=True )
     pccodes= {0:'buitensp',1: 'bezoekersp',2: 'bewonersp',3:'weekendp',4:lokaallabel,5:'niet-gem' }
     df['pendelcati'] = 0
     pci= df['pendelcati']
@@ -600,6 +607,8 @@ allvgrp=pendelcODIN(summ1gemdbl)
 allvtot=allvgrp.groupby(['pendelcat','Jaar'])['FactorV'].agg('sum').reset_index()
 #allvtot
 # -
+
+allvgrp.groupby(['UurCat','Uur'])['FactorV'].agg('sum')
 
 sns.lineplot(data=allvtot,x='Jaar',y='FactorV',hue='pendelcat')
 
@@ -773,6 +782,9 @@ modplotopdcatwofacet(pd.concat([autointergemrecs,autointergemrecsrbmtot]),
 
 modplotopdcatwofacet(pd.concat([autointergemrecs,autointergemrecsrbmtot]),
         rbmlrg+[rmb_rep_code],pd.concat([allgem,allgemrbmtot]),'rbm-3g-motiefV','GM_NAAM','FactorV','MotiefV_clean','pendelcat')
+
+modplotopdcatwofacet(pd.concat([autointergemrecs,autointergemrecsrbmtot]),
+        rbmlrg+[rmb_rep_code],pd.concat([allgem,allgemrbmtot]),'rbm-3g-uurpcat','GM_NAAM','FactorV','pendelcat','UurCat')
 
 rt2024=pd.concat([allgem[allgem['GM_CODE'].isin(rbmlrg)],allgemrbmtot])
 rt2024[rt2024['jaar']==2024]
